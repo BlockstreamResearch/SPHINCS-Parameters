@@ -2,48 +2,56 @@
 from sage.all import *
 
 """
-SPHINCS+ Parameters Security Analysis
+SPHINCS+ with FORS Security Analysis
 
 This script computes the security level for various parameter sets, considering
 both FORS forgery and hash preimage attacks.
 
 Methodology follows the original SPHINCS+ submission:
 https://sphincs.org/data/sphincs+-specification.pdf (Appendix A)
+Note: The original script uses an upper bound for P(FORS forgery | r signatures
+hit instance), namely (r/t)^k, which slightly underestimates security.
+This script uses the exact formula.
 
 Attack Model:
 -------------
-The adversary can win by either:
-  1. Finding a hash preimage (probability ≈ 2^-n)
-  2. Forging a FORS signature
+The adversary can win by making a hash query that either:
+  1. Finds a preimage (probability per query ≈ 2^-n), or
+  2. Results in a FORS forgery
 
 FORS Forgery Attack:
 --------------------
-SPHINCS+ uses 2^h FORS instances (one per hypertree leaf). After maxsigs
+SPHINCS+ uses 2^h FORS instances (one per hypertree leaf). After q_s
 signatures, some instances will have been used multiple times (birthday paradox).
 The adversary forges by finding an instance that was used r times, then creating
-a message that maps to only the r revealed leaves in that instance.
+a message that maps to only revealed leaves in that instance.
 
 Total FORS forgery probability:
-  P(FORS forge) = Σ_r P(r signatures hit instance and FORS forge)
-                = Σ_r P(r signatures hit instance) × P(FORS forge | r signatures hit instance)
+  P(FORS forgery) = Σ_r P(r signatures hit instance and FORS forgery)
+                  = Σ_r P(r signatures hit instance) × P(FORS forgery | r signatures hit instance)
 
 where:
-  - P(r signatures hit instance) follows a binomial distribution with maxsigs trials
+  - P(r signatures hit instance) follows a binomial distribution with q_s trials
     and success probability 2^-h. Therefore:
-    P(r signatures hit instance) = C(maxsigs, r) × (2^-h)^r × (1-2^-h)^(maxsigs-r)
-    where C(maxsigs, r) is the binomial coefficient
+    P(r signatures hit instance) = C(q_s, r) × (2^-h)^r × (1-2^-h)^(q_s-r)
+    where C(q_s, r) is the binomial coefficient
 
-  - P(FORS forge | r signatures hit instance) = (r/2^a)^k
-    Given r signatures to an instance, probability that a random message maps to only
-    revealed leaves (r leaves revealed per tree, all k indices must hit: (r/2^a)^k)
+  - P(FORS forgery | r signatures hit instance) = (1 - (1 - 1/t)^r)^k,  where t = 2^a
+    Each of the k FORS trees has t leaves. After r signatures, each tree has r
+    leaves revealed (one per signature). For forgery, all k trees must have their
+    required leaf already revealed.
+    P(required leaf NOT revealed in single tree) = (1 - 1/t)^r
+      (each of r signatures has probability (1 - 1/t) of missing the required leaf)
+    P(required leaf revealed in single tree) = 1 - (1 - 1/t)^r
+    P(all k trees have required leaf revealed) = (1 - (1 - 1/t)^r)^k
 
-Total Security: -log2(2^-n + P(FORS forge))
+Total Security: -log2(2^-n + P(FORS forgery))
 """
 
 hashbytes = 16  # 16 bytes = 128 bits
 
 # Parameter sets
-# Format: (maxsigs_bits, h, a, k)
+# Format: (q_s_bits, h, a, k)
 # Note that parameter a is called "b" in the original SPHINCS+ script
 parameter_sets = [
     # Table 1: 2^64 signatures (SPX)
@@ -75,23 +83,23 @@ def pow(p,e):
     """Power function with high precision"""
     return F(p)**e
 
-def qhitprob(qs, r, leaves):
+def qhitprob(q_s, r, leaves):
     """
-    Probability that exactly r out of maxsigs signatures hit the same FORS instance.
-    Follows binomial distribution with qs trials and success probability p = 1/leaves
+    Probability that exactly r out of q_s signatures hit the same FORS instance.
+    Follows binomial distribution with q_s trials and success probability p = 1/leaves
     """
     p = F(1/leaves)
-    return binomial(qs, r) * pow(p, r) * pow(1-p, qs-r)
+    return binomial(q_s, r) * pow(p, r) * pow(1-p, q_s-r)
 
-def compute_security(maxsigs, h, k, a):
+def compute_security(q_s, h, k, a):
     """
     Compute security level for given FORS parameters.
 
     Args:
-        maxsigs: Number of signatures
-        h: Tree height (number of FORS instances = 2^h)
+        q_s: Number of signatures
+        h: Hypertree height (number of FORS instances = 2^h)
         k: Number of FORS trees
-        a: Height of each FORS tree
+        a: Height of each FORS tree (t = 2^a leaves per tree)
 
     Returns:
         (fors_only_security, total_security_bits)
@@ -99,19 +107,20 @@ def compute_security(maxsigs, h, k, a):
         total_security_bits: Security in bits against both FORS forgery and hash preimage
     """
     leaves = 2**h
+    t = 2**a
 
     # Compute sigma
-    # = Σ_r P(r signatures hit instance) × P(FORS forge | r signatures hit instance)
+    # = Σ_r P(r signatures hit instance) × P(FORS forgery | r signatures hit instance)
     sigma = 0
     r = 1
 
     while True:
         # Probability of forgery given r signatures to a FORS instance
-        # Each tree has r revealed leaves, probability of hitting all k trees: (r/2^a)^k
-        p_forge = min(1, pow(F(r) / F(2**a), k))
+        # P(FORS forgery | r) = (1 - (1 - 1/t)^r)^k
+        p_forge = pow(1 - pow(1 - F(1)/F(t), r), k)
 
         # Probability of exactly r collisions to any specific instance
-        p_r_collisions = qhitprob(maxsigs, r, leaves)
+        p_r_collisions = qhitprob(q_s, r, leaves)
 
         # Contribution to total attack probability
         contribution = p_r_collisions * p_forge
@@ -120,8 +129,8 @@ def compute_security(maxsigs, h, k, a):
         r += 1
 
         # Stop when contribution is negligible (well below target security level)
-        # Also require r > maxsigs/leaves to ensure we're past the peak contribution
-        if r > maxsigs/leaves and contribution < F(2)**(-1250):
+        # Also require r > q_s/leaves to ensure we're past the peak contribution
+        if r > q_s/leaves and contribution < F(2)**(-1250):
             break
 
     # Compute security bits accounting for hash preimage attack
@@ -143,15 +152,15 @@ print()
 print(f"{'q_s':<8} {'h':<4} {'a':<4} {'k':<4} {'FORS-only':<14} {'Total':<14}")
 print("-" * 60)
 
-for maxsigs_bits, h, a, k in parameter_sets:
-    maxsigs = 2**maxsigs_bits
-    fors_only_security, total_security = compute_security(maxsigs, h, k, a)
+for q_s_bits, h, a, k in parameter_sets:
+    q_s = 2**q_s_bits
+    fors_only_security, total_security = compute_security(q_s, h, k, a)
 
     # Print row
-    qs_str = f"2^{maxsigs_bits}"
+    q_s_str = f"2^{q_s_bits}"
     fors_str = f"{fors_only_security:.1f} bits"
     total_str = f"{total_security:.1f} bits"
-    print(f"{qs_str:<8} {h:<4} {a:<4} {k:<4} {fors_str:<14} {total_str:<14}")
+    print(f"{q_s_str:<8} {h:<4} {a:<4} {k:<4} {fors_str:<14} {total_str:<14}")
 
 print("=" * 60)
 print()
