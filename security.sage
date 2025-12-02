@@ -9,9 +9,17 @@ both FORS forgery and hash preimage attacks.
 
 Methodology follows the original SPHINCS+ submission:
 https://sphincs.org/data/sphincs+-specification.pdf (Appendix A)
-Note: The original script uses an upper bound for P(FORS forgery | r signatures
-hit instance), namely (r/t)^k, which slightly underestimates security.
-This script uses the exact formula.
+
+Differences from the original SPHINCS+ parameter script:
+  1. The original uses upper bound (r/t)^k for P(FORS forgery | r signatures hit
+     instance). This script uses the exact formula (1 - (1 - 1/t)^r)^k.
+  2. To compute total security, the original sums attack probabilities:
+       -log2(2^-n + P(FORS forgery))
+     This script takes the max:
+       -log2(max(2^-n, P(FORS forgery)))
+     Rationale: A query targeting FORS forgery cannot simultaneously serve as a
+     preimage query for tree nodes or WOTS chains, because the tweaks are
+     different. These are independent attack strategies.
 
 Attack Model:
 -------------
@@ -45,7 +53,7 @@ where:
     P(required leaf revealed in single tree) = 1 - (1 - 1/t)^r
     P(all k trees have required leaf revealed) = (1 - (1 - 1/t)^r)^k
 
-Total Security: -log2(2^-n + P(FORS forgery))
+Total Security: -log2(max(2^-n, P(FORS forgery)))
 """
 
 hashbytes = 16  # 16 bytes = 128 bits
@@ -135,10 +143,10 @@ def compute_security(q_s, h, k, a):
 
     # Compute security bits accounting for hash preimage attack
     preimage_attack_prob = F(1) / F(2**(8*hashbytes))
-    total_attack_prob = preimage_attack_prob + sigma
+    total_attack_prob = max(preimage_attack_prob, sigma)
 
-    security_bits = -F(log(total_attack_prob) / log(2))
-    fors_only_security = -F(log(sigma) / log(2))
+    security_bits = -log(total_attack_prob, 2)
+    fors_only_security = -log(sigma, 2)
 
     return float(fors_only_security), float(security_bits)
 
