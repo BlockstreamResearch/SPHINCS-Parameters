@@ -281,11 +281,11 @@ def compute_mmax(h_prime, l, w, d_wots_expected_search, d, k, a):
     mmax is the max size of the authentication set (see pors.tex).
     """
     Thl = compute_Th(l)
-    Thk = compute_Th(k)
+    Thk1 = compute_Th(k-1)  # FORS+C has k-1 roots
     merkle_tree_fixed_part_time = (2**h_prime * (l*C_PRF + l*(w-1)*C_Th1 + Thl)) + (2**h_prime-1)*C_Th2
     hyper_tree_expected_time = d*merkle_tree_fixed_part_time + d_wots_expected_search*C_Th1c
     # Compute FORS+C time to relate PORS time in compression calls
-    fors_c_fixed_part_time = (k-1)*(2**a)*C_PRF + (k-1)*(2**a)*C_Th1 + (k-1)*(2**a-1)*C_Th2 + Thk
+    fors_c_fixed_part_time = (k-1)*(2**a)*C_PRF + (k-1)*(2**a)*C_Th1 + (k-1)*(2**a-1)*C_Th2 + Thk1
     fors_c_expected_search_time = 2**a*(C_Hmsg + C_PRFmsg)
     fors_c_expected_total_time = fors_c_fixed_part_time + fors_c_expected_search_time
     spx_fc_expected_total_time = hyper_tree_expected_time + fors_c_expected_total_time
@@ -362,9 +362,9 @@ def compute_signing_time(h, d, a, k, w, swn, scheme):
         #   - 2^a - 1 internal nodes (Th2)
         # Plus 1 hash to compress k-1 roots
         # Grinding: search for message hash with last a bits = 0, expected 2^a attempts
-        # BUG: Thk uses k instead of k-1
+        Thk1 = compute_Th(k-1)  # k-1 roots to compress
         h_fors_fixed = (k-1)*(2**a) + (k-1)*(2**a) + (k-1)*(2**a - 1) + 1
-        c_fors_fixed = (k-1)*(2**a)*C_PRF + (k-1)*(2**a)*C_Th1 + (k-1)*(2**a - 1)*C_Th2 + Thk
+        c_fors_fixed = (k-1)*(2**a)*C_PRF + (k-1)*(2**a)*C_Th1 + (k-1)*(2**a - 1)*C_Th2 + Thk1
         fors_exp_search = 2**a
         fors_worst_search = worst_case(F(1)/F(2**a), F(2)**(-30), 1)
         h_fors_search = fors_exp_search * h_msg
@@ -440,9 +440,9 @@ def compute_verification_time(h, d, a, k, w, swn, scheme, mmax=0):
     # FTS verification
     if scheme == "W+C_F+C":
         # FORS+C: k-1 leaves to hash, (k-1)*a auth path nodes, 1 root compression
-        # BUG: Thk uses k instead of k-1
+        Thk1 = compute_Th(k-1)  # k-1 roots to compress
         h_fts = (k-1) + (k-1)*a + 1
-        c_fts = (k-1)*C_Th1 + (k-1)*a*C_Th2 + Thk
+        c_fts = (k-1)*C_Th1 + (k-1)*a*C_Th2 + Thk1
     elif scheme == "W+C_P+FP":
         # PORS+FP: k leaves to hash, mmax auth set nodes
         h_fts = k + mmax
