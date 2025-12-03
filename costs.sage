@@ -23,8 +23,13 @@ Notation:
 
 from sage.all import *
 from scipy.stats import binom
+import os
 
 from octopus_pmf import interleave_cost_table
+
+# Load security.sage from the same directory
+_dir = os.path.dirname(os.path.abspath(__file__))
+load(os.path.join(_dir, "security.sage"))
 
 # =============================================================================
 # Constants
@@ -466,12 +471,17 @@ def generate_csv():
     print("scheme,q_s,security,h,d,a,k,w,l,paramsum,size,sign_hashes,sign_compressions,exp_search,worst_search,verify_hashes,verify_compressions,compressions_per_byte,bold")
 
     for scheme, q_s, h, d, a, k, w, l, swn, bold in PARAMETER_SETS:
+        # Compute and verify security level
+        scheme_type = "PORS+FP" if scheme == "W+C_P+FP" else "FORS"
+        security = compute_security(2**q_s, h, k, a, scheme_type)
+        assert security >= 128, f"Security {security:.1f} < 128 for {scheme} q_s=2^{q_s} h={h} a={a} k={k}"
+
         sign = compute_signing_time(h, d, a, k, w, swn, scheme)
         verify = compute_verification_time(h, d, a, k, w, swn, scheme, sign['mmax'])
         size = compute_size(h, d, a, k, w, scheme, sign['mmax'])
         compressions_per_byte = float(verify['compressions']) / float(size)
         bold_str = "True" if bold else "False"
-        print(f"{scheme},2^{q_s},128,{h},{d},{a},{k},{w},{l},{swn},{size},{sign['hashes']},{sign['compressions']},{sign['exp_search']},{sign['worst_search']},{verify['hashes']},{verify['compressions']},{compressions_per_byte:.2f},{bold_str}")
+        print(f"{scheme},2^{q_s},{int(security)},{h},{d},{a},{k},{w},{l},{swn},{size},{sign['hashes']},{sign['compressions']},{sign['exp_search']},{sign['worst_search']},{verify['hashes']},{verify['compressions']},{compressions_per_byte:.2f},{bold_str}")
 
 # =============================================================================
 # Main

@@ -4,8 +4,7 @@ from sage.all import *
 """
 SPHINCS+ FORS / PORS+FP Security Analysis
 
-This script computes the security level for various parameter sets, considering
-both forgery and hash preimage attacks.
+This script computes the security level for FORS and PORS+FP schemes.
 
 Methodology follows the original SPHINCS+ submission:
 https://sphincs.org/data/sphincs+-specification.pdf (Appendix A)
@@ -73,65 +72,10 @@ Total Security:
 -log2(max(2^-n, P(FORS/PORS+FP forgery)))
 """
 
-hashbytes = 16  # 16 bytes = 128 bits
-
-# Parameter sets matching the table order in parameters.tex
-# Format: (type, q_s_bits, h, a, k)
-# type: "FORS" for FORS/FORS+C, "PORS+FP" for PORS+FP
-# Note that parameter a is called "b" in the original SPHINCS+ script
-parameter_sets = [
-    # Table 1: 2^64 signatures (SPX)
-    ("FORS", 64, 63, 12, 14),
-
-    # Table 1: 2^40 signatures - W+C (FORS)
-    ("FORS", 40, 44, 16, 8),
-    ("FORS", 40, 44, 16, 8),
-    ("FORS", 40, 44, 16, 8),
-    ("FORS", 40, 40, 14, 11),
-    ("FORS", 40, 40, 14, 11),
-    # Table 1: 2^40 signatures - W+C F+C (FORS)
-    ("FORS", 40, 44, 16, 8),
-    ("FORS", 40, 40, 14, 11),
-    # Table 1: 2^40 signatures - W+C P+FP (PORS+FP)
-    ("PORS+FP", 40, 44, 16, 8),
-    ("PORS+FP", 40, 40, 14, 11),
-
-    # Table 1: 2^30 signatures - W+C (FORS)
-    ("FORS", 30, 36, 14, 9),
-    ("FORS", 30, 33, 15, 9),
-    ("FORS", 30, 33, 15, 9),
-    ("FORS", 30, 33, 15, 9),
-    ("FORS", 30, 32, 14, 10),
-    ("FORS", 30, 32, 14, 10),
-    # Table 1: 2^30 signatures - W+C F+C (FORS)
-    ("FORS", 30, 36, 14, 9),
-    ("FORS", 30, 33, 15, 9),
-    ("FORS", 30, 33, 15, 9),
-    ("FORS", 30, 32, 14, 10),
-    # Table 1: 2^30 signatures - W+C P+FP (PORS+FP)
-    ("PORS+FP", 30, 36, 14, 9),
-    ("PORS+FP", 30, 33, 15, 9),
-    ("PORS+FP", 30, 32, 14, 10),
-
-    # Table 2: 2^20 signatures - W+C (FORS)
-    ("FORS", 20, 24, 16, 8),
-    ("FORS", 20, 24, 16, 8),
-    # Table 2: 2^20 signatures - W+C F+C (FORS)
-    ("FORS", 20, 24, 16, 8),
-    # Table 2: 2^20 signatures - W+C P+FP (PORS+FP)
-    ("PORS+FP", 20, 24, 16, 8),
-    # Table 2: 2^20 signatures - W+C (FORS)
-    ("FORS", 20, 20, 15, 10),
-    # Table 2: 2^20 signatures - W+C F+C (FORS)
-    ("FORS", 20, 20, 15, 10),
-    # Table 2: 2^20 signatures - W+C P+FP (PORS+FP)
-    ("PORS+FP", 20, 20, 15, 10),
-]
-
 # High precision arithmetic
 F = RealField(100)
 
-def pow(p,e):
+def pow(p, e):
     """Power function with high precision"""
     return F(p)**e
 
@@ -155,7 +99,7 @@ def p_forge_pors_fp(r, k, t):
     """
     return F(binomial(min(r*k, t), k)) / F(binomial(t, k))
 
-def compute_security(q_s, h, k, a, scheme_type):
+def compute_security(q_s, h, k, a, scheme_type, hashbytes=16):
     """
     Compute security level for given FORS or PORS+FP parameters.
 
@@ -165,9 +109,10 @@ def compute_security(q_s, h, k, a, scheme_type):
         k: Number of trees (FORS) or leaf indices per signature (PORS+FP)
         a: Tree height parameter
         scheme_type: "FORS" or "PORS+FP"
+        hashbytes: Hash output size in bytes (default 16 = 128 bits)
 
     Returns:
-        (forgery_only_security, total_security_bits)
+        total_security_bits (float)
     """
     leaves = 2**h
 
@@ -203,34 +148,23 @@ def compute_security(q_s, h, k, a, scheme_type):
     total_attack_prob = max(preimage_attack_prob, sigma)
 
     security_bits = -log(total_attack_prob, 2)
-    forgery_only_security = -log(sigma, 2)
 
-    return float(forgery_only_security), float(security_bits)
+    return float(security_bits)
 
 
-# Run computation for all parameter sets
-print("=" * 75)
-print("FORS / PORS+FP Security Analysis")
-print("=" * 75)
-print()
+# Run demo when invoked directly (not when loaded by another script via load())
+import sys
+if sys.argv[0].endswith('security.sage') or sys.argv[0].endswith('security.sage.py'):
+    # SPHINCS+-128f parameters
+    q_s = 2**64
+    h = 63
+    a = 12
+    k = 14
+    scheme_type = "FORS"
 
-# Table header
-print(f"{'Type':<10} {'q_s':<8} {'h':<4} {'a':<4} {'k':<4} {'Forgery-only':<14} {'Total':<14}")
-print("-" * 75)
+    security = compute_security(q_s, h, k, a, scheme_type)
 
-for scheme_type, q_s_bits, h, a, k in parameter_sets:
-    q_s = 2**q_s_bits
-    forgery_security, total_security = compute_security(q_s, h, k, a, scheme_type)
-
-    # Print row
-    q_s_str = f"2^{q_s_bits}"
-    forgery_str = f"{forgery_security:.1f}"
-    total_str = f"{total_security:.1f}"
-    print(f"{scheme_type:<10} {q_s_str:<8} {h:<4} {a:<4} {k:<4} {forgery_str:<14} {total_str:<14}")
-
-print("=" * 75)
-print()
-print("Notes:")
-print("- Forgery-only: Security against FORS or PORS+FP forgery only")
-print("- Total: Security against both forgery and hash preimage attack")
-print("=" * 75)
+    print("=" * 40)
+    print(f"Parameters: q_s=2^64, h={h}, a={a}, k={k}, type={scheme_type}")
+    print(f"Security level: {security:.1f} bits")
+    print("=" * 40)
