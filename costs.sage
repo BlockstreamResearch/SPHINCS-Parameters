@@ -145,7 +145,6 @@ def compute_nu(l: int, paramsum: int, w: int) -> int:
     For WOTS+C, we need message digests whose base-w digits sum to exactly S_{w,n}.
     ν counts how many such encodings exist out of w^l total possibilities.
 
-    From parameters.tex:
         ν = Σ_{j=0}^{l} (-1)^j * C(l,j) * C((S_{w,n} + l) - j*w - 1, l-1)
 
     Returns integer ν. If ν is zero, returns 1 and prints a warning.
@@ -278,7 +277,7 @@ def compute_size(h, d, a, k, w, scheme, mmax=0):
 def compute_mmax(h_prime, l, w, d_wots_expected_search, d, k, a):
     """Compute mmax for PORS+FP such that signing time is close to FORS+C.
 
-    mmax is the max size of the authentication set (see pors.tex).
+    mmax is the max size of the authentication set.
     """
     Thl = compute_Th(l)
     Thk1 = compute_Th(k-1)  # FORS+C has k-1 roots
