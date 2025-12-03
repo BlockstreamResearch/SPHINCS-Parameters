@@ -4,7 +4,7 @@ from sage.all import *
 """
 SPHINCS+ FORS / PORS+FP Security Analysis
 
-This script computes the security level for FORS and PORS+FP schemes.
+This script computes the classical security level for FORS and PORS+FP schemes.
 
 Methodology follows the original SPHINCS+ submission:
 https://sphincs.org/data/sphincs+-specification.pdf (Appendix A)
@@ -81,7 +81,7 @@ def pow(p, e):
 
 def qhitprob(q_s, r, leaves):
     """
-    Probability that exactly r out of q_s signatures hit the same FORS instance.
+    Probability that exactly r out of q_s signatures hit the same few-time signature instance.
     Follows binomial distribution with q_s trials and success probability p = 1/leaves
     """
     p = F(1/leaves)
