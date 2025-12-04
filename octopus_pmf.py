@@ -1,3 +1,6 @@
+# Copied from https://github.com/MehdiAbri/PORS-FP
+# SPDX-License-Identifier: MIT
+
 from __future__ import annotations
 
 import math
