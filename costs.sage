@@ -466,11 +466,13 @@ def compute_verification_time(h, d, a, k, w, swn, scheme, mmax=0):
 # CSV Output
 # =============================================================================
 
-def generate_csv():
-    """Generate CSV output for all parameter sets."""
-    print("scheme,q_s,h,d,a,k,w,l,paramsum,size,sign_hashes,sign_compressions,exp_search,worst_search,verify_hashes,verify_compressions,compressions_per_byte,bold")
+def compute_all_results():
+    """Compute results for all parameter sets. Returns list of dicts."""
+    results = []
+    for scheme, q_s, h, d, a, k, w, _, swn, bold in PARAMETER_SETS:
+        # Compute l dynamically based on scheme
+        l = compute_wots_l(scheme, w)
 
-    for scheme, q_s, h, d, a, k, w, l, swn, bold in PARAMETER_SETS:
         # Verify security level is at least 128 bits
         scheme_type = "PORS+FP" if scheme == "W+C_P+FP" else "FORS"
         security = compute_security(2**q_s, h, k, a, scheme_type)
@@ -480,12 +482,133 @@ def generate_csv():
         verify = compute_verification_time(h, d, a, k, w, swn, scheme, sign['mmax'])
         size = compute_size(h, d, a, k, w, scheme, sign['mmax'])
         compressions_per_byte = float(verify['compressions']) / float(size)
-        bold_str = "True" if bold else "False"
-        print(f"{scheme},2^{q_s},{h},{d},{a},{k},{w},{l},{swn},{size},{sign['hashes']},{sign['compressions']},{sign['exp_search']},{sign['worst_search']},{verify['hashes']},{verify['compressions']},{compressions_per_byte:.2f},{bold_str}")
+
+        results.append({
+            'scheme': scheme,
+            'q_s': q_s,
+            'h': h,
+            'd': d,
+            'a': a,
+            'k': k,
+            'w': w,
+            'l': l,
+            'swn': swn,
+            'size': size,
+            'sign_hashes': sign['hashes'],
+            'sign_compressions': sign['compressions'],
+            'exp_search': sign['exp_search'],
+            'worst_search': sign['worst_search'],
+            'verify_hashes': verify['hashes'],
+            'verify_compressions': verify['compressions'],
+            'compressions_per_byte': compressions_per_byte,
+            'bold': bold,
+        })
+    return results
+
+
+def generate_csv():
+    """Generate CSV output for all parameter sets."""
+    print("scheme,q_s,h,d,a,k,w,l,paramsum,size,sign_hashes,sign_compressions,exp_search,worst_search,verify_hashes,verify_compressions,compressions_per_byte,bold")
+
+    for r in compute_all_results():
+        bold_str = "True" if r['bold'] else "False"
+        print(f"{r['scheme']},2^{r['q_s']},{r['h']},{r['d']},{r['a']},{r['k']},{r['w']},{r['l']},{r['swn']},{r['size']},{r['sign_hashes']},{r['sign_compressions']},{r['exp_search']},{r['worst_search']},{r['verify_hashes']},{r['verify_compressions']},{r['compressions_per_byte']:.2f},{bold_str}")
+
+
+def format_num(n):
+    """Format large numbers with K/M suffixes for readability."""
+    n = float(n)  # Convert Sage types to Python float
+    if n >= 1_000_000:
+        return f"{n/1_000_000:.1f}M"
+    elif n >= 1_000:
+        return f"{n/1_000:.1f}K"
+    else:
+        return str(int(n))
+
+
+def generate_table(q_s_filter=None):
+    """Generate pretty ASCII table output for parameter sets.
+
+    Args:
+        q_s_filter: If specified, only show rows with this q_s value (e.g., 40 for 2^40 sigs)
+    """
+    results = compute_all_results()
+
+    if q_s_filter is not None:
+        results = [r for r in results if r['q_s'] == q_s_filter]
+
+    if not results:
+        print(f"No parameter sets found for q_s=2^{q_s_filter}")
+        return
+
+    # Group results by q_s for section headers
+    q_s_groups = {}
+    for r in results:
+        q_s_groups.setdefault(r['q_s'], []).append(r)
+
+    # Column definitions: (header, key, width, format_func)
+    columns = [
+        ("Scheme", 'scheme', 10, str),
+        ("h", 'h', 4, str),
+        ("d", 'd', 3, str),
+        ("a", 'a', 3, str),
+        ("k", 'k', 3, str),
+        ("w", 'w', 4, str),
+        ("l", 'l', 3, str),
+        ("S_wn", 'swn', 5, str),
+        ("Size", 'size', 6, str),
+        ("Sign(C)", 'sign_compressions', 9, format_num),
+        ("Verify(C)", 'verify_compressions', 10, format_num),
+        ("C/byte", 'compressions_per_byte', 6, lambda x: f"{x:.2f}"),
+    ]
+
+    # Calculate total width
+    total_width = sum(w for _, _, w, _ in columns) + len(columns) - 1
+
+    for q_s in sorted(q_s_groups.keys(), reverse=True):
+        group = q_s_groups[q_s]
+
+        # Section header
+        print()
+        print("=" * total_width)
+        print(f" 2^{q_s} signatures ".center(total_width, "="))
+        print("=" * total_width)
+
+        # Column headers
+        header_line = " ".join(h.center(w) for h, _, w, _ in columns)
+        print(header_line)
+        print("-" * total_width)
+
+        # Data rows
+        for r in group:
+            row_parts = []
+            for _, key, width, fmt in columns:
+                val = fmt(r[key])
+                row_parts.append(val.rjust(width) if key != 'scheme' else val.ljust(width))
+            print(" ".join(row_parts))
+
+    print()
+    print("Legend: Size=bytes, Sign(C)/Verify(C)=compression calls, C/byte=verify compressions per signature byte")
+
 
 # =============================================================================
 # Main
 # =============================================================================
 
 if __name__ == "__main__":
-    generate_csv()
+    import sys
+
+    if len(sys.argv) > 1 and sys.argv[1] == "--table":
+        # Optional: --table 40 to filter by q_s
+        q_s_filter = int(sys.argv[2]) if len(sys.argv) > 2 else None
+        generate_table(q_s_filter)
+    elif len(sys.argv) > 1 and sys.argv[1] == "--help":
+        print("Usage: sage costs.sage [--table [q_s]]")
+        print()
+        print("Options:")
+        print("  (no args)      Output CSV format")
+        print("  --table        Output pretty ASCII table")
+        print("  --table N      Output table filtered to 2^N signatures (e.g., --table 40)")
+        print("  --help         Show this help message")
+    else:
+        generate_csv()
