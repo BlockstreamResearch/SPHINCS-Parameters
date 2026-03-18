@@ -595,6 +595,32 @@ def generate_table(q_s_filter=None):
 # Main
 # =============================================================================
 
+def compute_single(scheme, q_s_log2, h, d, a, k, w, swn):
+    """Compute and display results for a single parameter set."""
+    q_s = 2**q_s_log2
+    l = compute_wots_l(scheme, w)
+    scheme_type = "PORS+FP" if scheme == "W+C_P+FP" else "FORS"
+    security = compute_security(q_s, h, k, a, scheme_type)
+    sign = compute_signing_time(h, d, a, k, w, swn, scheme)
+    mmax = sign['mmax']
+    verify = compute_verification_time(h, d, a, k, w, swn, scheme, mmax)
+    size = compute_size(h, d, a, k, w, scheme, mmax)
+    c_per_byte = float(verify['compressions']) / float(size)
+
+    print("Scheme:     " + scheme)
+    print("q_s:        2^" + str(q_s_log2))
+    print("(k,a,H,d):  (" + str(int(k)) + ", " + str(int(a)) + ", " + str(int(h)) + ", " + str(int(d)) + ")")
+    print("w:          " + str(int(w)))
+    print("S_wn:       " + str(int(swn)))
+    print("l:          " + str(int(l)))
+    print("mmax:       " + str(int(mmax)))
+    print("Security:   " + "{:.1f}".format(security) + " bits")
+    print("Size:       " + str(int(size)) + " bytes")
+    print("Sign(C):    " + format_num(sign['compressions']))
+    print("Verify(C):  " + format_num(verify['compressions']))
+    print("C/byte:     " + "{:.2f}".format(c_per_byte))
+
+
 if __name__ == "__main__":
     import sys
 
@@ -602,13 +628,33 @@ if __name__ == "__main__":
         # Optional: --table 40 to filter by q_s
         q_s_filter = int(sys.argv[2]) if len(sys.argv) > 2 else None
         generate_table(q_s_filter)
+    elif len(sys.argv) > 1 and sys.argv[1] == "--params":
+        # Usage: sage costs.sage --params scheme q_s k a h d w swn
+        if len(sys.argv) != 10:
+            print("Usage: sage costs.sage --params scheme q_s k a h d w swn")
+            print("  scheme: SPX, W+C, W+C_F+C, W+C_P+FP")
+            print("  q_s: log2 of max signatures (e.g., 10 for 2^10)")
+            print("Example: sage costs.sage --params W+C_P+FP 10 8 17 12 1 16 240")
+            sys.exit(1)
+        scheme = sys.argv[2]
+        q_s_log2 = int(sys.argv[3])
+        k = int(sys.argv[4])
+        a = int(sys.argv[5])
+        h = int(sys.argv[6])
+        d = int(sys.argv[7])
+        w = int(sys.argv[8])
+        swn = int(sys.argv[9])
+        compute_single(scheme, q_s_log2, h, d, a, k, w, swn)
     elif len(sys.argv) > 1 and sys.argv[1] == "--help":
-        print("Usage: sage costs.sage [--table [q_s]]")
+        print("Usage: sage costs.sage [OPTIONS]")
         print()
         print("Options:")
-        print("  (no args)      Output CSV format")
-        print("  --table        Output pretty ASCII table")
-        print("  --table N      Output table filtered to 2^N signatures (e.g., --table 40)")
-        print("  --help         Show this help message")
+        print("  (no args)                                  Output CSV format")
+        print("  --table [N]                                Output pretty ASCII table [filtered to 2^N]")
+        print("  --params scheme q_s k a h d w swn          Compute single parameter set")
+        print("  --help                                     Show this help message")
+        print()
+        print("Example:")
+        print("  sage costs.sage --params W+C_P+FP 10 8 17 12 1 16 240")
     else:
         generate_csv()
