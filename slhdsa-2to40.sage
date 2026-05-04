@@ -1,6 +1,6 @@
 #!/usr/bin/env sage
 """
-Standard SLH-DSA-128s VS custom (h=40) variants sweeping (d, k, a) for various OTS/FTS combinations.
+Standard SLH-DSA-128s VS custom variants sweeping (h, d, k, a) for various OTS/FTS combinations.
 
 Variant is selected via --ots and --fts flags:
   --ots {wots-tw, wots+c}        (default: wots-tw)
@@ -22,11 +22,17 @@ Filters (defaults; override via CLI):
   --max-sign-ratio X       Reject if sign    > X * std sign       (default: no limit)
   --max-verify-ratio X     Reject if verify  > X * std verify     (default: no limit)
 
+Sweep ranges (comma-separated lists):
+  --h N1,N2,...            Hypertree heights to sweep            (default: 40..50 inclusive)
+  --d N1,N2,...            Layer counts to sweep                 (default: 2..25 inclusive)
+                           Combinations where h % d != 0 are auto-skipped.
+
 Usage:
-  sage slhdsa-2to40.sage                                  # default (SPX)
+  sage slhdsa-2to40.sage                                  # default (SPX, h=40)
   sage slhdsa-2to40.sage --ots wots+c --fts pors+fp       # W+C_P+FP variant
   sage slhdsa-2to40.sage --ots wots+c --fts fors+c        # W+C_F+C variant
   sage slhdsa-2to40.sage --max-size 4500 --max-keygen-ratio 10 --max-sign-ratio 10
+  sage slhdsa-2to40.sage --h 40,42,45,48 --d 2,3,4,5,6,8
 """
 import os
 import sys
@@ -35,6 +41,9 @@ import sys
 # CLI parsing (parse before loading costs.sage so we can suppress its CSV)
 # -----------------------------------------------------------------------------
 
+def _parse_int_list(s):
+    return [int(x) for x in s.split(",") if x.strip()]
+
 def _parse_args(argv):
     ots = "wots-tw"
     fts = "fors"
@@ -42,6 +51,8 @@ def _parse_args(argv):
     kg_ratio = float('inf')
     sg_ratio = float('inf')
     sv_ratio = float('inf')
+    h_values = list(range(40, 51))   # 40..50 inclusive
+    d_values = list(range(2, 26))    # 2..25 inclusive
     i = 1
     while i < len(argv):
         a = argv[i]
@@ -63,16 +74,22 @@ def _parse_args(argv):
         elif a == "--max-verify-ratio" and i + 1 < len(argv):
             sv_ratio = float(argv[i + 1])
             i += 2
-        elif a in ("-h", "--help"):
+        elif a == "--h" and i + 1 < len(argv):
+            h_values = _parse_int_list(argv[i + 1])
+            i += 2
+        elif a == "--d" and i + 1 < len(argv):
+            d_values = _parse_int_list(argv[i + 1])
+            i += 2
+        elif a == "--help":
             print(__doc__)
             sys.exit(0)
         else:
             print("Unknown argument: {}".format(a), file=sys.stderr)
             print("Use --help for usage.", file=sys.stderr)
             sys.exit(2)
-    return ots, fts, max_size, kg_ratio, sg_ratio, sv_ratio
+    return ots, fts, max_size, kg_ratio, sg_ratio, sv_ratio, h_values, d_values
 
-OTS, FTS, MAX_SIZE, MAX_KEYGEN_RATIO, MAX_SIGN_RATIO, MAX_VERIFY_RATIO = _parse_args(sys.argv)
+OTS, FTS, MAX_SIZE, MAX_KEYGEN_RATIO, MAX_SIGN_RATIO, MAX_VERIFY_RATIO, H_VALUES, D_VALUES = _parse_args(sys.argv)
 
 SCHEME_MAP = {
     ("wots-tw", "fors"):    "SPX",
@@ -115,7 +132,7 @@ STD_SWN    = 0
 
 K_RANGE  = range(6, 25)
 A_RANGE  = range(8, 21)
-D_VALUES = [2, 4, 5, 8]
+# H_VALUES and D_VALUES come from CLI flags (parsed at top of file)
 
 
 def evaluate(q_s_log2, h, d, k, a, w, swn, scheme, security_model):
@@ -214,13 +231,16 @@ def label_for(w, swn):
 
 for w, swn in W_SWN_PAIRS:
     label = label_for(w, swn)
-    for d in D_VALUES:
-        for k in K_RANGE:
-            for a in A_RANGE:
-                consider(
-                    evaluate(40, 40, d, k, a, w, swn, SCHEME, SECURITY_MODEL),
-                    label,
-                )
+    for h in H_VALUES:
+        for d in D_VALUES:
+            if h % d != 0:
+                continue
+            for k in K_RANGE:
+                for a in A_RANGE:
+                    consider(
+                        evaluate(40, h, d, k, a, w, swn, SCHEME, SECURITY_MODEL),
+                        label,
+                    )
 
 all_results.sort(key=lambda x: x['size'])
 
@@ -277,7 +297,8 @@ total_width = sum(col_w for _, _, col_w, _ in columns) + len(columns) - 1
 
 print()
 print("=" * total_width)
-print("  SLH-DSA-128s vs {} variants (h=40, d in {{2,4,5,8}})  ".format(SCHEME).center(total_width))
+print("  SLH-DSA-128s vs {} variants (h in {}, d in {})  ".format(
+    SCHEME, H_VALUES, D_VALUES).center(total_width))
 print("  ots={}, fts={}  ".format(OTS, FTS).center(total_width))
 def _ratio_str(r):
     return "no limit" if r == float('inf') else "<= {:g}x std".format(r)
@@ -401,5 +422,5 @@ print("  - All ratios (KG/std, SG/std, SV/std) are relative to standard SLH-DSA-
 print("  - Sec(bits) is capped at 128.0 by the n=128 preimage bound.")
 if OTS == "wots+c":
     print("  - swn is the WOTS+C target chain sum S_{w,n}; values mirror PARAMETER_SETS in costs.sage.")
-print("  - Sweep ranges: d in {}, k in [{}, {}], a in [{}, {}], (w,swn) in {}.".format(
-    D_VALUES, K_RANGE.start, K_RANGE.stop - 1, A_RANGE.start, A_RANGE.stop - 1, W_SWN_PAIRS))
+print("  - Sweep ranges: h in {}, d in {}, k in [{}, {}], a in [{}, {}], (w,swn) in {}.".format(
+    H_VALUES, D_VALUES, K_RANGE.start, K_RANGE.stop - 1, A_RANGE.start, A_RANGE.stop - 1, W_SWN_PAIRS))
