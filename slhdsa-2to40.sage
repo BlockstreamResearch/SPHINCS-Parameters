@@ -21,6 +21,7 @@ Filters (defaults; override via CLI):
   --max-keygen-ratio X     Reject if keygen  > X * std keygen     (default: no limit)
   --max-sign-ratio X       Reject if sign    > X * std sign       (default: no limit)
   --max-verify-ratio X     Reject if verify  > X * std verify     (default: no limit)
+  --max-c-per-byte X       Reject if verify_C / size > X          (default: no limit)
 
 Sweep ranges (comma-separated lists):
   --h N1,N2,...            Hypertree heights to sweep            (default: 40..50 inclusive)
@@ -51,6 +52,7 @@ def _parse_args(argv):
     kg_ratio = float('inf')
     sg_ratio = float('inf')
     sv_ratio = float('inf')
+    cpb_max  = float('inf')
     h_values = list(range(40, 51))   # 40..50 inclusive
     d_values = list(range(2, 26))    # 2..25 inclusive
     i = 1
@@ -74,6 +76,9 @@ def _parse_args(argv):
         elif a == "--max-verify-ratio" and i + 1 < len(argv):
             sv_ratio = float(argv[i + 1])
             i += 2
+        elif a == "--max-c-per-byte" and i + 1 < len(argv):
+            cpb_max = float(argv[i + 1])
+            i += 2
         elif a == "--h" and i + 1 < len(argv):
             h_values = _parse_int_list(argv[i + 1])
             i += 2
@@ -87,9 +92,11 @@ def _parse_args(argv):
             print("Unknown argument: {}".format(a), file=sys.stderr)
             print("Use --help for usage.", file=sys.stderr)
             sys.exit(2)
-    return ots, fts, max_size, kg_ratio, sg_ratio, sv_ratio, h_values, d_values
+    return ots, fts, max_size, kg_ratio, sg_ratio, sv_ratio, cpb_max, h_values, d_values
 
-OTS, FTS, MAX_SIZE, MAX_KEYGEN_RATIO, MAX_SIGN_RATIO, MAX_VERIFY_RATIO, H_VALUES, D_VALUES = _parse_args(sys.argv)
+(OTS, FTS, MAX_SIZE,
+ MAX_KEYGEN_RATIO, MAX_SIGN_RATIO, MAX_VERIFY_RATIO,
+ MAX_C_PER_BYTE, H_VALUES, D_VALUES) = _parse_args(sys.argv)
 
 SCHEME_MAP = {
     ("wots-tw", "fors"):    "SPX",
@@ -197,7 +204,7 @@ print("  Verify: {:.0f} C  (limit: {:.0f} C)".format(std['verify_C'], VERIFY_LIM
 print("Sweeping {} configurations...".format(SCHEME), file=sys.stderr)
 all_results = [std]
 
-rejected = {'security': 0, 'size': 0, 'keygen': 0, 'sign': 0, 'verify': 0}
+rejected = {'security': 0, 'size': 0, 'keygen': 0, 'sign': 0, 'verify': 0, 'c_per_byte': 0}
 considered = 0
 
 
@@ -218,6 +225,9 @@ def consider(r, label):
         return
     if r['verify_C'] > VERIFY_LIMIT:
         rejected['verify'] += 1
+        return
+    if r['c_per_byte'] > MAX_C_PER_BYTE:
+        rejected['c_per_byte'] += 1
         return
     r['label'] = label
     all_results.append(r)
@@ -302,8 +312,12 @@ print("  SLH-DSA-128s vs {} variants (h in {}, d in {})  ".format(
 print("  ots={}, fts={}  ".format(OTS, FTS).center(total_width))
 def _ratio_str(r):
     return "no limit" if r == float('inf') else "<= {:g}x std".format(r)
-print("  Filters: size < {} B, keygen {}, sign {}, verify {}  ".format(
-    MAX_SIZE, _ratio_str(MAX_KEYGEN_RATIO), _ratio_str(MAX_SIGN_RATIO), _ratio_str(MAX_VERIFY_RATIO)
+def _cpb_str(x):
+    return "no limit" if x == float('inf') else "<= {:g}".format(x)
+print("  Filters: size < {} B, keygen {}, sign {}, verify {}, C/byte {}  ".format(
+    MAX_SIZE,
+    _ratio_str(MAX_KEYGEN_RATIO), _ratio_str(MAX_SIGN_RATIO), _ratio_str(MAX_VERIFY_RATIO),
+    _cpb_str(MAX_C_PER_BYTE)
 ).center(total_width))
 print("  All costs in SHA-256 compression-function calls  ".center(total_width))
 print("=" * total_width)
@@ -354,6 +368,10 @@ print(" Rejected (size >= {} B):         {}".format(MAX_SIZE, rejected['size']))
 print("{}{}".format(_rej_label("keygen", MAX_KEYGEN_RATIO), rejected['keygen']))
 print("{}{}".format(_rej_label("sign",   MAX_SIGN_RATIO),   rejected['sign']))
 print("{}{}".format(_rej_label("verify", MAX_VERIFY_RATIO), rejected['verify']))
+if MAX_C_PER_BYTE == float('inf'):
+    print(" Rejected (C/byte > no limit):     {}".format(rejected['c_per_byte']))
+else:
+    print(" Rejected (C/byte > {:g}):           {}".format(MAX_C_PER_BYTE, rejected['c_per_byte']))
 print(" Passed all filters (custom):      {}".format(len(all_results) - 1))
 print()
 
@@ -368,6 +386,7 @@ print("  Size:   {} B".format(std['size']))
 print("  Keygen: {} C".format(fmt_num(std['keygen_C'])))
 print("  Sign:   {} C".format(fmt_num(std['sign_C'])))
 print("  Verify: {} C".format(fmt_num(std['verify_C'])))
+print("  C/byte: {:.2f}".format(std['c_per_byte']))
 
 
 def describe(label, results):
@@ -378,29 +397,23 @@ def describe(label, results):
     smallest     = min(results, key=lambda x: x['size'])
     fastest_sign = min(results, key=lambda x: x['sign_C'])
     fastest_kg   = min(results, key=lambda x: x['keygen_C'])
+    lowest_cpb   = min(results, key=lambda x: x['c_per_byte'])
     print()
     print("Best {}:".format(label))
-    print("  Smallest sig:    d={}, k={}, a={}  ->  {} B  ({} vs std)".format(
-        smallest['d'], smallest['k'], smallest['a'],
-        smallest['size'], fmt_pct(smallest['size'])))
-    print("                   KG: {} C ({})  Sign: {} C ({})  Verify: {} C ({})".format(
-        fmt_num(smallest['keygen_C']), fmt_ratio(smallest['keygen_C'], std['keygen_C']),
-        fmt_num(smallest['sign_C']),   fmt_ratio(smallest['sign_C'],   std['sign_C']),
-        fmt_num(smallest['verify_C']), fmt_ratio(smallest['verify_C'], std['verify_C'])))
-    print("  Fastest sign:    d={}, k={}, a={}  ->  {} B  ({} vs std)".format(
-        fastest_sign['d'], fastest_sign['k'], fastest_sign['a'],
-        fastest_sign['size'], fmt_pct(fastest_sign['size'])))
-    print("                   KG: {} C ({})  Sign: {} C ({})  Verify: {} C ({})".format(
-        fmt_num(fastest_sign['keygen_C']), fmt_ratio(fastest_sign['keygen_C'], std['keygen_C']),
-        fmt_num(fastest_sign['sign_C']),   fmt_ratio(fastest_sign['sign_C'],   std['sign_C']),
-        fmt_num(fastest_sign['verify_C']), fmt_ratio(fastest_sign['verify_C'], std['verify_C'])))
-    print("  Fastest keygen:  d={}, k={}, a={}  ->  {} B  ({} vs std)".format(
-        fastest_kg['d'], fastest_kg['k'], fastest_kg['a'],
-        fastest_kg['size'], fmt_pct(fastest_kg['size'])))
-    print("                   KG: {} C ({})  Sign: {} C ({})  Verify: {} C ({})".format(
-        fmt_num(fastest_kg['keygen_C']), fmt_ratio(fastest_kg['keygen_C'], std['keygen_C']),
-        fmt_num(fastest_kg['sign_C']),   fmt_ratio(fastest_kg['sign_C'],   std['sign_C']),
-        fmt_num(fastest_kg['verify_C']), fmt_ratio(fastest_kg['verify_C'], std['verify_C'])))
+
+    def _print(title, r):
+        print("  {:<16} d={}, k={}, a={}  ->  {} B  ({} vs std)".format(
+            title, r['d'], r['k'], r['a'], r['size'], fmt_pct(r['size'])))
+        print("                   KG: {} C ({})  Sign: {} C ({})  Verify: {} C ({})  C/byte: {:.2f}".format(
+            fmt_num(r['keygen_C']), fmt_ratio(r['keygen_C'], std['keygen_C']),
+            fmt_num(r['sign_C']),   fmt_ratio(r['sign_C'],   std['sign_C']),
+            fmt_num(r['verify_C']), fmt_ratio(r['verify_C'], std['verify_C']),
+            r['c_per_byte']))
+
+    _print("Smallest sig:",    smallest)
+    _print("Fastest sign:",    fastest_sign)
+    _print("Fastest keygen:",  fastest_kg)
+    _print("Lowest C/byte:",   lowest_cpb)
 
 
 for w, swn in W_SWN_PAIRS:
