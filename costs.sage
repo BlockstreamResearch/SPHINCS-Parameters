@@ -309,6 +309,31 @@ def compute_mmax(h_prime, l, w, d_wots_expected_search, d, k, a):
     return mmax
 
 
+def compute_keygen_time(h, d, w, scheme):
+    """
+    Compute keygen time in compression function calls.
+
+    Keygen builds the top-level XMSS tree (height h' = h/d) to derive PK.root.
+    No WOTS+C counter search occurs during keygen: the WOTS keypairs at the
+    leaves of the top tree are used as verification keys, not to sign anything.
+
+    One XMSS tree with 2^h' leaves:
+      - 2^h' WOTS keypairs, each requiring:
+          - l PRF calls to generate secret keys
+          - l*(w-1) chain hashes (Th1) to derive the public chain values
+          - 1 hash to compress l public values into a leaf (Thl)
+      - 2^h' - 1 internal Merkle tree nodes (Th2)
+
+    Returns the keygen time as a number of compression function calls.
+    """
+    assert h % d == 0, "h must be divisible by d"
+    h_prime = h // d
+    l = compute_wots_l(scheme, w)
+    Thl = compute_Th(l)
+
+    return 2**h_prime * (l*C_PRF + l*(w-1)*C_Th1 + Thl) + (2**h_prime - 1)*C_Th2
+
+
 def compute_signing_time(h, d, a, k, w, swn, scheme):
     """
     Compute signing time in both hash calls and compression function calls.
@@ -480,6 +505,7 @@ def compute_all_results():
 
         sign = compute_signing_time(h, d, a, k, w, swn, scheme)
         verify = compute_verification_time(h, d, a, k, w, swn, scheme, sign['mmax'])
+        keygen_compressions = compute_keygen_time(h, d, w, scheme)
         size = compute_size(h, d, a, k, w, scheme, sign['mmax'])
         compressions_per_byte = float(verify['compressions']) / float(size)
 
@@ -494,6 +520,7 @@ def compute_all_results():
             'l': l,
             'swn': swn,
             'size': size,
+            'keygen_compressions': keygen_compressions,
             'sign_hashes': sign['hashes'],
             'sign_compressions': sign['compressions'],
             'exp_search': sign['exp_search'],
@@ -508,11 +535,11 @@ def compute_all_results():
 
 def generate_csv():
     """Generate CSV output for all parameter sets."""
-    print("scheme,q_s,h,d,a,k,w,l,paramsum,size,sign_hashes,sign_compressions,exp_search,worst_search,verify_hashes,verify_compressions,compressions_per_byte,bold")
+    print("scheme,q_s,h,d,a,k,w,l,paramsum,size,keygen_compressions,sign_hashes,sign_compressions,exp_search,worst_search,verify_hashes,verify_compressions,compressions_per_byte,bold")
 
     for r in compute_all_results():
         bold_str = "True" if r['bold'] else "False"
-        print(f"{r['scheme']},2^{r['q_s']},{r['h']},{r['d']},{r['a']},{r['k']},{r['w']},{r['l']},{r['swn']},{r['size']},{r['sign_hashes']},{r['sign_compressions']},{r['exp_search']},{r['worst_search']},{r['verify_hashes']},{r['verify_compressions']},{r['compressions_per_byte']:.2f},{bold_str}")
+        print(f"{r['scheme']},2^{r['q_s']},{r['h']},{r['d']},{r['a']},{r['k']},{r['w']},{r['l']},{r['swn']},{r['size']},{r['keygen_compressions']},{r['sign_hashes']},{r['sign_compressions']},{r['exp_search']},{r['worst_search']},{r['verify_hashes']},{r['verify_compressions']},{r['compressions_per_byte']:.2f},{bold_str}")
 
 
 def format_num(n):
@@ -557,6 +584,7 @@ def generate_table(q_s_filter=None):
         ("l", 'l', 3, str),
         ("S_wn", 'swn', 5, str),
         ("Size", 'size', 6, str),
+        ("Keygen(C)", 'keygen_compressions', 10, format_num),
         ("Sign(C)", 'sign_compressions', 9, format_num),
         ("Verify(C)", 'verify_compressions', 10, format_num),
         ("C/byte", 'compressions_per_byte', 6, lambda x: f"{x:.2f}"),
@@ -588,7 +616,7 @@ def generate_table(q_s_filter=None):
             print(" ".join(row_parts))
 
     print()
-    print("Legend: Size=bytes, Sign(C)/Verify(C)=compression calls, C/byte=verify compressions per signature byte")
+    print("Legend: Size=bytes, Keygen(C)/Sign(C)/Verify(C)=compression calls, C/byte=verify compressions per signature byte")
 
 
 # =============================================================================
@@ -604,6 +632,7 @@ def compute_single(scheme, q_s_log2, h, d, a, k, w, swn):
     sign = compute_signing_time(h, d, a, k, w, swn, scheme)
     mmax = sign['mmax']
     verify = compute_verification_time(h, d, a, k, w, swn, scheme, mmax)
+    keygen_compressions = compute_keygen_time(h, d, w, scheme)
     size = compute_size(h, d, a, k, w, scheme, mmax)
     c_per_byte = float(verify['compressions']) / float(size)
 
@@ -616,6 +645,7 @@ def compute_single(scheme, q_s_log2, h, d, a, k, w, swn):
     print("mmax:       " + str(int(mmax)))
     print("Security:   " + "{:.1f}".format(security) + " bits")
     print("Size:       " + str(int(size)) + " bytes")
+    print("Keygen(C):  " + format_num(keygen_compressions))
     print("Sign(C):    " + format_num(sign['compressions']))
     print("Verify(C):  " + format_num(verify['compressions']))
     print("C/byte:     " + "{:.2f}".format(c_per_byte))
