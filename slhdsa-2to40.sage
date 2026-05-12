@@ -437,3 +437,23 @@ if OTS == "wots+c":
     print("  - swn is the WOTS+C target chain sum S_{w,n}; values mirror PARAMETER_SETS in costs.sage.")
 print("  - Sweep ranges: h in {}, d in {}, k in [{}, {}], a in [{}, {}], (w,swn) in {}.".format(
     H_VALUES, D_VALUES, K_RANGE.start, K_RANGE.stop - 1, A_RANGE.start, A_RANGE.stop - 1, W_SWN_PAIRS))
+
+import csv
+
+csv_filename = "candidates.csv"
+print("\nSaving candidate configurations to {}...".format(csv_filename))
+
+# Define the exact dictionary keys returned by evaluate()
+fieldnames = [
+    'label', 'h', 'd', 'h_prime', 'k', 'a', 'w', 'l', 
+    'swn', 'mmax', 'security', 'size', 'keygen_C', 
+    'sign_C', 'verify_C', 'c_per_byte'
+]
+
+with open(csv_filename, 'w', newline='') as f:
+    writer = csv.DictWriter(f, fieldnames=fieldnames)
+    writer.writeheader()
+    for r in all_results:
+        writer.writerow({k: r[k] for k in fieldnames})
+
+print("Successfully saved {} candidates to {}.".format(len(all_results), csv_filename))
