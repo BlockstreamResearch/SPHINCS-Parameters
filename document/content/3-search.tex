@@ -29,9 +29,9 @@ Let's introduce the following filters to defined metrics:
 \begin{itemize}
     \item Bound on signature size (input: \text{max\_size}): $\text{size} \leq \text{max\_size}$;
     \item Bound on key generation cost (input: $X$): $\text{cost}_{\text{kg\_custom}} \leq X \cdot \text{cost}_{\text{kg\_std}}$;
-    \item Bound on signing cost (input: $X$): $\text{cost}_{\text{sig\_custom}} \leq X \cdot \text{cost}_{\text{sig\_std}}$;
-    \item Bound on verification cost (input: $X$): $\text{cost}_{\text{ver\_custom}} \leq X \cdot \text{cost}_{\text{ver\_std}}$;
-    \item Bound on compression per byte (input: $X$): $ \text{cost}_{\text{ver\_custom}}/\text{size} \leq X $
+    \item Bound on signature generation cost (input: $X$): $\text{cost}_{\text{sg\_custom}} \leq X \cdot \text{cost}_{\text{sg\_std}}$;
+    \item Bound on signature verification cost (input: $X$): $\text{cost}_{\text{sv\_custom}} \leq X \cdot \text{cost}_{\text{sv\_std}}$;
+    \item Bound on compression per byte (input: $X$): $ \text{cost}_{\text{cb\_custom}}/\text{size} \leq X $
 \end{itemize}
 
 where $X$ is arbitrary positive real number, and \text{max\_size} is the positive integer value.
@@ -67,7 +67,7 @@ Best Density Ratio (\texorpdfstring{$\rho$}{rho}) & $(50, 2, 23, 15, 16)$ & $784
 From Table~\ref{tab:minimal_metric_each}, we can see that the results for each metric is minimized as possible, 
 but with the cost of other metrics being too big, which makes this parameters impractical to use. Let's consider strategy to find the suitable parameters.
 
-\paragraph{Balanced Metrics} If we ask a question, how the size set of parameters change, if we use common value $X$ across all 4 metrics related to it? 
+\paragraph{Balanced Metrics} If we ask a question, how the size set of parameters change, if we use common value $X$ across all 5 metrics (setting $\text{max\_size} = X \cdot \text{size\_std}$ for $X \leq 1$)? 
 How the number of candidates changes depending on choice of filter input? What is the smallest $X$ that we can set to obtain a few candidates? 
 We apply the result for different values of $X$, and obtain the following results:
 
@@ -80,23 +80,23 @@ We apply the result for different values of $X$, and obtain the following result
 
 The bigger the multiplier, the bigger numer of candidates we get through the search process. 
 And the oppossite is also true, with smaller $X$, the number of candidates becomes smaller. 
-The smallest value of multiplier is $X \approx 0.8299$, and the results presented in the table~\ref{tab:optimal_candidate_metrics}
+The smallest value of multiplier is $X \approx 0.8840$, and the results presented in the Table~\ref{tab:optimal_candidate_metrics}
 
 \begin{table}[htbp]
     \centering
     \small
-    \caption{Performance Comparison between the Standard Baseline and the Balanced Candidate ($X = 0.8299$)}
+    \caption{Performance Comparison between the Standard Baseline and the Balanced Candidate ($X = 0.8840$)}
     \label{tab:optimal_candidate_metrics}
     \begin{tabular}{lrrr}
         \toprule
-        \textbf{Metric} & \textbf{STANDARD Baseline} & \textbf{Optimal Candidate} & \textbf{Relative Multiplier ($X$)} \\
+        \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Optimal Candidate} & \textbf{Relative Multiplier ($X$)} \\
         \midrule
-        Parameters $(h, d, k, a, w)$ & $(63, 7, 14, 12, 16)$ & $(40, 5, 21, 12, 16)$ & -- \\
-        Signature Size (Bytes) & $7,872$ & $7,840$ & $0.9959\times$ \\
-        Key Generation Cost & $292,862.0$ & $146,431.0$ & $0.5000\times$ \\
-        Signing Cost & $2,279,391.0$ & $1,076,100.49$ & $0.4721\times$ \\
-        Verification Cost & $2,387.0$ & $1,973.09$ & $0.8266\times$ \\
-        Hash Density Ratio ($\rho$) & $0.303227$ & $0.251648$ & $0.8299\times$ \\
+        Parameters $(h, d, k, a, w)$ & $(63, 7, 14, 12, 16)$ & $(40, 5, 24, 8, 16)$ & -- \\
+        Signature Size (Bytes) & $7,872$ & $6,928$ & $0.8801\times$ \\
+        Key Generation Cost & $292,862.0$ & $146,430.0$ & $0.5000\times$ \\
+        Signing Cost & $2,279,391.0$ & $756,689.0$ & $0.3320\times$ \\
+        Verification Cost & $2,387.0$ & $1,857.0$ & $0.7780\times$ \\
+        Compression per Byte ($\rho$) & $0.303227$ & $0.268043$ & $0.8840\times$ \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -120,14 +120,165 @@ Let's see the the visualized example below, where we chose signature size and si
     \label{fig:scatter_plot}
 \end{figure}
 
+While this interpretation of the parameters search fulfills its purpose to demonstrate how actually we find the candidates, this method needs more plots to know the exact values.
+We can do better! 
+
+In the new strategy, we plot unbounded parameters set (with only condition to have 128 bits security) on the plane randomly (the position doesn't matter). 
+After initializing candidates, apply the signature size filter, visualized as color filtering card. Moving further apply all other filter unil the last one.
+The resulting set is the set with appropriate candidates where we can search for the best. 
+
+Let's consider an example, where we set the following coefficients in the filters: 
+$$X_{\text{size}} = 0.85, X_{\text{kg}} = 1.5, X_{\text{sg}} = 2, X_{\text{sv}} = 0.8, X_{\text{cb}} = 1.$$
+
+The result of search for candidates with filtering shown below (see the Figure~\ref{fig:full_filtering_process}):
+
+\begin{figure}[htbp]
+    \centering
+    % Row 1
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{content/images/sieve_step1_initial.png}
+        \caption{Initial Pool}
+        \label{fig:sieve_1}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{content/images/sieve_step2_size.png}
+        \caption{SigSize}
+        \label{fig:sieve_2}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{content/images/sieve_step3_keygen.png}
+        \caption{KeyGen}
+        \label{fig:sieve_3}
+    \end{subfigure}
+    
+    \vspace{0.5cm}
+    
+    % Row 2
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{content/images/sieve_step4_siggen.png}
+        \caption{SigGen}
+        \label{fig:sieve_4}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{content/images/sieve_step5_verify.png}
+        \caption{SigVerify}
+        \label{fig:sieve_5}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{content/images/sieve_step6_rho.png}
+        \caption{Comp/Byte}
+        \label{fig:sieve_6}
+    \end{subfigure}
+    
+    \caption{Full Parameter Filtering Process}
+    \label{fig:full_filtering_process}
+\end{figure}
+
+Starting with the total number of candidates equal to 19437. After applying signature size filter, succesfully reduce the number of candidates up to 6202.
+In the next step, we reduce the candidates in more than 7 times. 
+Filtering further, we left with smaller and smaller number of suitable candidates, resulting only in final 60 candidates to check further. 
+
+Obtaining the set of final candidates, we are ready to search for the best among them. 
+For this part we use weighted euclidean distance. 
+The reason behind choosing such metric lies in the ability to sign the priority of metrics.
+Let's define the raw weight coefficients as $w_{\text{size}}, w_{\text{kg}}, w_{\text{sg}}, w_{\text{sv}}$, and $w_{\text{cb}}$, representing the relative priority of signature size, key generation, signing, verification, and compression per byte, respectively. All coefficients are real positive numbers ($w \in \mathbb{R}^+$). 
+
+To ensure the calculation remains proportionally consistent regardless of the scale of the chosen weights, we normalize them into coefficients $p_i$ (where $i \in \{\text{size}, \text{kg}, \text{sg}, \text{sv}, \text{cb}\}$) such that their total sum equals $1$:
+\begin{equation}
+    p_i = \frac{w_i}{w_{\text{size}} + w_{\text{kg}} + w_{\text{sg}} + w_{\text{sv}} + w_{\text{cb}}}, \quad \text{ensuring} \quad \sum p_i = 1
+    \label{eq:weight_normalization}
+\end{equation}
+
+Using these normalized coefficients, we calculate the Weighted Euclidean Distance (the $L_2$ norm) from the origin $(0,0,0,0,0)$ to the candidate's point $P$. The distance $d(P)$ is defined as:
+\begin{equation}
+    d(P) = \sqrt{p_{\text{size}} X_{\text{size}}^2 + p_{\text{kg}} X_{\text{kg}}^2 + p_{\text{sg}} X_{\text{sg}}^2 + p_{\text{sv}} X_{\text{sv}}^2 + p_{\text{cb}} X_{\text{cb}}^2}
+    \label{eq:weighted_euclidean_distance}
+\end{equation}
+
+Note that we don't use raw metric values, but instead a ratio of raw metric to the standard. 
+
+To visualize the distances we set the points color takes from a color scale, where lower the distance, the color moves to the blue region.
+If the distance is higher it maps to the red color shade.
+For example, let's consider two cases where the weights are: 
+\begin{itemize}
+    \item Case 1: $w_{\text{size}} = w_{\text{kg}} = w_{\text{sg}} = w_{\text{sv}} = w_{\text{cb}} = 1$;
+    \item Case 2: $w_{\text{size}}=5, w_{\text{kg}}=1, w_{\text{sg}}=1.5, w_{\text{sv}}=2$, and $w_{\text{cb}}=1$.
+\end{itemize}
+
+The result for the first case presented below:
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.7\textwidth]{content/images/sieve_step7_distance_1.png}
+    \caption{Visualization of Searching for the Case 1.}
+    \label{fig:distance_plot_1}
+\end{figure}
+
+The parameters and metrics values of the best candidate presented in the Table~\ref{tab:euclidean_candidate_metrics_case_1}. 
 
 
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Performance Comparison between the Standard Baseline and the Best Shortest Distance Candidate}
+    \label{tab:euclidean_candidate_metrics_case_1}
+    \begin{tabular}{lrrr}
+        \toprule
+        \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Best Candidate} & \textbf{Relative Multiplier ($X$)} \\
+        \midrule
+        Parameters $(h, d, k, a, w)$ & $(63, 7, 14, 12, 16)$ & $(40, 5, 19, 9, 16)$ & -- \\
+        Signature Size (Bytes) & $7,872$ & $6,512$ & $0.8272\times$ \\
+        Key Generation Cost & $292,862.0$ & $146,430.0$ & $0.5000\times$ \\
+        Signing Cost & $2,279,391.0$ & $771,034.0$ & $0.3383\times$ \\
+        Verification Cost & $2,387.0$ & $1,809.0$ & $0.7579\times$ \\
+        Compression per Byte ($\rho$) & $0.303227$ & $0.277795$ & $0.9161\times$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
+\newpage
 
+For the second case, we have the following picture:
 
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.75\textwidth]{content/images/sieve_step7_distance_2.png}
+    \caption{Visualization of Searching for the Case 2.}
+    \label{fig:distance_plot_1}
+\end{figure}
 
+And the resulting values obtained (see Table~\ref{tab:euclidean_candidate_metrics_case_2}).
 
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Performance Comparison between the Standard Baseline and the Best Shortest Distance Candidate}
+    \label{tab:euclidean_candidate_metrics_case_2}
+    \begin{tabular}{lrrr}
+        \toprule
+        \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Best Candidate} & \textbf{Relative Multiplier ($X$)} \\
+        \midrule
+        Parameters $(h, d, k, a, w)$ & $(63, 7, 14, 12, 16)$ & $(40, 5, 13, 12, 16)$ & -- \\
+        Signature Size (Bytes) & $7,872$ & $6,176$ & $0.7846\times$ \\
+        Key Generation Cost & $292,862.0$ & $146,430.0$ & $0.5000\times$ \\
+        Signing Cost & $2,279,391.0$ & $945,124.0$ & $0.4146\times$ \\
+        Verification Cost & $2,387.0$ & $1,771.0$ & $0.7419\times$ \\
+        Compression per Byte ($\rho$) & $0.303227$ & $0.286755$ & $0.9457\times$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
+Comparing two cases, there is difference in the resulting metrics. While in the first case we have more balanced costs, the second case results show the prioritization for size, signing and verification. 
 
 
 
