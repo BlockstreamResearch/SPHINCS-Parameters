@@ -1,0 +1,13 @@
+\section{Introduction}
+\label{sec:introduction}
+
+Post-quantum signatures are rapidly evolving and getting better, while the day, when a quantum computer will be able to break the classic signature schemes, is closer that we might think.
+This creates the need to transion to post-quantum schemes, especially in the systems where the signture algorithms are the main instrument, for example, Bitcoin. 
+In the case of the Bitcoin, hash-based signature scheme (SPHINCS+ or SLH-DSA) is the most compatible one among all quantum-resistant algorithms. 
+While the NIST standard stateless hash-based signature scheme parameter choice making the it suboptimal to implement in the Bitcoin, we still can optimize the algorithm to be more efficient.
+This could be achived through optimizing the algorithm structure or only changing construction parameters. 
+For the first case, we need to make sure that the modifications are proven to be secure which needs to pass the test of time with enough research done.
+The more reasonable and safe option is to change parameters to achive smaller signature size and smaller signing/verification costs. 
+Fortunely for us, we have enough room to play with the paraters to obtain signatures that sufficient for the Bitcoin. 
+
+In this document we will show and explain the methodology of searching parameters for SHRINCS stateless part (SHL-DSA architecture for $2^{40}$ signatures). 

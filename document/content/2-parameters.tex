@@ -1,0 +1,52 @@
+\section{Parameters Description}
+
+\subsection{Initial Parameters}
+
+As mentioned in the introduction, our objective is to find such parameters that will be better than SLH-DSA. 
+For the Bitcoin we require no more than 128-bit security. 
+If we put the security cap higher this will lead to bigger signature size and costs, which is not preferable.
+Another parameter that sets the further foundation for the parameter search is the number of signatures, namely $q_{s}$. 
+In SLH-DSA-128s version, the number of signatures is set to be $q_{s} = 2^{64}$. 
+While parameters for standardized SLH-DSA are created for general purpose usage, the number of required signatures in Bitcoin is lower.
+Setting $q_{s} = 2^{40}$ is enough for our purposes, which will decrease the size and the computational cost.
+
+\subsection{SLH-DSA Parameters}
+
+The basic architecture of SLH-DSA relies on a hyper-tree of extended Merkle signature schemes (XMSS) to authenticate underlying one-time and few-time signature keys. 
+We formally parameterize each candidate configuration using the tuple $(h, d, k, a, w)$, where each variable controls a distinct geometric trade-off within the overall structure.
+
+\paragraph{Hyper-Tree Geometry ($h$ and $d$)}
+The hyper-tree configuration determines the capacity and layer traversal costs of the signature scheme.
+\begin{itemize}
+    \item $h$ represents the total height of the multi-layered hyper-tree. 
+    This variable dictates the maximum number of few-time signature instances supported at the base layer, yielding a total capacity of $2^h$ unique leaf nodes.
+    \item $d$ defines the number of independent tree layers comprising the hyper-tree. 
+\end{itemize}
+To ensure symmetrical construction across all internal boundaries, our search pipeline strictly mandates that the total height $h$ must be perfectly divisible by the layer count $d$. 
+Consequently, each individual XMSS tree layer operates with a uniform height denoted as $h'$:
+\begin{equation*}
+    h' = \frac{h}{d}
+\end{equation*}
+Adjusting the ratio between $h$ and $d$ governs the balance between signature size and key generation speed. 
+Minimizing layers ($d$) reduces the total number of intermediate public keys and authentication paths included in the signature payload, saving valuable bytes. 
+However, this exponentially increases the height $h'$ of each constituent tree layer, requiring significantly more hash operations to compute the root node during key generation.
+
+\paragraph{Few-Time Signature Layer ($k$ and $a$)}
+The lowest layer of the hyper-tree authenticates the Forest of Random Subsets (FORS) few-time signature scheme, which directly signs the message digest.
+\begin{itemize}
+    \item $k$ represents the number of independent, parallel Merkle trees operating within the FORS layer.
+    \item $a$ defines the height of each individual FORS tree. This parameter dictates that each constituent tree contains exactly $t = 2^a$ leaves.
+\end{itemize}
+
+Increasing $k$ and $a$ strengthens the scheme against multi-target subset forgery attacks, allowing the structure to safely support larger capacities. 
+However, expanding these dimensions directly increases the byte footprint of the appended authentication paths.
+
+\paragraph{One-Time Signature Base ($w$)}
+Internal tree roots are signed using the Winternitz One-Time Signature Plus (WOTS+) scheme. 
+The base parameter $w$ defines the underlying digit representation used to split the message digest during signing. 
+Our framework evaluates candidate configurations across standard baseline settings where $w \in \{16, 32, 256\}$.
+
+Selecting a larger base value significantly shortens the required number of parallel hash chains ($l$), which reduces the overall WOTS+ signature payload size. 
+This spatial efficiency trades against local compute cycles: larger base parameters require significantly longer individual hash chains, resulting in higher execution costs during public key generation and signature creation.
+
+We set the ranges as follows: $(h,d,k,a,w) \in \{40,...,52\}\times\{2,...,26\}\times\{2,...,25\}\times\{8,...,21\}\times\{16,32,256\}$.
