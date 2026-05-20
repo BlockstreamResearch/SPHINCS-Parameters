@@ -1,39 +1,38 @@
 \section{Search Methodology}
 
 \subsection{Initial Search Conditions}
-
-Searching for the best parameters require defining conditions that the best parameters set must to satisfy.  Consequently, the conditions must rely on some metrics, which depend on the parameters. We use the following ones:
+Searching for the best parameters requires defining the conditions that the chosen parameter set must satisfy. Consequently, those conditions must rely on metrics that depend on the parameters. We use the following:
 
 \begin{itemize}
-    \item Signature size: the size of the signature in bytes;
-    \item Key Generation cost: the number of SHA-256 compressions during key generation phase;
-    \item Signature Generation cost: compressions executed during signing phase;
-    \item Signature Verification cost: the number of compressions during verification phase;
-    \item Compression per Byte: the ratio between verification cost to the signature size.
+    \item \textbf{Signature size}: the size of the signature in bytes;
+    \item \textbf{Key generation cost}: the number of SHA-256 compressions during the key-generation phase;
+    \item \textbf{Signature generation cost}: the number of compressions executed during signing;
+    \item \textbf{Signature verification cost}: the number of compressions during verification;
+    \item \textbf{Compressions per byte}: the ratio of verification cost to signature size.
 \end{itemize}
 
-We think that's pretty valuable to choose SLH-DSA-128s as the baseline for the search, which gives us an intuitive way to fairly compare the metrics between custom parameters and standartized SLH-DSA.
+We choose SLH-DSA-128s as the baseline for the search; this gives us an intuitive way to compare custom parameter sets against the standardized scheme on equal footing.
 
 \subsection{Toolset}
-These nice sage scripts: https://github.com/BlockstreamResearch/SPHINCS-Parameters
+The methodology described here uses a set of SageMath scripts available at \url{https://github.com/BlockstreamResearch/SPHINCS-Parameters}.
 
-\subsection{Sweep Strategy}
-We start by running through all parameter pairs $(h,d,k,a,w)$.  Applying the bounds (security level, size $\leq$ SLH-DSA, no less than $2^{40}$ signatures) reduce the search space from \textbf{41,328} candidates to \textbf{9,229}. Minus 78\% of candidates, but the left space of is still big to traverse, so we need to apply other conditions to make the possible parameters set smaller. 
+\subsection{Sweep Strategy} \label{sec:sweep-strategy}
+We start by enumerating all parameter tuples $(h, d, k, a, w)$. Applying the initial bounds (security level, size $\leq$ SLH-DSA, at least $2^{40}$ supported signatures) reduces the search space from \emph{41,328} candidates to \emph{9,229} - a $78\%$ cut. The remaining space is still too large to inspect by hand, so we need additional filters.
 
-Let's introduce the following filters:
+We introduce the following filters\footnote{The coefficient for each filter, except the signature size, may be greater than 1 (meaning we accept some regression on that metric in exchange for gains elsewhere).}:
 
 \begin{itemize}
-    \item \textbf{Bound on signature size}: $\mathsf{target.size}\leq c_{size} \cdot \mathsf{std.size}$, where $c_{size}$ is a input size coefficient ($0 \leq c_{size} \leq \mathsf{std.size}$)
-    \item \textbf{Bound on key generation cost }: $\mathsf{target.KeyGen}\leq c_{kg} \cdot \mathsf{std.KeyGen}$, where $c_{kg}$ is a key generation cost coefficient ($c_{kg} > 0$)
-    \item \textbf{Bound on signature generation cost }: $\mathsf{target.SigGen}\leq c_{sg} \cdot \mathsf{std.SigGen}$, where $c_{sg}$ is a signature generation cost coefficient ($c_{sg} > 0$)
-    \item \textbf{Bound on signature verification cost }: $\mathsf{target.SigVer}\leq c_{sv} \cdot \mathsf{std.GigVer}$, where $c_{sv}$ is a signature verification cost coefficient ($c_{sg} > 0$)
-    \item \textbf{Bound on compressions per byte verification ratio}: $\mathsf{target.C/B}\leq c_{cb} \cdot \mathsf{std.C/B}$, where $c_{cb}$ is a C/B coefficient  ($c_{sb} > 0$)
+    \item \textbf{Bound on signature size}: $\mathsf{target.size} \leq c_{\text{size}} \cdot \mathsf{std.size}$, where $c_{\text{size}}$ is a size coefficient ($0 \leq c_{\text{size}} \leq 1$).
+    \item \textbf{Bound on key-generation cost}: $\mathsf{target.KeyGen} \leq c_{\text{kg}} \cdot \mathsf{std.KeyGen}$, where $c_{\text{kg}} > 0$.
+    \item \textbf{Bound on signature-generation cost}: $\mathsf{target.SigGen} \leq c_{\text{sg}} \cdot \mathsf{std.SigGen}$, where $c_{\text{sg}} > 0$.
+    \item \textbf{Bound on signature-verification cost}: $\mathsf{target.SigVer} \leq c_{\text{sv}} \cdot \mathsf{std.SigVer}$, where $c_{\text{sv}} > 0$.
+    \item \textbf{Bound on the compressions-per-byte ratio}: $\mathsf{target.C/B} \leq c_{\text{cb}} \cdot \mathsf{std.C/B}$, where $c_{\text{cb}} > 0$.
 \end{itemize}
 
-We can apply following filters in different combinations, with different values used to bound the metrics to get the desired result. Let's consider the following cases to investigate how the filters setup affects the set of parameters.
+These filters can be combined and parameterized in different ways to produce different result sets. Below, we consider several cases to illustrate how the choice of filter parameters affects the resulting candidate set.
 
-\subsubsection{Case 1: Best In Class}
-This is the case, where we try to find the most efficient signature per a certain metric.  The bounds on other metrics are unlimited. The results shown in the table. 
+\subsubsection{Case 1: Best in Class}
+In this case, we find the most efficient signature for a single metric at a time, leaving the other metrics unbounded. The results are shown in Table~\ref{tab:minimal_metric_each}.
 
 \begin{table}[h!]
 \small
@@ -63,18 +62,18 @@ Best Density Ratio (\texorpdfstring{$\rho$}{rho}) & $(50, 2, 23, 15, 16)$ & \tex
 }
 \end{table}
 
-From Table~\ref{tab:minimal_metric_each}, we can see that the results for each metric is minimized as possible, but (unfortunately) for the big trade of other metrics, which makes this parameters impractical to use. Let's consider another strategy to find the suitable parameters.
+Table~\ref{tab:minimal_metric_each} confirms what one would suspect: each metric can be minimized impressively in isolation, but only at a brutal cost to the others, leaving these parameter sets unusable in practice. We therefore consider a different strategy.
 
-\subsubsection{Case 2: Balanced Metrics} 
-The next experiment: let's find "average" candidates for which all metrics will not exceed a particular threshold $X \cdot \mathsf{std}$ (filter applied to each metric, and exception only is the max signature size). By increasing $X$ we receive the following picture:
+\subsubsection{Case 2: Balanced Metrics}
+In the next experiment, we look for ``average'' candidates whose metrics all stay below a uniform threshold $X \cdot \mathsf{std}$ (the filter is applied to every metric, with the exception of the maximum signature size $\leq \mathsf{std}$). By gradually increasing $X$, we obtain the following picture.
 \begin{figure}[h!]
     \centering
-    \includegraphics[width=0.5\textwidth]{content/images/concentric_diagram.png}
+    \includegraphics[width=0.8\textwidth]{content/images/concentric_diagram.png}
     \caption{Global Minimax Expansion: Concentric Euler diagram illustrating the volume of candidates unlocked at expanding uniform multiplier thresholds.}
     \label{fig:concentric_minimax}
 \end{figure}
 
-Obviously, the smaller the multiplier $X$, the smaller number of candidates we get through the search process. Moreover, we can see a clear winner ($X \approx 0.8840$), but let's investigate how cool it is (Table~\ref{tab:optimal_candidate_metrics}). 
+Naturally, the smaller the multiplier $X$, the fewer candidates survive the filter. A clear winner emerges at $X \approx 0.8840$; let us see how compelling it actually is (Table~\ref{tab:optimal_candidate_metrics}).
 
 \begin{table}[h!]
     \centering
@@ -95,37 +94,42 @@ Obviously, the smaller the multiplier $X$, the smaller number of candidates we g
     \end{tabular}
 \end{table}
 
-Someone can say it's pretty good. Our opinion that 12\% win on the signature size isn't very attractive. 
+One might call this a reasonable result. We are less impressed: a 12\% saving on signature size is not particularly attractive on its own (the goal is to materially close the gap with Schnorr).
 
-\paragraph{Optimal Search Strategy} Every candidates can be related to the some tuple of metrics value. 
-The search for optimal candidate could be represented as finding the closest point to the origin in five dimentionl space (finding the shortest vector). 
-The issue is that we cannot visualize the such high dimentional space, but we can analyse the 2D projections of 5 dimentional space.
-We could create 10 graphs of every metrics pairs, but It is quite complicated to analyse.
-The better option is the strategy, were we define the metrics that are important to us, and the rest we cound use the default filter, by setting $X=1$. 
-And to find the best candidate, we serach for the point that the the closest to the origin.
+\subsubsection{Case 3: Adaptive Search}
+The strategy is straightforward:
+\begin{enumerate}
+    \item Decide which sacrifices you are willing to make on each metric.
+    \item Find the best candidate among those that remain.
+\end{enumerate}
 
-Let's see the the visualized example below, where we chose signature size and signing cost as important metrics, while other must be better than the baseline.
+For step (1) we apply the filters introduced in Section~\ref{sec:sweep-strategy}. This subsection is dedicated to step (2).
 
-\begin{figure}[htbp]
+Each candidate is uniquely defined by its tuple of metric values, so the search for an optimal candidate can be cast as finding the point closest to the origin in a five-dimensional space (analogous to a shortest-vector problem, but mercifully confined to a small set of survivors), where each axis represents one of our metrics. That is almost the whole story.
+
+To build intuition, suppose we care about only two metrics - signature size and signature generation cost. We require the signature size to be no larger than that of SLH-DSA, and we are willing to tolerate a signing cost of at most $2\times$ the standard. In this case all admissible candidates fit inside the green rectangle in Figure~\ref{fig:scatter_plot}, which makes brute-force inspection easy: the best candidate is simply the point closest to the origin $(0, 0)$.
+
+\begin{figure}[h!]
     \centering
-    \includegraphics[width=0.8\textwidth]{content/images/scatter_plot.png}
+    \includegraphics[width=0.7\textwidth]{content/images/scatter_plot.png}
     \caption{Visualization of Candidates with Prioritization of Size and Signing Cost Metrics.}
     \label{fig:scatter_plot}
 \end{figure}
 
-While this interpretation of the parameters search fulfills its purpose to demonstrate how actually we find the candidates, this method needs more plots to know the exact values.
-We can do better! 
+We cannot directly visualize a 5-dimensional space, but we can show the filtering process in a different way.
 
-In the new strategy, we plot unbounded parameters set (with only condition to have 128 bits security) on the plane randomly (the position doesn't matter). 
-After initializing candidates, apply the signature size filter, visualized as color filtering card. Moving further apply all other filter unil the last one.
-The resulting set is the set with appropriate candidates where we can search for the best. 
+First, we scatter the unbounded candidate set (subject only to the 128-bit security condition) on a plane, with positions chosen randomly - the layout carries no meaning, and each point is uniquely identified by its parameter tuple. After initialization, we apply the signature-size filter, visualized as a coloured ``sieve''. We then apply each remaining filter in turn until the last one.
 
-Let's consider an example, where we set the following coefficients in the filters: 
-$$X_{\text{size}} = 0.85, X_{\text{kg}} = 1.5, X_{\text{sg}} = 2, X_{\text{sv}} = 0.8, X_{\text{cb}} = 1.$$
+The resulting set contains the candidates that survived every filter; this is the pool in which we search for the best one.
 
-The result of search for candidates with filtering shown below (see the Figure~\ref{fig:full_filtering_process}):
+As an example, consider the following filter coefficients:
+\begin{equation*}
+    X_{\text{size}} = 0.85, \quad X_{\text{kg}} = 1.5, \quad X_{\text{sg}} = 2, \quad X_{\text{sv}} = 0.8, \quad X_{\text{cb}} = 1.
+\end{equation*}
 
-\begin{figure}[htbp]
+The filtering process is shown in Figure~\ref{fig:full_filtering_process}.
+
+\begin{figure}[h!]
     \centering
     % Row 1
     \begin{subfigure}[b]{0.32\textwidth}
@@ -177,16 +181,23 @@ The result of search for candidates with filtering shown below (see the Figure~\
     \label{fig:full_filtering_process}
 \end{figure}
 
-Starting with the total number of candidates equal to 19437. After applying signature size filter, succesfully reduce the number of candidates up to 6202.
-In the next step, we reduce the candidates in more than 7 times. 
-Filtering further, we left with smaller and smaller number of suitable candidates, resulting only in final 60 candidates to check further. 
+We start with \emph{19,437} candidates. The signature-size filter trims the pool to \emph{6,202}; the next filter (KeyGen) cuts it by more than $7\times$. Each subsequent filter prunes further, leaving \emph{60} final candidates for inspection.
 
-Obtaining the set of final candidates, we are ready to search for the best among them. 
-For this part we use weighted euclidean distance. 
-The reason behind choosing such metric lies in the ability to sign the priority of metrics.
-Let's define the raw weight coefficients as $w_{\text{size}}, w_{\text{kg}}, w_{\text{sg}}, w_{\text{sv}}$, and $w_{\text{cb}}$, representing the relative priority of signature size, key generation, signing, verification, and compression per byte, respectively. All coefficients are real positive numbers ($w \in \mathbb{R}^+$). 
+With the final 60 candidates in hand, we are ready to pick a winner.
 
-To ensure the calculation remains proportionally consistent regardless of the scale of the chosen weights, we normalize them into coefficients $p_i$ (where $i \in \{\text{size}, \text{kg}, \text{sg}, \text{sv}, \text{cb}\}$) such that their total sum equals $1$:
+For each surviving candidate $P$, let $X_i$ denote the ratio of the candidate's value for metric $i$ to the corresponding standard value, where $i \in \{\text{size}, \text{kg}, \text{sg}, \text{sv}, \text{cb}\}$. Working with ratios rather than raw values keeps the five axes on a common, dimensionless scale. The Euclidean distance from the origin to $P$ is then
+\begin{equation}
+    d(P) = \sqrt{X_{\text{size}}^2 + X_{\text{kg}}^2 + X_{\text{sg}}^2 + X_{\text{sv}}^2 + X_{\text{cb}}^2}\,,
+    \label{eq:euclidean_distance}
+\end{equation}
+and the optimal candidate is the one minimizing $d(P)$.
+
+This treats every metric as equally important, which is rarely what we actually want. Signature size, for example, usually carries far more weight than key-generation cost in a Bitcoin context. The next subsection addresses this by attaching weights to each axis.
+
+\subsection{Decisional Weights} \label{sec:decisional-weights}
+We can do better by applying the \emph{weighted} Euclidean distance. The motivation is that weights give us a principled way to encode the relative priority of each metric. Let $w_{\text{size}}, w_{\text{kg}}, w_{\text{sg}}, w_{\text{sv}}, w_{\text{cb}} \in \mathbb{R}^+$ denote the raw weight coefficients representing the relative importance of signature size, key generation, signing, verification, and compressions per byte, respectively.
+
+To keep the calculation proportionally consistent regardless of the absolute scale of the chosen weights, we normalize them into coefficients $p_i$ (where $i \in \{\text{size}, \text{kg}, \text{sg}, \text{sv}, \text{cb}\}$) such that they sum to $1$:
 \begin{equation}
     p_i = \frac{w_i}{w_{\text{size}} + w_{\text{kg}} + w_{\text{sg}} + w_{\text{sv}} + w_{\text{cb}}}, \quad \text{ensuring} \quad \sum p_i = 1
     \label{eq:weight_normalization}
@@ -198,17 +209,15 @@ Using these normalized coefficients, we calculate the Weighted Euclidean Distanc
     \label{eq:weighted_euclidean_distance}
 \end{equation}
 
-Note that we don't use raw metric values, but instead a ratio of raw metric to the standard. 
+As before, each $X_i$ is the ratio of the candidate's metric to its standard counterpart, so the five axes remain on a common dimensionless scale.
 
-To visualize the distances we set the points color takes from a color scale, where lower the distance, the color moves to the blue region.
-If the distance is higher it maps to the red color shade.
-For example, let's consider two cases where the weights are: 
+To visualize the distances, we map each candidate's distance onto a colour scale: lower distances shade towards blue, higher distances towards red. As an example, consider the following two weight settings:
 \begin{itemize}
     \item Case 1: $w_{\text{size}} = w_{\text{kg}} = w_{\text{sg}} = w_{\text{sv}} = w_{\text{cb}} = 1$;
-    \item Case 2: $w_{\text{size}}=5, w_{\text{kg}}=1, w_{\text{sg}}=1.5, w_{\text{sv}}=2$, and $w_{\text{cb}}=1$.
+    \item Case 2: $w_{\text{size}} = 5,\ w_{\text{kg}} = 1,\ w_{\text{sg}} = 1.5,\ w_{\text{sv}} = 2,\ w_{\text{cb}} = 1$.
 \end{itemize}
 
-The result for the first case presented below:
+The result for the first case is shown below.
 
 \begin{figure}[htbp]
     \centering
@@ -217,7 +226,7 @@ The result for the first case presented below:
     \label{fig:distance_plot_1}
 \end{figure}
 
-The parameters and metrics values of the best candidate presented in the Table~\ref{tab:euclidean_candidate_metrics_case_1}. 
+The parameters and metric values of the best candidate are shown in Table~\ref{tab:euclidean_candidate_metrics_case_1}.
 
 
 \begin{table}[htbp]
@@ -247,10 +256,10 @@ For the second case, we have the following picture:
     \centering
     \includegraphics[width=0.75\textwidth]{content/images/sieve_step7_distance_2.png}
     \caption{Visualization of Searching for the Case 2.}
-    \label{fig:distance_plot_1}
+    \label{fig:distance_plot_2}
 \end{figure}
 
-And the resulting values obtained (see Table~\ref{tab:euclidean_candidate_metrics_case_2}).
+The resulting values are shown in Table~\ref{tab:euclidean_candidate_metrics_case_2}.
 
 \begin{table}[htbp]
     \centering
@@ -271,9 +280,4 @@ And the resulting values obtained (see Table~\ref{tab:euclidean_candidate_metric
     \end{tabular}
 \end{table}
 
-Comparing two cases, there is difference in the resulting metrics. While in the first case we have more balanced costs, the second case results show the prioritization for size, signing and verification. 
-
-
-
-
-
+Comparing the two cases, the resulting metrics differ noticeably. The first case yields more balanced costs across the board, while the second case clearly favours signature size and verification at the expense of a heavier signing operation - exactly the trade-off we asked the weights to enforce.

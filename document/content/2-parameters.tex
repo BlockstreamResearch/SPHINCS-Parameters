@@ -1,43 +1,46 @@
 \section{Parameters Description}
 
 \subsection{Initial Bounds}
-
-As mentioned in the introduction, our objective is to find parameters that make the signature "better" than SLH-DSA. But first of all, we need to define some strict boundaries that we will not cross:
+As mentioned in the introduction, our objective is to find parameters that make the signature ``better'' than SLH-DSA. Before we can do so, we have to fix the strict boundaries that we will not cross:
 \begin{enumerate}
-    \item Obviously we don't want to have signature larger than SLH-DSA (otherwise, why did we start all this?).
-    \item For Bitcoin, we require at least a 128-bit security level. All parameters we select mustn't degrade security. 
-    \item No less than $q_{s} = 2^{40}$ signatures supported. SLH-DSA-128s defines the number of signatures to be $q_{s} = 2^{64}$. That's a lot. In the case of Bitcoin, we assume that having $q_{s} = 2^{40}$ signatures is a practical decision, covering potential needs for on-chain operations and Lightning.
-    \item Sub-algorithms, hash and addressing functions remain the same.
+    \item We obviously do not want a signature larger than SLH-DSA - otherwise, why bother in the first place?
+    \item For Bitcoin, we require at least a 128-bit security level. None of the parameters we select may degrade security below this floor.
+    \item At least $q_{s} = 2^{40}$ supported signatures. SLH-DSA-128s defines the maximum number of signatures as $q_{s} = 2^{64}$, which is generous. For Bitcoin, we assume that $q_{s} = 2^{40}$ is a practical compromise, comfortably covering the foreseeable needs of on-chain operations and the Lightning Network.
+    \item Sub-algorithms, hash, and addressing functions remain unchanged.
 \end{enumerate}
 
 \subsection{SLH-DSA Parameters}
-
-SLH-DSA utilizes a hyper-tree of extended Merkle signature schemes (XMSS) to authenticate underlying one-time and few-time signature keys.  We formally parameterize each candidate configuration using the tuple $(h, d, k, a, w)$, where each variable controls a distinct geometric trade-off within the overall structure.
+SLH-DSA uses a hyper-tree of eXtended Merkle Signature Schemes (XMSS) to authenticate the underlying one-time and few-time signature keys. We formally parameterize each candidate configuration using the tuple $(h, d, k, a, w)$, where each variable controls a distinct geometric trade-off within the overall structure.
 
 \paragraph{Hyper-Tree Geometry ($h$ and $d$).}
-The hyper-tree configuration determines the capacity and layer traversal costs of the signature scheme.
+The hyper-tree configuration determines the capacity and layer-traversal costs of the signature scheme.
 \begin{itemize}
-    \item $h$ represents the total height of the multi-layered hyper-tree. This variable dictates the maximum number of few-time signature instances supported at the base layer, yielding a total capacity of $2^h$ unique leaf nodes.
-    \item $d$ defines the number of independent tree layers comprising the hyper-tree. 
+    \item $h$ is the total height of the multi-layered hyper-tree. This dictates the maximum number of few-time signature instances supported at the base layer, yielding a total capacity of $2^h$ unique leaf nodes.
+    \item $d$ is the number of independent tree layers comprising the hyper-tree.
 \end{itemize}
-To ensure symmetrical construction across all internal boundaries, our search pipeline strictly mandates that the total height $h$ must be perfectly divisible by the layer count $d$. Consequently, each individual XMSS tree layer operates with a uniform height denoted as $h'$:
+To ensure a symmetric construction across all internal boundaries, our search pipeline requires that the total height $h$ be perfectly divisible by the layer count $d$. Consequently, each individual XMSS tree layer has a uniform height $h'$:
 \begin{equation*}
-    h' = \frac{h}{d}
+    h' = \frac{h}{d}.
 \end{equation*}
-Adjusting the ratio between $h$ and $d$ governs the balance between signature size and key generation cost.  Minimizing the number of layers ($d$) reduces the total number of intermediate public keys and authentication paths in the signature payload, saving valuable signature bytes. However, this exponentially increases the height $h'$ of each constituent tree layer, requiring significantly more hash operations to compute the root node during key generation.
+Adjusting the ratio between $h$ and $d$ governs the balance between signature size and key-generation cost. Reducing the number of layers $d$ shrinks the total number of intermediate public keys and authentication paths in the signature payload, saving valuable bytes. However, this exponentially increases the height $h'$ of each constituent tree, requiring significantly more hash operations to compute the root node during key generation.
 
 \paragraph{Few-Time Signature Layer ($k$ and $a$).}
 The lowest layer of the hyper-tree authenticates the Forest of Random Subsets (FORS) few-time signature scheme, which directly signs the message digest.
 \begin{itemize}
-    \item $k$ represents the number of independent, parallel Merkle trees operating within the FORS layer.
-    \item $a$ defines the height of each individual FORS tree. This parameter dictates that each constituent tree contains exactly $t = 2^a$ leaves.
+    \item $k$ is the number of independent, parallel Merkle trees in the FORS layer.
+    \item $a$ is the height of each individual FORS tree, so that each constituent tree contains exactly $t = 2^a$ leaves.
 \end{itemize}
 
-Increasing $k$ and $a$ strengthens the scheme against multi-target subset forgery attacks, allowing the structure to safely support larger capacities. However, expanding these dimensions directly increases the byte footprint of the appended authentication paths.
+Increasing $k$ and $a$ strengthens the scheme against multi-target subset-forgery attacks and allows the structure to support larger capacities safely. However, expanding these dimensions directly increases the byte footprint of the appended authentication paths.
 
 \paragraph{One-Time Signature Base ($w$).}
-Internal tree roots are signed using the Winternitz One-Time Signature Plus (WOTS+) scheme. The base parameter $w$ defines the underlying digit representation used to split the message digest during signing.  Our framework evaluates candidate configurations across standard baseline settings where $w \in \{16, 32, 256\}$.
+Internal tree roots are signed using the Winternitz One-Time Signature Plus (WOTS+) scheme. The base parameter $w$ defines the digit representation used to split the message digest during signing. Our framework evaluates candidate configurations across the standard baseline settings $w \in \{16, 32, 256\}$.
 
-Selecting a larger base value significantly reduces the required number of parallel hash chains ($l$), thereby reducing the overall WOTS+ signature payload size. This spatial efficiency comes at the cost of local compute cycles: larger base parameters require significantly longer individual hash chains, resulting in higher execution costs during key and signature generation.
+Selecting a larger base reduces the number of parallel hash chains $\ell$, which in turn reduces the overall WOTS+ payload size. This spatial efficiency comes at the cost of local compute: larger base parameters require longer hash chains, resulting in higher execution costs during key and signature generation.
 
-We sweep the ranges as follows: $(h,d,k,a,w) \in \{40,...,52\}\times\{2,...,26\}\times\{2,...,25\}\times\{8,...,21\}\times\{16,32,256\}$.
+We sweep the ranges as follows:
+\begin{equation*}
+    (h, d, k, a, w) \in \{40, \dots, 52\} \times \{2, \dots, 26\} \times \{2, \dots, 25\} \times \{8, \dots, 21\} \times \{16, 32, 256\}.
+\end{equation*}
+
+\textit{The SLH-DSA-128s baseline tuple (63, 7, 14, 12, 16) sits outside this range and is included for comparison}
