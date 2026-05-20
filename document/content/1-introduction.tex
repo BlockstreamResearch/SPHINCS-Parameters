@@ -1,0 +1,9 @@
+\section{Introduction} \label{sec:introduction}
+
+In the case of Bitcoin, hash-based signature schemes are the most compatible among all quantum-resistant signature algorithms.  Still, the smallest stateless hash-based signature proposed by NIST (SLH-DSA-128s) is 7,856 bytes, which is more than 100$\times$ larger than the current Schnorr signature. The question is whether we can have something smaller and more practical without significant deviation from the standard?
+
+SHRINCS proposes a hybrid signature that consists of a stateful and a stateless part, varying the signature size from \emph{324} (stateful) to \emph{X} (stateless) bytes. This document tries to answer the question of what the value of \emph{X} might be while keeping other signature metrics (KeyGen, SigGen, SigVer, etc) practical.
+
+In this document, we show the methodology of searching parameters for SLH-DSA-compatible signatures: how changes in the hypertree structure and other parameters can affect the signature metrics. Unfortunately, as mentioned before, we keep ourselves in very conservative bounds and avoid any changes in signature sub-algorithms to make the signature as compatible as possible with the SLH-DSA standard. 
+
+\textit{Sometimes we will refer to amazing proposals, like hypertree pruning and +C compression techniques, which allow us to achieve even better shrinking results. Although some of them can be considered as partially compatible, we do not rely on them in the evaluation framework. We still think it's useful to present the potential capabilities of such techniques and allow the reader to tweak the parameters based on them.} 
