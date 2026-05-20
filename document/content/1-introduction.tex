@@ -1,13 +1,9 @@
-\section{Introduction}
-\label{sec:introduction}
+\section{Introduction} \label{sec:introduction}
 
-Post-quantum signatures are rapidly evolving and getting better, while the day, when a quantum computer will be able to break the classic signature schemes, is closer that we might think.
-This creates the need to transion to post-quantum schemes, especially in the systems where the signture algorithms are the main instrument, for example, Bitcoin. 
-In the case of the Bitcoin, hash-based signature scheme (SPHINCS+ or SLH-DSA) is the most compatible one among all quantum-resistant algorithms. 
-While the NIST standard stateless hash-based signature scheme parameter choice making the it suboptimal to implement in the Bitcoin, we still can optimize the algorithm to be more efficient.
-This could be achived through optimizing the algorithm structure or only changing construction parameters. 
-For the first case, we need to make sure that the modifications are proven to be secure which needs to pass the test of time with enough research done.
-The more reasonable and safe option is to change parameters to achive smaller signature size and smaller signing/verification costs. 
-Fortunely for us, we have enough room to play with the paraters to obtain signatures that sufficient for the Bitcoin. 
+In the case of Bitcoin, hash-based signature schemes are the most compatible among all quantum-resistant signature algorithms.  Still, the smallest stateless hash-based signature proposed by NIST (SLH-DSA-128s) is 7,856 bytes, which is more than 100$\times$ larger than the current Schnorr signature. The question is whether we can have something smaller and more practical without significant deviation from the standard?
 
-In this document we will show and explain the methodology of searching parameters for SHRINCS stateless part (SHL-DSA architecture for $2^{40}$ signatures). 
+SHRINCS proposes a hybrid signature that consists of a stateful and a stateless part, varying the signature size from \emph{324} (stateful) to \emph{X} (stateless) bytes. This document tries to answer the question of what the value of \emph{X} might be while keeping other signature metrics (KeyGen, SigGen, SigVer, etc) practical.
+
+In this document, we show the methodology of searching parameters for SLH-DSA-compatible signatures: how changes in the hypertree structure and other parameters can affect the signature metrics. Unfortunately, as mentioned before, we keep ourselves in very conservative bounds and avoid any changes in signature sub-algorithms to make the signature as compatible as possible with the SLH-DSA standard. 
+
+\textit{Sometimes we will refer to amazing proposals, like hypertree pruning and +C compression techniques, which allow us to achieve even better shrinking results. Although some of them can be considered as partially compatible, we do not rely on them in the evaluation framework. We still think it's useful to present the potential capabilities of such techniques and allow the reader to tweak the parameters based on them.} 

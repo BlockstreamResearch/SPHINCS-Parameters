@@ -2,94 +2,88 @@
 
 \subsection{Initial Search Conditions}
 
-Searching for the best parameters require defining conditions that the best parameters set must to satisfy. 
-Consequently, the conditions must rely on some metrics, which depend on the parameters. We use the following metrics:
+Searching for the best parameters require defining conditions that the best parameters set must to satisfy.  Consequently, the conditions must rely on some metrics, which depend on the parameters. We use the following ones:
 
 \begin{itemize}
-    \item Signature size: the size of the signture in bytes;
-    \item Key generation cost: the number of SHA-256 compressions computations during key generation phase;
-    \item Signing cost: compressions evaluated during signing phase;
-    \item Verification cost: the number of compressions during verification phase;
-    \item compression per byte: the ratio between verification cost to the signature size.
+    \item Signature size: the size of the signature in bytes;
+    \item Key Generation cost: the number of SHA-256 compressions during key generation phase;
+    \item Signature Generation cost: compressions executed during signing phase;
+    \item Signature Verification cost: the number of compressions during verification phase;
+    \item Compression per Byte: the ratio between verification cost to the signature size.
 \end{itemize}
 
-Considering the specifics of the Bitcoin, we require to have size smaller than in the SLH-DSA. 
-Note, we previoulsy set the security level must equal to 128-bits, which is also condition that must to be satisfied.
+We think that's pretty valuable to choose SLH-DSA-128s as the baseline for the search, which gives us an intuitive way to fairly compare the metrics between custom parameters and standartized SLH-DSA.
 
-We choose SLH-DSA-128s as the baseline for the search, which gives us an intuitive way to fairly compare the metrics between custom parameters and standartized SLH-DSA.
+\subsection{Toolset}
+These nice sage scripts: https://github.com/BlockstreamResearch/SPHINCS-Parameters
 
-\subsection{Search Strategy}
+\subsection{Sweep Strategy}
+We start by running through all parameter pairs $(h,d,k,a,w)$.  Applying the bounds (security level, size $\leq$ SLH-DSA, no less than $2^{40}$ signatures) reduce the search space from \textbf{41,328} candidates to \textbf{9,229}. Minus 78\% of candidates, but the left space of is still big to traverse, so we need to apply other conditions to make the possible parameters set smaller. 
 
-With initialized search space, we start by running through all parameter pairs $(h,d,k,a,w)$ that satisfy security bound and signature size smaller than SLH-DSA. 
-Applying this conditions reduce search space from 41,328 candidates to 9229.
-But the space of posible parameters is still big to traverse, so we need to apply other conditions to make the possible parameters set smaller. 
-
-Let's introduce the following filters to defined metrics:
+Let's introduce the following filters:
 
 \begin{itemize}
-    \item Bound on signature size (input: \text{max\_size}): $\text{size} \leq \text{max\_size}$;
-    \item Bound on key generation cost (input: $X$): $\text{cost}_{\text{kg\_custom}} \leq X \cdot \text{cost}_{\text{kg\_std}}$;
-    \item Bound on signature generation cost (input: $X$): $\text{cost}_{\text{sg\_custom}} \leq X \cdot \text{cost}_{\text{sg\_std}}$;
-    \item Bound on signature verification cost (input: $X$): $\text{cost}_{\text{sv\_custom}} \leq X \cdot \text{cost}_{\text{sv\_std}}$;
-    \item Bound on compression per byte (input: $X$): $ \text{cost}_{\text{cb\_custom}}/\text{size} \leq X $
+    \item \textbf{Bound on signature size}: $\mathsf{target.size}\leq c_{size} \cdot \mathsf{std.size}$, where $c_{size}$ is a input size coefficient ($0 \leq c_{size} \leq \mathsf{std.size}$)
+    \item \textbf{Bound on key generation cost }: $\mathsf{target.KeyGen}\leq c_{kg} \cdot \mathsf{std.KeyGen}$, where $c_{kg}$ is a key generation cost coefficient ($c_{kg} > 0$)
+    \item \textbf{Bound on signature generation cost }: $\mathsf{target.SigGen}\leq c_{sg} \cdot \mathsf{std.SigGen}$, where $c_{sg}$ is a signature generation cost coefficient ($c_{sg} > 0$)
+    \item \textbf{Bound on signature verification cost }: $\mathsf{target.SigVer}\leq c_{sv} \cdot \mathsf{std.GigVer}$, where $c_{sv}$ is a signature verification cost coefficient ($c_{sg} > 0$)
+    \item \textbf{Bound on compressions per byte verification ratio}: $\mathsf{target.C/B}\leq c_{cb} \cdot \mathsf{std.C/B}$, where $c_{cb}$ is a C/B coefficient  ($c_{sb} > 0$)
 \end{itemize}
 
-where $X$ is arbitrary positive real number, and \text{max\_size} is the positive integer value.
+We can apply following filters in different combinations, with different values used to bound the metrics to get the desired result. Let's consider the following cases to investigate how the filters setup affects the set of parameters.
 
-We can apply follwoing filters in different combinations, with different values used to bound the metrics to get the desired result.
-Let's consider the following cases to investigate how the filters setup affects the set of suitable parameters.
-
-\paragraph{Absolute optimal single metric} This is case, where we try to find the smallest metric while keeping only initial conditions. 
-The bounds on other metrics are unlimited. The results shown in the table. 
-\newpage
+\subsubsection{Case 1: Best In Class}
+This is the case, where we try to find the most efficient signature per a certain metric.  The bounds on other metrics are unlimited. The results shown in the table. 
 
 \begin{table}[h!]
 \small
 \raggedright 
 \caption{Absolute Global Extremes}
+% ADD (VS std, $\times$) for SigVer
 \label{tab:minimal_metric_each}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{llrrrrrrrr}
 \toprule
-\textbf{Award Category} & \textbf{Tuple $(h, d, k, a, w)$} & \textbf{Size (B)} & \textbf{vs. Std} & \textbf{Keygen ($C$)} & \textbf{KG/Std} & \textbf{Sign ($C$)} & \textbf{SG/Std} & \textbf{Verify ($C$)} & \textbf{$\rho$ ($C$/B)} \\
+\textbf{Award Category} & \textbf{Tuple $(h, d, k, a, w)$} & \textbf{Size (B)} & \textbf{VS std, \%} & \textbf{KeyGen ($C$)} & \textbf{VS std, $\times$} & \textbf{SigGen ($C$)} & \textbf{VS std, $\times$} & \textbf{SigVer ($C$)} & \textbf{$\rho$ ($C$/B)} \\
 \midrule
-\texttt{STANDARD} Baseline & $(63, 7, 14, 12, 16)$ & $7872$ & $+0.0\%$ & $2.93 \times 10^5$ & $1.00\text{x}$ & $2.28 \times 10^6$ & $1.00\text{x}$ & $2387$ & $0.30$ \\
-Smallest Signature & $(50, 2, 6, 20, 256)$ & $3424$ & $-56.5\%$ & $1.55 \times 10^{11}$ & $5.29 \times 10^5\text{x}$ & $3.10 \times 10^{11}$ & $1.36 \times 10^5\text{x}$ & $4953$ & $1.45$ \\
-Fastest Keygen & $(40, 10, 8, 20, 32)$ & $7680$ & $-2.4\%$ & $1.40 \times 10^4$ & $0.05\text{x}$ & $3.37 \times 10^7$ & $14.78\text{x}$ & $4673$ & $0.61$ \\
-Fastest Signing & $(40, 8, 23, 8, 32)$ & $7440$ & $-5.5\%$ & $2.80 \times 10^4$ & $0.10\text{x}$ & $2.47 \times 10^5$ & $0.11\text{x}$ & $3888$ & $0.52$ \\
-Fastest Verification & $(50, 2, 7, 17, 16)$ & $3968$ & $-49.6\%$ & $1.92 \times 10^{10}$ & $6.55 \times 10^4\text{x}$ & $3.84 \times 10^{10}$ & $1.68 \times 10^4\text{x}$ & $894$ & $0.23$ \\
-Best Density Ratio (\texorpdfstring{$\rho$}{rho}) & $(50, 2, 23, 15, 16)$ & $7840$ & $-0.4\%$ & $1.92 \times 10^{10}$ & $6.55 \times 10^4\text{x}$ & $3.84 \times 10^{10}$ & $1.68 \times 10^4\text{x}$ & $1366$ & $0.17$ \\
+%---
+\texttt{STANDARD} Baseline & $(63, 7, 14, 12, 16)$ & $7872$ & $+0.0\%$ & $2.93 \times 10^5$ & $1.00$ & $2.28 \times 10^6$ & $1.00$ & $2387$ & $0.30$ \\
+%---
+Smallest Signature & $(50, 2, 6, 20, 256)$ & \textcolor{green}{$3424$} & \textcolor{green}{$-56.5\%$} & \textcolor{red}{$1.55 \times 10^{11}$} & \textcolor{red}{$5.29 \times 10^5$} & \textcolor{red}{$3.10 \times 10^{11}$} & \textcolor{red}{$1.36 \times 10^5$} & \textcolor{red}{$4953$} & \textcolor{red}{$1.45$} \\
+%---
+Fastest Keygen & $(40, 10, 8, 20, 32)$ & \textcolor{red}{$7680$} & \textcolor{red}{$-2.4\%$} & \textcolor{green}{$1.40 \times 10^4$} & \textcolor{green}{$0.05$} & \textcolor{orange}{$3.37 \times 10^7$} & \textcolor{orange}{$14.78$} & \textcolor{orange}{$4673$} & \textcolor{orange}{$0.61$} \\
+%---
+Fastest Signing & $(40, 8, 23, 8, 32)$ & \textcolor{red}{$7440$} & \textcolor{red}{$-5.5\%$} & \textcolor{green}{$2.80 \times 10^4$} & \textcolor{green}{$0.10$} & \textcolor{green}{$2.47 \times 10^5$} & \textcolor{green}{$0.11$} & \textcolor{orange}{$3888$} & \textcolor{orange}{$0.52$} \\
+%---
+Fastest Verification & $(50, 2, 7, 17, 16)$ & \textcolor{green}{$3968$} & \textcolor{green}{$-49.6\%$} & \textcolor{red}{$1.92 \times 10^{10}$} & \textcolor{red}{$6.55 \times 10^4$} & \textcolor{red}{$3.84 \times 10^{10}$} & \textcolor{red}{$1.68 \times 10^4$} & \textcolor{green}{$894$} & \textcolor{green}{$0.23$} \\
+%---
+Best Density Ratio (\texorpdfstring{$\rho$}{rho}) & $(50, 2, 23, 15, 16)$ & \textcolor{red}{$7840$} & \textcolor{red}{$-0.4\%$} & \textcolor{red}{$1.92 \times 10^{10}$} & \textcolor{red}{$6.55 \times 10^4$} & \textcolor{red}{$3.84 \times 10^{10}$} & \textcolor{red}{$1.68 \times 10^4$} & \textcolor{green}{$1366$} & \textcolor{green}{$0.17$} \\
 \bottomrule
 \end{tabular}%
 }
 \end{table}
 
-From Table~\ref{tab:minimal_metric_each}, we can see that the results for each metric is minimized as possible, 
-but with the cost of other metrics being too big, which makes this parameters impractical to use. Let's consider strategy to find the suitable parameters.
+From Table~\ref{tab:minimal_metric_each}, we can see that the results for each metric is minimized as possible, but (unfortunately) for the big trade of other metrics, which makes this parameters impractical to use. Let's consider another strategy to find the suitable parameters.
 
-\paragraph{Balanced Metrics} If we ask a question, how the size set of parameters change, if we use common value $X$ across all 5 metrics (setting $\text{max\_size} = X \cdot \text{size\_std}$ for $X \leq 1$)? 
-How the number of candidates changes depending on choice of filter input? What is the smallest $X$ that we can set to obtain a few candidates? 
-We apply the result for different values of $X$, and obtain the following results:
-
-\begin{figure}[htbp]
+\subsubsection{Case 2: Balanced Metrics} 
+The next experiment: let's find "average" candidates for which all metrics will not exceed a particular threshold $X \cdot \mathsf{std}$ (filter applied to each metric, and exception only is the max signature size). By increasing $X$ we receive the following picture:
+\begin{figure}[h!]
     \centering
-    \includegraphics[width=0.8\textwidth]{content/images/concentric_diagram.png}
+    \includegraphics[width=0.5\textwidth]{content/images/concentric_diagram.png}
     \caption{Global Minimax Expansion: Concentric Euler diagram illustrating the volume of candidates unlocked at expanding uniform multiplier thresholds.}
     \label{fig:concentric_minimax}
 \end{figure}
 
-The bigger the multiplier, the bigger numer of candidates we get through the search process. 
-And the oppossite is also true, with smaller $X$, the number of candidates becomes smaller. 
-The smallest value of multiplier is $X \approx 0.8840$, and the results presented in the Table~\ref{tab:optimal_candidate_metrics}
+Obviously, the smaller the multiplier $X$, the smaller number of candidates we get through the search process. Moreover, we can see a clear winner ($X \approx 0.8840$), but let's investigate how cool it is (Table~\ref{tab:optimal_candidate_metrics}). 
 
-\begin{table}[htbp]
+\begin{table}[h!]
     \centering
     \small
-    \caption{Performance Comparison between the Standard Baseline and the Balanced Candidate ($X = 0.8840$)}
+    \caption{Performance Comparison between the Standard Baseline and the Balanced Candidate}
     \label{tab:optimal_candidate_metrics}
     \begin{tabular}{lrrr}
         \toprule
-        \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Optimal Candidate} & \textbf{Relative Multiplier ($X$)} \\
+        \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Optimal Candidate} & \textbf{Ratio} \\
         \midrule
         Parameters $(h, d, k, a, w)$ & $(63, 7, 14, 12, 16)$ & $(40, 5, 24, 8, 16)$ & -- \\
         Signature Size (Bytes) & $7,872$ & $6,928$ & $0.8801\times$ \\
@@ -101,8 +95,7 @@ The smallest value of multiplier is $X \approx 0.8840$, and the results presente
     \end{tabular}
 \end{table}
 
-Even if it is balanced metric, sometimes there is need in tradeoffs and searching for smaller metric values.
-Below we explain and visualize the strategy to find such candidates.
+Someone can say it's pretty good. Our opinion that 12\% win on the signature size isn't very attractive. 
 
 \paragraph{Optimal Search Strategy} Every candidates can be related to the some tuple of metrics value. 
 The search for optimal candidate could be represented as finding the closest point to the origin in five dimentionl space (finding the shortest vector). 
