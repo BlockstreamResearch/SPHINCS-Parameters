@@ -4,10 +4,11 @@ Executes specialized SLH-DSA parameter sweeps using basic WOTS-TW + FORS archite
 UNIVERSAL CONSTRAINT: Signature sizes in ALL categories strictly cannot exceed the Standard Baseline (7856B).
 
 Selective execution flags:
-  --cat1    Run Category 1: Absolute Extremes
-  --cat2    Run Category 2: Time-Constrained Signatures
-  --cat3    Run Category 3: Speed & CPB Optimized Tracks
-  (If no flags are provided, all categories are executed by default.)
+  --cat1               Run Category 1: Absolute Extremes
+  --cat2               Run Category 2: Time-Constrained Signatures
+  --cat3               Run Category 3: Speed & CPB Optimized Tracks
+  --only-new-coeffs    Generate data strictly for new sub-standard coefficients
+  (If no category flags are provided, all requested categories are executed by default.)
 """
 
 import os
@@ -21,7 +22,13 @@ import seaborn as sns
 STD_SIZE = 7856
 STD_CPB = 0.303845
 
-BASE_DIR = "outputs_specialized"
+# =============================================================================
+# Global Configuration Toggles
+# =============================================================================
+# Set to True to execute sweeps strictly for newly added sub-standard coefficients [0.3, 0.5, 0.7, 0.9]
+ONLY_NEW_COEFFS = False
+
+BASE_DIR = os.path.join("utils", "outputs_specialized")
 CAT1_DIR = os.path.join(BASE_DIR, "cat1_extremes")
 CAT2_DIR = os.path.join(BASE_DIR, "cat2_time_constrained")
 CAT3_DIR = os.path.join(BASE_DIR, "cat3_speed_optimized")
@@ -142,19 +149,17 @@ def run_category_1():
 # =============================================================================
 # CATEGORY 2: Smallest Signatures Under Strictly Capped Times
 # =============================================================================
-def run_category_2():
+def run_category_2(factors):
     print("\n" + "="*70)
     print("Category 2: Smallest Signatures Capped by Execution Time")
     print("="*70)
-    
-    factors = [1.0, 1.5, 2.0, 5.0, 10.0]
     
     for x in factors:
         folder_path = os.path.join(CAT2_DIR, f"time_cap_{x}x")
         os.makedirs(folder_path, exist_ok=True)
         
         print(f"-> Sweeping for Smallest Size (Size <= Std) with All Times <= {x}x Standard...")
-        df_pool = run_basic_sweep(max_size=STD_SIZE, kg_r=x, sg_r=x, sv_r=x)
+        df_pool = run_basic_sweep(max_size=STD_SIZE, kg_r=x, sg_r=x, sv_r=x, cpb_max=STD_CPB*x)
         
         if len(df_pool) <= 1:
             print(f"   [!] No custom candidates pass operational caps at {x}x std.")
@@ -174,12 +179,10 @@ def run_category_2():
 # =============================================================================
 # CATEGORY 3: 4 Tracks Optimized One-by-One (Remaining Overheads Scaled)
 # =============================================================================
-def run_category_3():
+def run_category_3(factors):
     print("\n" + "="*70)
     print("Category 3: 4 Tracks Optimized One-by-One Under Scaled Overheads")
     print("="*70)
-    
-    factors = [1.0, 1.5, 2.0, 5.0, 10.0]
     
     tracks = [
         {
@@ -252,9 +255,17 @@ def main():
     parser.add_argument("--cat1", action="store_true", help="Execute strictly Category 1: Absolute Extremes")
     parser.add_argument("--cat2", action="store_true", help="Execute strictly Category 2: Time-Constrained Signatures")
     parser.add_argument("--cat3", action="store_true", help="Execute strictly Category 3: Individual Operational Tracks")
+    parser.add_argument("--only-new-coeffs", action="store_true", help="Generate data strictly for new sub-standard coefficients [0.3, 0.5, 0.7, 0.9]")
     args = parser.parse_args()
 
     run_all = not (args.cat1 or args.cat2 or args.cat3)
+
+    sweep_only_new = ONLY_NEW_COEFFS or args.only_new_coeffs
+    if sweep_only_new:
+        factors_list = [0.8 , 0.85]
+        print("\n[*] Execution Mode: Restricted to Newly Integrated Coefficients")
+    else:
+        factors_list = [0.3, 0.5, 0.7, 0.8 , 0.85, 0.9, 1.0, 1.5, 2.0, 5.0, 10.0]
 
     if not shutil.which("sage"):
         print("Critical Error: 'sage' engine is inaccessible. Initialize Sage environment first.")
@@ -267,9 +278,9 @@ def main():
     if run_all or args.cat1:
         run_category_1()
     if run_all or args.cat2:
-        run_category_2()
+        run_category_2(factors_list)
     if run_all or args.cat3:
-        run_category_3()
+        run_category_3(factors_list)
 
     print("\n" + "="*70)
     print(f"Requested execution scope successfully finished! Workspace stored in: '{BASE_DIR}/'")
