@@ -38,25 +38,24 @@ In this case, we find the most efficient signature for a single metric at a time
 \small
 \raggedright 
 \caption{Absolute Global Extremes}
-% ADD (VS std, $\times$) for SigVer
 \label{tab:minimal_metric_each}
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{llrrrrrrrr}
+\begin{tabular}{llrrrrrrrrr}
 \toprule
-\textbf{Award Category} & \textbf{Tuple $(h, d, k, a, w)$} & \textbf{Size (B)} & \textbf{VS std, \%} & \textbf{KeyGen ($C$)} & \textbf{VS std, $\times$} & \textbf{SigGen ($C$)} & \textbf{VS std, $\times$} & \textbf{SigVer ($C$)} & \textbf{$\rho$ ($C$/B)} \\
+\textbf{Award Category} & \textbf{Tuple $(h, d, k, a, w)$} & \textbf{Size (B)} & \textbf{VS std, \%} & \textbf{KeyGen ($C$)} & \textbf{VS std, $\times$} & \textbf{SigGen ($C$)} & \textbf{VS std, $\times$} & \textbf{SigVer ($C$)} & \textbf{VS std, $\times$} & \textbf{$\rho$ ($C$/B)} \\
 \midrule
 %---
-\texttt{STANDARD} Baseline & $(63, 7, 14, 12, 16)$ & $7872$ & $+0.0\%$ & $2.93 \times 10^5$ & $1.00$ & $2.28 \times 10^6$ & $1.00$ & $2387$ & $0.30$ \\
+\texttt{STANDARD} Baseline & $(63, 7, 14, 12, 16)$ & $7872$ & $+0.0\%$ & $2.93 \times 10^5$ & $1.00$ & $2.28 \times 10^6$ & $1.00$ & $2387$ & $1.00$ & $0.30$ \\
 %---
-Smallest Signature & $(50, 2, 6, 20, 256)$ & \textcolor{green}{$3424$} & \textcolor{green}{$-56.5\%$} & \textcolor{red}{$1.55 \times 10^{11}$} & \textcolor{red}{$5.29 \times 10^5$} & \textcolor{red}{$3.10 \times 10^{11}$} & \textcolor{red}{$1.36 \times 10^5$} & \textcolor{red}{$4953$} & \textcolor{red}{$1.45$} \\
+Smallest Signature & $(50, 2, 6, 20, 256)$ & \textcolor{green}{$3424$} & \textcolor{green}{$-56.5\%$} & \textcolor{red}{$1.55 \times 10^{11}$} & \textcolor{red}{$5.29 \times 10^5$} & \textcolor{red}{$3.10 \times 10^{11}$} & \textcolor{red}{$1.36 \times 10^5$} & \textcolor{red}{$4953$} & \textcolor{red}{$2.08$} & \textcolor{red}{$1.45$} \\
 %---
-Fastest Keygen & $(40, 10, 8, 20, 32)$ & \textcolor{red}{$7680$} & \textcolor{red}{$-2.4\%$} & \textcolor{green}{$1.40 \times 10^4$} & \textcolor{green}{$0.05$} & \textcolor{orange}{$3.37 \times 10^7$} & \textcolor{orange}{$14.78$} & \textcolor{orange}{$4673$} & \textcolor{orange}{$0.61$} \\
+Fastest Keygen & $(40, 10, 8, 20, 32)$ & \textcolor{red}{$7680$} & \textcolor{red}{$-2.4\%$} & \textcolor{green}{$1.40 \times 10^4$} & \textcolor{green}{$0.05$} & \textcolor{orange}{$3.37 \times 10^7$} & \textcolor{orange}{$14.78$} & \textcolor{orange}{$4673$} & \textcolor{orange}{$1.96$} & \textcolor{orange}{$0.61$} \\
 %---
-Fastest Signing & $(40, 8, 23, 8, 32)$ & \textcolor{red}{$7440$} & \textcolor{red}{$-5.5\%$} & \textcolor{green}{$2.80 \times 10^4$} & \textcolor{green}{$0.10$} & \textcolor{green}{$2.47 \times 10^5$} & \textcolor{green}{$0.11$} & \textcolor{orange}{$3888$} & \textcolor{orange}{$0.52$} \\
+Fastest Signing & $(40, 8, 23, 8, 32)$ & \textcolor{red}{$7440$} & \textcolor{red}{$-5.5\%$} & \textcolor{green}{$2.80 \times 10^4$} & \textcolor{green}{$0.10$} & \textcolor{green}{$2.47 \times 10^5$} & \textcolor{green}{$0.11$} & \textcolor{orange}{$3888$} & \textcolor{orange}{$1.63$} & \textcolor{orange}{$0.52$} \\
 %---
-Fastest Verification & $(50, 2, 7, 17, 16)$ & \textcolor{green}{$3968$} & \textcolor{green}{$-49.6\%$} & \textcolor{red}{$1.92 \times 10^{10}$} & \textcolor{red}{$6.55 \times 10^4$} & \textcolor{red}{$3.84 \times 10^{10}$} & \textcolor{red}{$1.68 \times 10^4$} & \textcolor{green}{$894$} & \textcolor{green}{$0.23$} \\
+Fastest Verification & $(50, 2, 7, 17, 16)$ & \textcolor{green}{$3968$} & \textcolor{green}{$-49.6\%$} & \textcolor{red}{$1.92 \times 10^{10}$} & \textcolor{red}{$6.55 \times 10^4$} & \textcolor{red}{$3.84 \times 10^{10}$} & \textcolor{red}{$1.68 \times 10^4$} & \textcolor{green}{$894$} & \textcolor{green}{$0.37$} & \textcolor{green}{$0.23$} \\
 %---
-Best Density Ratio (\texorpdfstring{$\rho$}{rho}) & $(50, 2, 23, 15, 16)$ & \textcolor{red}{$7840$} & \textcolor{red}{$-0.4\%$} & \textcolor{red}{$1.92 \times 10^{10}$} & \textcolor{red}{$6.55 \times 10^4$} & \textcolor{red}{$3.84 \times 10^{10}$} & \textcolor{red}{$1.68 \times 10^4$} & \textcolor{green}{$1366$} & \textcolor{green}{$0.17$} \\
+Best Density Ratio (\texorpdfstring{$\rho$}{rho}) & $(50, 2, 23, 15, 16)$ & \textcolor{red}{$7840$} & \textcolor{red}{$-0.4\%$} & \textcolor{red}{$1.92 \times 10^{10}$} & \textcolor{red}{$6.55 \times 10^4$} & \textcolor{red}{$3.84 \times 10^{10}$} & \textcolor{red}{$1.68 \times 10^4$} & \textcolor{green}{$1366$} & \textcolor{green}{$0.57$} & \textcolor{green}{$0.17$} \\
 \bottomrule
 \end{tabular}%
 }
@@ -185,9 +184,9 @@ We start with \emph{19,437} candidates. The signature-size filter trims the pool
 
 With the final 60 candidates in hand, we are ready to pick a winner.
 
-For each surviving candidate $P$, let $X_i$ denote the ratio of the candidate's value for metric $i$ to the corresponding standard value, where $i \in \{\text{size}, \text{kg}, \text{sg}, \text{sv}, \text{cb}\}$. Working with ratios rather than raw values keeps the five axes on a common, dimensionless scale. The Euclidean distance from the origin to $P$ is then
+For each surviving candidate $P$, let $\widetilde{X}_i$ denote the ratio of the candidate's value for metric $i$ to the corresponding standard value, where $i \in \{\text{size}, \text{kg}, \text{sg}, \text{sv}, \text{cb}\}$. Working with ratios rather than raw values keeps the five axes on a common, dimensionless scale. The Euclidean distance from the origin to $P$ is then
 \begin{equation}
-    d(P) = \sqrt{X_{\text{size}}^2 + X_{\text{kg}}^2 + X_{\text{sg}}^2 + X_{\text{sv}}^2 + X_{\text{cb}}^2}\,,
+    d(P) = \sqrt{\widetilde{X}_{\text{size}}^2 + \widetilde{X}_{\text{kg}}^2 + \widetilde{X}_{\text{sg}}^2 + \widetilde{X}_{\text{sv}}^2 + \widetilde{X}_{\text{cb}}^2}\,,
     \label{eq:euclidean_distance}
 \end{equation}
 and the optimal candidate is the one minimizing $d(P)$.
@@ -205,11 +204,11 @@ To keep the calculation proportionally consistent regardless of the absolute sca
 
 Using these normalized coefficients, we calculate the Weighted Euclidean Distance (the $L_2$ norm) from the origin $(0,0,0,0,0)$ to the candidate's point $P$. The distance $d(P)$ is defined as:
 \begin{equation}
-    d(P) = \sqrt{p_{\text{size}} X_{\text{size}}^2 + p_{\text{kg}} X_{\text{kg}}^2 + p_{\text{sg}} X_{\text{sg}}^2 + p_{\text{sv}} X_{\text{sv}}^2 + p_{\text{cb}} X_{\text{cb}}^2}
+    d(P) = \sqrt{p_{\text{size}} \widetilde{X}_{\text{size}}^2 + p_{\text{kg}} \widetilde{X}_{\text{kg}}^2 + p_{\text{sg}} \widetilde{X}_{\text{sg}}^2 + p_{\text{sv}} \widetilde{X}_{\text{sv}}^2 + p_{\text{cb}} \widetilde{X}_{\text{cb}}^2}
     \label{eq:weighted_euclidean_distance}
 \end{equation}
 
-As before, each $X_i$ is the ratio of the candidate's metric to its standard counterpart, so the five axes remain on a common dimensionless scale.
+As before, each $\widetilde{X}_i$ is the ratio of the candidate's metric to its standard counterpart, so the five axes remain on a common dimensionless scale.
 
 To visualize the distances, we map each candidate's distance onto a colour scale: lower distances shade towards blue, higher distances towards red. As an example, consider the following two weight settings:
 \begin{itemize}
@@ -221,7 +220,7 @@ The result for the first case is shown below.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.7\textwidth]{content/images/sieve_step7_distance_1.png}
+    \includegraphics[width=0.75\textwidth]{content/images/sieve_step7_distance_1.png}
     \caption{Visualization of Searching for the Case 1.}
     \label{fig:distance_plot_1}
 \end{figure}
@@ -236,7 +235,7 @@ The parameters and metric values of the best candidate are shown in Table~\ref{t
     \label{tab:euclidean_candidate_metrics_case_1}
     \begin{tabular}{lrrr}
         \toprule
-        \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Best Candidate} & \textbf{Relative Multiplier ($X$)} \\
+        \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Best Candidate} & \textbf{Ratio to Std.} \\
         \midrule
         Parameters $(h, d, k, a, w)$ & $(63, 7, 14, 12, 16)$ & $(40, 5, 19, 9, 16)$ & -- \\
         Signature Size (Bytes) & $7,872$ & $6,512$ & $0.8272\times$ \\
@@ -268,7 +267,7 @@ The resulting values are shown in Table~\ref{tab:euclidean_candidate_metrics_cas
     \label{tab:euclidean_candidate_metrics_case_2}
     \begin{tabular}{lrrr}
         \toprule
-        \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Best Candidate} & \textbf{Relative Multiplier ($X$)} \\
+        \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Best Candidate} & \textbf{Ratio to Std.} \\
         \midrule
         Parameters $(h, d, k, a, w)$ & $(63, 7, 14, 12, 16)$ & $(40, 5, 13, 12, 16)$ & -- \\
         Signature Size (Bytes) & $7,872$ & $6,176$ & $0.7846\times$ \\
@@ -281,3 +280,67 @@ The resulting values are shown in Table~\ref{tab:euclidean_candidate_metrics_cas
 \end{table}
 
 Comparing the two cases, the resulting metrics differ noticeably. The first case yields more balanced costs across the board, while the second case clearly favours signature size and verification at the expense of a heavier signing operation - exactly the trade-off we asked the weights to enforce.
+
+\subsection{Ideal Candidate Examples} \label{sec:ideal-examples}
+
+To demonstrate the full pipeline on a concrete, tightly constrained scenario, we fix the following filtering coefficients:
+\begin{equation*}
+    X_{\text{size}} = 0.74, \quad X_{\text{kg}} = 1.0, \quad X_{\text{sg}} = 2,
+    \quad X_{\text{sv}} = 0.8, \quad X_{\text{cb}} = 1.
+\end{equation*}
+Applying these constraints to the full parameter grid leaves exactly two surviving configurations, whose metrics are compared against the standard baseline in Table~\ref{tab:euclidean_candidate_metrics_ideal}.
+
+\begin{table}[htbp]
+\centering
+\small
+\raggedright
+\caption{Performance Comparison between the Standard Baseline and the Two Evaluated Candidates}
+\label{tab:euclidean_candidate_metrics_ideal}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Metric} & \textbf{Standard Baseline} & \textbf{Candidate 1} &
+\textbf{Ratio to Std.} & \textbf{Candidate 2} & \textbf{Ratio to Std.} \\
+\midrule
+Parameters $(h, d, k, a, w)$      & $(63, 7, 14, 12, 16)$ & $(45, 5, 10, 13, 16)$ & --            & $(45, 5, 8, 16, 16)$ & --            \\
+Signature Size (Bytes)            & $7{,}872$             & $5{,}792$             & $0.7358\times$ & $5{,}728$            & $0.7276\times$ \\
+Key Generation Cost               & $292{,}862.0$         & $292{,}862.0$         & $1.0000\times$ & $292{,}862.0$        & $1.0000\times$ \\
+Signing Cost                      & $2{,}279{,}391.0$     & $1{,}791{,}978.0$     & $0.7862\times$ & $3{,}561{,}453.0$    & $1.5625\times$ \\
+Verification Cost                 & $2{,}387.0$           & $1{,}726.0$           & $0.7231\times$ & $1{,}719.0$          & $0.7202\times$ \\
+Compression per Byte ($\rho$)     & $0.303227$            & $0.297997$            & $0.9828\times$ & $0.300105$           & $0.9897\times$ \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+As the table makes clear, the two survivors represent distinct operationaltrade-offs. 
+Candidate~1 offers a well-rounded improvement: signature size, signing cost, and verification cost all decrease relative to the standard.
+Candidate~2 pushes further on size and verification, but at a concrete price---its signing cost exceeds the standard by more than $1.5\times$, making it suitable only in contexts where signing latency is secondary.
+
+To determine which candidate is preferable, we specify the optimization priorities via the weight coefficients introduced in Section~\ref{sec:decisional-weights}. We consider two illustrative settings:
+\begin{itemize}
+    \item \textbf{Case 1:} $w_{\text{size}} = w_{\text{kg}} = w_{\text{sg}} = w_{\text{sv}} = w_{\text{cb}} = 1$;
+    \item \textbf{Case 2:} $w_{\text{size}} = 15, w_{\text{kg}} = 0.1, w_{\text{sg}} = 0.1, w_{\text{sv}} = 15, w_{\text{cb}} = 0.1$.
+\end{itemize}
+
+Under the uniform weights of Case~1, Candidate~1 achieves the smallest weighted distance and is therefore selected as the optimal configuration. The search outcome is visualized in Figure~\ref{fig:ideal_distance_plot_1}.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.75\textwidth]{content/images/ideal_candidate_case_1.png}
+\caption{Visualization of the search process under balanced weights (Case~1).}
+\label{fig:ideal_distance_plot_1}
+\end{figure}
+
+Under Case~2, the heavy penalties attached to size and verification are sufficient to overcome Candidate~2's signing-cost disadvantage: its gains on the two prioritized axes yield a strictly shorter weighted distance than Candidate~1, shifting the optimum accordingly. This outcome is shown in Figure~\ref{fig:ideal_distance_plot_2}.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.75\textwidth]{content/images/ideal_candidate_case_2.png}
+\caption{Visualization of the search process under size- and verification-weighted priorities (Case~2).}
+\label{fig:ideal_distance_plot_2}
+\end{figure}
+
+The interactive visualization used to produce Figure~\ref{fig:ideal_distance_plot_1} and Figure~\ref{fig:ideal_distance_plot_2} is publicly available at \url{https://mjthatch.github.io/SPHINCS-Parameters/site/}.
+
+

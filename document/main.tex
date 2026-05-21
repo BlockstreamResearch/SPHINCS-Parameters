@@ -23,7 +23,7 @@
 %% Decide which name is canonical and use it consistently throughout the document.
 %% (If "SHRINCS" is intentional — the hybrid construction's own name — consider a short
 %% footnote on first mention to disambiguate it from SPHINCS+/SLH-DSA.)
-\title{SHRINCS Parameter Search Methodology}
+\title{SHRINCS Stateless Parameter Search Methodology}
 \date{\today}
 
 \begin{document}
@@ -37,14 +37,9 @@
 \input{content/2-parameters}
 \input{content/3-search}
 
-%% SUGGESTION: If you add \cite{} calls to the introduction (nist, delving-post,
-%% conduition-blog, mike-paper), set up a bibliography here by adding a refs.bib
-%% file and the following lines before \end{document}:
-%%
-%%     \bibliographystyle{plain}
-%%     \bibliography{refs}
-%%
-%% Without this, every citation will render as "[?]" and latexmk will emit
-%% "Citation undefined" warnings.
+\newpage
+
+\bibliographystyle{plain}
+\bibliography{refs}
 
 \end{document}
