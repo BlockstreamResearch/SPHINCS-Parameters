@@ -281,13 +281,15 @@ The resulting values are shown in Table~\ref{tab:euclidean_candidate_metrics_cas
 
 Comparing the two cases, the resulting metrics differ noticeably. The first case yields more balanced costs across the board, while the second case clearly favours signature size and verification at the expense of a heavier signing operation - exactly the trade-off we asked the weights to enforce.
 
-\subsection{Ideal Candidate Examples} \label{sec:ideal-examples}
+\section{Recommended Candidate Tuple} \label{sec:ideal-examples}
 
-To demonstrate the full pipeline on a concrete, tightly constrained scenario, we fix the following filtering coefficients:
+To demonstrate the full pipeline on a concrete parameter set we selected, we fix the following filtering coefficients:
 \begin{equation*}
-    X_{\text{size}} = 0.74, \quad X_{\text{kg}} = 1.0, \quad X_{\text{sg}} = 2,
-    \quad X_{\text{sv}} = 0.8, \quad X_{\text{cb}} = 1.
+    X_{\text{size}} = 0.74, \quad X_{\text{kg}} = 2.0, \quad X_{\text{sg}} = 2.0,
+    \quad X_{\text{sv}} = 0.8, \quad X_{\text{cb}} = 1.0.
 \end{equation*}
+These coefficients say that we really care about the signature size (to make at least 25\% win) and the verification complexity. At the same time having the key and signature complexity 2$\times$ at most is a acceptable trade-off because (1) it's not very critical taking into account even hardware wallet takes 2-3 seconds to produce SLH-DSA signature, (2) we can apply pruning technique \cite{conduition-blog} to reduce it additionally.  
+
 Applying these constraints to the full parameter grid leaves exactly two surviving configurations, whose metrics are compared against the standard baseline in Table~\ref{tab:euclidean_candidate_metrics_ideal}.
 
 \begin{table}[htbp]
@@ -313,9 +315,12 @@ Compression per Byte ($\rho$)     & $0.303227$            & $0.297997$          
 }
 \end{table}
 
-As the table makes clear, the two survivors represent distinct operationaltrade-offs. 
-Candidate~1 offers a well-rounded improvement: signature size, signing cost, and verification cost all decrease relative to the standard.
-Candidate~2 pushes further on size and verification, but at a concrete price---its signing cost exceeds the standard by more than $1.5\times$, making it suitable only in contexts where signing latency is secondary.
+As the table makes clear, the two survivors represent distinct operational trade-offs.
+\begin{itemize}
+    \item Candidate~1 offers a well-rounded improvement: signature size, signing cost, and verification cost all decrease relative to the standard.
+    \item Candidate~2 pushes further on size and verification, but at a concrete price - its signing cost exceeds the standard by more than $1.5\times$, making it suitable only in contexts where signing latency is secondary.
+\end{itemize}
+
 
 To determine which candidate is preferable, we specify the optimization priorities via the weight coefficients introduced in Section~\ref{sec:decisional-weights}. We consider two illustrative settings:
 \begin{itemize}
@@ -342,5 +347,3 @@ Under Case~2, the heavy penalties attached to size and verification are sufficie
 \end{figure}
 
 The interactive visualization used to produce Figure~\ref{fig:ideal_distance_plot_1} and Figure~\ref{fig:ideal_distance_plot_2} is publicly available at \url{https://mjthatch.github.io/SPHINCS-Parameters/site/}.
-
-
