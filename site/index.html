@@ -1,753 +1,890 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SHRINCS Parameter Explorer</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦐</text></svg>">
-<style>
-  :root {
-    --bg: #f7f7f5;
-    --panel: #ffffff;
-    --border: #e5e5e0;
-    --text: #1a1a1a;
-    --text-soft: #6b6b6b;
-    --text-mute: #9a9a92;
-    --accent: #2563eb;
-    --accent-soft: #dbeafe;
-    --good: #16a34a;
-    --good-soft: #dcfce7;
-    --warn: #d97706;
-    --bad: #dc2626;
-    --bad-soft: #fee2e2;
-    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  }
-  * { box-sizing: border-box; }
-  html, body {
-    margin: 0;
-    padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.5;
-  }
-  body { padding: 24px; }
-  header { max-width: 1280px; margin: 0 auto 20px; }
-  h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
-  .tagline { color: var(--text-soft); margin: 0; font-size: 14px; }
-  .tagline a { color: var(--accent); text-decoration: none; }
-  .tagline a:hover { text-decoration: underline; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SHRINCS Parameter Explorer</title>
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦐</text></svg>">
+  <style>
+    :root {
+      --bg: #f7f7f5;
+      --panel: #ffffff;
+      --border: #e5e5e0;
+      --text: #1a1a1a;
+      --text-soft: #6b6b6b;
+      --text-mute: #9a9a92;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --good: #16a34a;
+      --good-soft: #dcfce7;
+      --warn: #d97706;
+      --bad: #dc2626;
+      --bad-soft: #fee2e2;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
 
-  .layout {
-    max-width: 1280px;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: 320px 1fr;
-    gap: 16px;
-  }
+    * {
+      box-sizing: border-box;
+    }
 
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px;
-  }
-  .panel + .panel { margin-top: 16px; }
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
 
-  .panel h2 {
-    margin: 0 0 4px;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-soft);
-    font-weight: 600;
-  }
-  .panel .hint {
-    margin: 0 0 12px;
-    color: var(--text-mute);
-    font-size: 12px;
-  }
-  .section-title {
-    margin-top: 20px !important;
-  }
+    body {
+      padding: 24px;
+    }
 
-  .control {
-    margin-bottom: 10px;
-  }
-  .control label {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    font-size: 13px;
-    font-family: var(--mono);
-    margin-bottom: 2px;
-  }
-  .control label .name { color: var(--text); }
-  .control label .val { color: var(--accent); font-weight: 600; }
-  .control input[type="range"] {
-    width: 100%;
-    accent-color: var(--accent);
-  }
-  .control input.val-input {
-    width: 64px;
-    text-align: right;
-    border: 1px solid transparent;
-    background: transparent;
-    font-family: var(--mono);
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--accent);
-    padding: 2px 6px;
-    border-radius: 3px;
-    -moz-appearance: textfield;
-  }
-  .control input.val-input:hover {
-    border-color: var(--border);
-  }
-  .control input.val-input:focus {
-    outline: none;
-    border-color: var(--accent);
-    background: var(--accent-soft);
-  }
-  .control input.val-input::-webkit-inner-spin-button,
-  .control input.val-input::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
+    header {
+      max-width: 1280px;
+      margin: 0 auto 20px;
+    }
 
-  .reset-btn {
-    margin-top: 8px;
-    padding: 6px 12px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    color: var(--text-soft);
-    width: 100%;
-  }
-  .reset-btn:hover { background: var(--accent-soft); color: var(--accent); }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
 
-  .funnel-row {
-    display: grid;
-    grid-template-columns: 200px 1fr 80px;
-    gap: 8px;
-    align-items: center;
-    margin-bottom: 4px;
-    font-size: 13px;
-    font-family: var(--mono);
-  }
-  .funnel-row .label { color: var(--text-soft); }
-  .funnel-row .bar {
-    height: 18px;
-    background: var(--accent-soft);
-    border-radius: 3px;
-    transition: width 0.2s ease;
-  }
-  .funnel-row .count {
-    text-align: right;
-    color: var(--text);
-    font-weight: 500;
-  }
-  .funnel-row.eliminated .bar { background: var(--bad-soft); opacity: 0.6; }
+    .tagline {
+      color: var(--text-soft);
+      margin: 0;
+      font-size: 14px;
+    }
 
-  .scatter-wrap {
-    position: relative;
-  }
-  #scatter {
-    width: 100%;
-    height: 500px;
-    display: block;
-    border-radius: 4px;
-    cursor: crosshair;
-  }
-  #hover-ring {
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    border: 2px solid #1a1a1a;
-    border-radius: 50%;
-    pointer-events: none;
-    transform: translate(-50%, -50%);
-    display: none;
-    box-shadow: 0 0 0 1px rgba(255,255,255,0.9);
-  }
-  #tooltip {
-    position: fixed;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 10px 12px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-    pointer-events: none;
-    font-size: 12px;
-    z-index: 100;
-    min-width: 280px;
-    max-width: 340px;
-    display: none;
-  }
-  #tooltip .tt-tuple {
-    font-family: var(--mono);
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--accent);
-    margin: 0 0 4px;
-  }
-  #tooltip .tt-status {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-bottom: 8px;
-  }
-  #tooltip .tt-status.survivor { color: var(--good); }
-  #tooltip .tt-status.eliminated { color: var(--bad); }
-  #tooltip .tt-status.winner { color: var(--accent); }
-  #tooltip table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: var(--mono);
-    font-size: 11px;
-  }
-  #tooltip td {
-    padding: 2px 4px;
-  }
-  #tooltip td:first-child { color: var(--text-soft); }
-  #tooltip td:nth-child(2),
-  #tooltip td:nth-child(3) { text-align: right; }
-  #tooltip td.ratio { text-align: right; font-weight: 600; }
-  #tooltip td.ratio.good { color: var(--good); }
-  #tooltip td.ratio.warn { color: var(--warn); }
-  #tooltip td.ratio.bad { color: var(--bad); }
-  #tooltip .tt-distance {
-    margin-top: 6px;
-    padding-top: 6px;
-    border-top: 1px solid var(--border);
-    color: var(--text-soft);
-    font-size: 11px;
-  }
-  #tooltip .tt-distance strong {
-    color: var(--text);
-    font-family: var(--mono);
-  }
-  .scatter-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 10px;
-    font-size: 11px;
-    color: var(--text-soft);
-  }
-  .scatter-legend .item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .scatter-legend .swatch {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    display: inline-block;
-  }
+    .tagline a {
+      color: var(--accent);
+      text-decoration: none;
+    }
 
-  .winner-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-  }
-  .winner-tuple {
-    font-family: var(--mono);
-    font-size: 18px;
-    color: var(--accent);
-    font-weight: 600;
-    margin: 0 0 4px;
-  }
-  .winner-distance {
-    color: var(--text-soft);
-    font-size: 12px;
-    margin: 0;
-  }
-  table.metrics {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-    margin-top: 8px;
-  }
-  table.metrics th, table.metrics td {
-    padding: 6px 8px;
-    text-align: right;
-    border-bottom: 1px solid var(--border);
-    font-family: var(--mono);
-  }
-  table.metrics th:first-child, table.metrics td:first-child {
-    text-align: left;
-    color: var(--text-soft);
-  }
-  table.metrics th {
-    color: var(--text-soft);
-    font-weight: 500;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .ratio { font-size: 12px; }
-  .ratio.good { color: var(--good); }
-  .ratio.warn { color: var(--warn); }
-  .ratio.bad { color: var(--bad); }
+    .tagline a:hover {
+      text-decoration: underline;
+    }
 
-  .empty-state {
-    text-align: center;
-    color: var(--text-mute);
-    padding: 24px;
-    font-style: italic;
-  }
+    .layout {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 16px;
+    }
 
-  .custom-inputs {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    margin-bottom: 12px;
-  }
-  .custom-inputs .field {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .custom-inputs .field label {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text-soft);
-  }
-  .custom-inputs .field input {
-    width: 72px;
-    padding: 6px 8px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    font-family: var(--mono);
-    font-size: 14px;
-    text-align: right;
-  }
-  .custom-inputs .field input:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
-  .custom-status {
-    padding: 8px 12px;
-    border-radius: 4px;
-    margin-bottom: 12px;
-    font-size: 13px;
-  }
-  .custom-status.ok      { background: var(--good-soft); color: var(--good); }
-  .custom-status.warn    { background: #fef3c7; color: var(--warn); }
-  .custom-status.invalid { background: var(--bad-soft); color: var(--bad); }
-  .custom-status ul {
-    margin: 4px 0 0 18px;
-    padding: 0;
-    font-size: 12px;
-  }
-  .custom-notes {
-    margin-top: 10px;
-    font-size: 12px;
-    color: var(--text-soft);
-  }
-  .custom-notes div { margin: 2px 0; }
-  .custom-notes code {
-    font-family: var(--mono);
-    background: var(--bg);
-    padding: 1px 4px;
-    border-radius: 3px;
-  }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
 
-  .info-strip {
-    background: var(--accent-soft);
-    color: var(--accent);
-    padding: 8px 12px;
-    border-radius: 4px;
-    font-size: 12px;
-    margin-bottom: 16px;
-  }
+    .panel+.panel {
+      margin-top: 16px;
+    }
 
-  /* Tablet: stack the layout, allow custom inputs to wrap. */
-  @media (max-width: 900px) {
-    .layout { grid-template-columns: 1fr; }
-    .winner-grid { grid-template-columns: 1fr; }
-  }
+    .panel h2 {
+      margin: 0 0 4px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-soft);
+      font-weight: 600;
+    }
 
-  /* Phone: tighten paddings, fonts, and let funnel labels wrap. */
-  @media (max-width: 600px) {
-    body { padding: 12px; }
-    h1 { font-size: 18px; }
-    .tagline { font-size: 13px; }
-    .panel { padding: 12px; }
-    .panel + .panel { margin-top: 12px; }
-
-    /* Funnel: collapse the 200px label column so it wraps under the bar. */
-    .funnel-row {
-      grid-template-columns: 1fr 60px;
-      grid-template-areas: "label count" "bar bar";
-      row-gap: 2px;
-      margin-bottom: 8px;
+    .panel .hint {
+      margin: 0 0 12px;
+      color: var(--text-mute);
       font-size: 12px;
     }
-    .funnel-row .label { grid-area: label; }
-    .funnel-row .count { grid-area: count; }
-    .funnel-row > div:nth-child(2) { grid-area: bar; }
-    .funnel-row .bar { height: 8px; }
 
-    /* Scatter: short and dense for narrow viewports. */
-    #scatter { height: 300px; }
-    .scatter-legend { gap: 8px; font-size: 10px; }
-
-    /* Custom inputs: let them flow onto two rows; smaller boxes. */
-    .custom-inputs { gap: 8px; }
-    .custom-inputs .field input { width: 56px; font-size: 13px; padding: 5px 6px; }
-    .custom-inputs .field label { font-size: 10px; }
-
-    /* Winner block: compact mono and tighter table. */
-    .winner-tuple { font-size: 16px; }
-    table.metrics th, table.metrics td { padding: 4px 6px; font-size: 12px; }
-    #tooltip { min-width: 240px; max-width: 88vw; padding: 8px 10px; }
-    #tooltip .tt-tuple { font-size: 13px; }
-    #tooltip table { font-size: 10px; }
-  }
-
-  /* Very narrow phones: 5 inputs per row would still overflow at 56px each.
-     Switch to a 2-column grid so they wrap nicely. */
-  @media (max-width: 380px) {
-    .custom-inputs {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
+    .section-title {
+      margin-top: 20px !important;
     }
-    .custom-inputs .field input { width: 100%; }
-  }
-</style>
+
+    .control {
+      margin-bottom: 10px;
+    }
+
+    .control label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 13px;
+      font-family: var(--mono);
+      margin-bottom: 2px;
+    }
+
+    .control label .name {
+      color: var(--text);
+    }
+
+    .control label .val {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .control input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .control input.val-input {
+      width: 64px;
+      text-align: right;
+      border: 1px solid transparent;
+      background: transparent;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      padding: 2px 6px;
+      border-radius: 3px;
+      -moz-appearance: textfield;
+    }
+
+    .control input.val-input:hover {
+      border-color: var(--border);
+    }
+
+    .control input.val-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .control input.val-input::-webkit-inner-spin-button,
+    .control input.val-input::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .reset-btn {
+      margin-top: 8px;
+      padding: 6px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-soft);
+      width: 100%;
+    }
+
+    .reset-btn:hover {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .funnel-row {
+      display: grid;
+      grid-template-columns: 200px 1fr 80px;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 4px;
+      font-size: 13px;
+      font-family: var(--mono);
+    }
+
+    .funnel-row .label {
+      color: var(--text-soft);
+    }
+
+    .funnel-row .bar {
+      height: 18px;
+      background: var(--accent-soft);
+      border-radius: 3px;
+      transition: width 0.2s ease;
+    }
+
+    .funnel-row .count {
+      text-align: right;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .funnel-row.eliminated .bar {
+      background: var(--bad-soft);
+      opacity: 0.6;
+    }
+
+    .scatter-wrap {
+      position: relative;
+    }
+
+    #scatter {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 4px;
+      cursor: crosshair;
+    }
+
+    #hover-ring {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #1a1a1a;
+      border-radius: 50%;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      display: none;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
+    }
+
+    #tooltip {
+      position: fixed;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+      pointer-events: none;
+      font-size: 12px;
+      z-index: 100;
+      min-width: 280px;
+      max-width: 340px;
+      display: none;
+    }
+
+    #tooltip .tt-tuple {
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+      margin: 0 0 4px;
+    }
+
+    #tooltip .tt-status {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+    }
+
+    #tooltip .tt-status.survivor {
+      color: var(--good);
+    }
+
+    #tooltip .tt-status.eliminated {
+      color: var(--bad);
+    }
+
+    #tooltip .tt-status.winner {
+      color: var(--accent);
+    }
+
+    #tooltip table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    #tooltip td {
+      padding: 2px 4px;
+    }
+
+    #tooltip td:first-child {
+      color: var(--text-soft);
+    }
+
+    #tooltip td:nth-child(2),
+    #tooltip td:nth-child(3) {
+      text-align: right;
+    }
+
+    #tooltip td.ratio {
+      text-align: right;
+      font-weight: 600;
+    }
+
+    #tooltip td.ratio.good {
+      color: var(--good);
+    }
+
+    #tooltip td.ratio.warn {
+      color: var(--warn);
+    }
+
+    #tooltip td.ratio.bad {
+      color: var(--bad);
+    }
+
+    #tooltip .tt-distance {
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+      color: var(--text-soft);
+      font-size: 11px;
+    }
+
+    #tooltip .tt-distance strong {
+      color: var(--text);
+      font-family: var(--mono);
+    }
+
+    .scatter-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+
+    .scatter-legend .item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .scatter-legend .swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .winner-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .winner-tuple {
+      font-family: var(--mono);
+      font-size: 18px;
+      color: var(--accent);
+      font-weight: 600;
+      margin: 0 0 4px;
+    }
+
+    .winner-distance {
+      color: var(--text-soft);
+      font-size: 12px;
+      margin: 0;
+    }
+
+    table.metrics {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+
+    table.metrics th,
+    table.metrics td {
+      padding: 6px 8px;
+      text-align: right;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono);
+    }
+
+    table.metrics th:first-child,
+    table.metrics td:first-child {
+      text-align: left;
+      color: var(--text-soft);
+    }
+
+    table.metrics th {
+      color: var(--text-soft);
+      font-weight: 500;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .ratio {
+      font-size: 12px;
+    }
+
+    .ratio.good {
+      color: var(--good);
+    }
+
+    .ratio.warn {
+      color: var(--warn);
+    }
+
+    .ratio.bad {
+      color: var(--bad);
+    }
+
+    .empty-state {
+      text-align: center;
+      color: var(--text-mute);
+      padding: 24px;
+      font-style: italic;
+    }
+
+    .custom-inputs {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      margin-bottom: 12px;
+    }
+
+    .custom-inputs .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .custom-inputs .field label {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+
+    .custom-inputs .field input {
+      width: 72px;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 14px;
+      text-align: right;
+    }
+
+    .custom-inputs .field input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .custom-status {
+      padding: 8px 12px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+
+    .custom-status.ok {
+      background: var(--good-soft);
+      color: var(--good);
+    }
+
+    .custom-status.warn {
+      background: #fef3c7;
+      color: var(--warn);
+    }
+
+    .custom-status.invalid {
+      background: var(--bad-soft);
+      color: var(--bad);
+    }
+
+    .custom-status ul {
+      margin: 4px 0 0 18px;
+      padding: 0;
+      font-size: 12px;
+    }
+
+    .custom-notes {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--text-soft);
+    }
+
+    .custom-notes div {
+      margin: 2px 0;
+    }
+
+    .custom-notes code {
+      font-family: var(--mono);
+      background: var(--bg);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    .info-strip {
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .winner-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
+
 <body>
 
-<header>
-  <h1>SHRINCS Parameter Explorer</h1>
-  <p class="tagline">
-    Interactive search over SLH-DSA-compatible parameter tuples.
-    Methodology from the <a href="https://github.com/BlockstreamResearch/SPHINCS-Parameters">SHRINCS Parameter Search</a> tech report.
-  </p>
-</header>
+  <header>
+    <h1>SHRINCS Parameter Explorer</h1>
+    <p class="tagline">
+      Interactive search over SLH-DSA-compatible parameter tuples.
+      Methodology from the <a href="https://github.com/BlockstreamResearch/SPHINCS-Parameters">SHRINCS Parameter
+        Search</a> tech report.
+    </p>
+  </header>
 
-<main class="layout">
+  <main class="layout">
 
-  <aside class="panel sidebar">
-    <h2>Filter coefficients</h2>
-    <p class="hint">Bound each metric as a coefficient of SLH-DSA-128s. Survivors must satisfy every bound.</p>
-    <div id="filter-controls"></div>
+    <aside class="panel sidebar">
+      <h2>Filter coefficients</h2>
+      <p class="hint">Bound each metric as a coefficient of SLH-DSA-128s. Survivors must satisfy every bound.</p>
+      <div id="filter-controls"></div>
 
-    <h2 class="section-title">Importance weights</h2>
-    <p class="hint">Higher weight = more important when picking the winner from the survivors.</p>
-    <div id="weight-controls"></div>
+      <h2 class="section-title">Importance weights</h2>
+      <p class="hint">Higher weight = more important when picking the winner from the survivors.</p>
+      <div id="weight-controls"></div>
 
-    <button class="reset-btn" id="reset-btn">Reset to defaults</button>
-  </aside>
+      <button class="reset-btn" id="reset-btn">Reset to defaults</button>
+    </aside>
 
-  <section>
-    <div class="panel">
-      <div id="initial-info" class="info-strip"></div>
-      <h2>Filtering funnel</h2>
-      <p class="hint">Each filter is applied in sequence. Bars show how many candidates survive each step.</p>
-      <div id="funnel"></div>
-    </div>
-
-    <div class="panel">
-      <h2>Candidate sieve</h2>
-      <p class="hint">
-        Each dot is one (h, d, k, a, w) tuple. Positions are random — the layout carries no meaning.
-        Survivors are coloured by their weighted distance to the origin (blue = closer to ideal, red = farther).
-        Filtered-out candidates fade to grey. The winner is ringed.
-      </p>
-      <div class="scatter-wrap">
-        <canvas id="scatter" width="800" height="500"></canvas>
-        <div id="hover-ring"></div>
+    <section>
+      <div class="panel">
+        <div id="initial-info" class="info-strip"></div>
+        <h2>Filtering funnel</h2>
+        <p class="hint">Each filter is applied in sequence. Bars show how many candidates survive each step.</p>
+        <div id="funnel"></div>
       </div>
-      <div class="scatter-legend" id="scatter-legend"></div>
-    </div>
 
-    <div id="tooltip"></div>
-
-    <div class="panel">
-      <h2>Best candidate (minimum weighted distance)</h2>
-      <div id="winner"></div>
-    </div>
-
-    <div class="panel">
-      <h2>Compare your own candidate</h2>
-      <p class="hint">Enter any (h, d, k, a, w) tuple to see how it stacks up against SLH-DSA-128s.</p>
-      <div class="custom-inputs" id="custom-inputs">
-        <div class="field"><label>h</label><input type="number" id="cust-h" value="63" min="1" step="1"></div>
-        <div class="field"><label>d</label><input type="number" id="cust-d" value="7"  min="1" step="1"></div>
-        <div class="field"><label>k</label><input type="number" id="cust-k" value="14" min="1" step="1"></div>
-        <div class="field"><label>a</label><input type="number" id="cust-a" value="12" min="1" step="1"></div>
-        <div class="field"><label>w</label><input type="number" id="cust-w" value="16" min="2" step="1"></div>
+      <div class="panel">
+        <h2>Candidate sieve</h2>
+        <p class="hint">
+          Each dot is one (h, d, k, a, w) tuple. Positions are random — the layout carries no meaning.
+          Survivors are coloured by their weighted distance to the origin (blue = closer to ideal, red = farther).
+          Filtered-out candidates fade to grey. The winner is ringed.
+        </p>
+        <div class="scatter-wrap">
+          <canvas id="scatter" width="800" height="500"></canvas>
+          <div id="hover-ring"></div>
+        </div>
+        <div class="scatter-legend" id="scatter-legend"></div>
       </div>
-      <div id="custom-status"></div>
-      <div id="custom-result"></div>
-    </div>
-  </section>
 
-</main>
+      <div id="tooltip"></div>
 
-<script>
-'use strict';
+      <div class="panel">
+        <h2>Best candidate (minimum weighted distance)</h2>
+        <div id="winner"></div>
+      </div>
 
-// ---------- Constants ----------
-// SLH-DSA-128s baseline (matches the numbers in the tech report)
-const STD = { n: 16, h: 63, d: 7, k: 14, a: 12, w: 16 };
+      <div class="panel">
+        <h2>Compare your own candidate</h2>
+        <p class="hint">Enter any (h, d, k, a, w) tuple to see how it stacks up against SLH-DSA-128s.</p>
+        <div class="custom-inputs" id="custom-inputs">
+          <div class="field"><label>h</label><input type="number" id="cust-h" value="63" min="1" step="1"></div>
+          <div class="field"><label>d</label><input type="number" id="cust-d" value="7" min="1" step="1"></div>
+          <div class="field"><label>k</label><input type="number" id="cust-k" value="14" min="1" step="1"></div>
+          <div class="field"><label>a</label><input type="number" id="cust-a" value="12" min="1" step="1"></div>
+          <div class="field"><label>w</label><input type="number" id="cust-w" value="16" min="2" step="1"></div>
+        </div>
+        <div id="custom-status"></div>
+        <div id="custom-result"></div>
+      </div>
+    </section>
 
-// ---------- Cost formulas ----------
-// WOTS+ chain length: len_1 + len_2
-function wotsLen(n, w) {
-  const log2w = Math.log2(w);
-  const len1 = Math.ceil(8 * n / log2w);
-  const len2 = Math.floor(Math.log2(len1 * (w - 1)) / log2w) + 1;
-  return len1 + len2;
-}
+  </main>
 
-// Fudge factors calibrated so the std baseline matches the report exactly
-// (the underlying formulas are slight simplifications of the FIPS 205 cost model)
-const FUDGE = { kg: 1.0875, sg: 1.1734, sv: 1.1540 };
+  <script>
+    'use strict';
 
-function metrics(p) {
-  const n = STD.n;
-  const hp = p.h / p.d;
-  const len = wotsLen(n, p.w);
-  // Signature size in bytes
-  const size = n * (2 + p.k * (p.a + 1) + p.h + p.d * len);
-  // KeyGen: build one XMSS tree of height h' on top
-  const kg = Math.pow(2, hp) * (len * (p.w - 1) + 1) * FUDGE.kg;
-  // SigGen: FORS sign + rebuild d XMSS trees
-  const sg = (p.k * Math.pow(2, p.a) + p.d * Math.pow(2, hp) * (len * (p.w - 1) + 1)) * FUDGE.sg;
-  // SigVer: FORS verify + HT auth paths + WOTS chain completions
-  const sv = (p.k * p.a + p.h + p.d * len * (p.w - 1) / 2) * FUDGE.sv;
-  // Compressions per byte
-  const cb = sv / size;
-  return { size, kg, sg, sv, cb };
-}
+    // ---------- Constants ----------
+    // SLH-DSA-128s baseline (matches the numbers in the tech report)
+    const STD = { n: 16, h: 63, d: 7, k: 14, a: 12, w: 16 };
 
-const STD_M = metrics(STD);
+    // ---------- Cost formulas ----------
+    // WOTS+ chain length: len_1 + len_2
+    function wotsLen(n, w) {
+      const log2w = Math.log2(w);
+      const len1 = Math.ceil(8 * n / log2w);
+      const len2 = Math.floor(Math.log2(len1 * (w - 1)) / log2w) + 1;
+      return len1 + len2;
+    }
 
-// ---------- Sweep ----------
-// Parameter ranges from the report
-function sweep() {
-  const candidates = [];
-  for (let h = 40; h <= 52; h++) {
-    for (let d = 2; d <= 26; d++) {
-      if (h % d !== 0) continue;
-      for (let k = 2; k <= 25; k++) {
-        for (let a = 8; a <= 21; a++) {
-          for (const w of [16, 32, 256]) {
-            const p = { h, d, k, a, w };
-            const m = metrics(p);
-            // Skip pathological/infinite candidates
-            if (!isFinite(m.kg) || !isFinite(m.sg)) continue;
-            candidates.push({ ...p, ...m });
+    function metrics(p) {
+      const n = STD.n; // 16 bytes (128-bit security)
+      const hp = p.h / p.d;
+      const len = wotsLen(n, p.w);
+
+      // Compression function costs (Matching the math from costs.sage)
+      const C_PRF = 1;  // PRF generation
+      const C_Th1 = 1;  // 1-block tweakable hash (Leaves / WOTS chains)
+      const C_Th2 = 2;  // 2-block tweakable hash (Internal tree nodes)
+      const C_Hmsg = 2; // Message hash
+      const C_PRFmsg = 2; // Message PRF
+
+      // Thl/Thk approximations (Cost to compress L or K public values)
+      const Thl = len;
+      const Thk = p.k;
+
+      // 1. Signature Size (Bytes)
+      // Rand (2*n) + FORS (k*(a+1)*n) + Hypertree Auth (h*n) + WOTS (d*len*n)
+      const size = n * (2 + p.k * (p.a + 1) + p.h + p.d * len);
+
+      // 2. Cost of ONE XMSS Tree Layer (c_merkle)
+      const leavesPerTree = Math.pow(2, hp);
+      // Leaves: PRF + WOTS chains (w-1)*C_Th1 + leaf compression (Thl)
+      const wotsCost = (len * C_PRF) + (len * (p.w - 1) * C_Th1) + Thl;
+      // Internal nodes: (2^hp - 1) * C_Th2
+      const c_merkle = (leavesPerTree * wotsCost) + ((leavesPerTree - 1) * C_Th2);
+
+      // 3. Key Generation (Build top tree only)
+      const kg = c_merkle;
+
+      // 4. Signature Generation (FORS + d * c_merkle)
+      const forsLeaves = Math.pow(2, p.a);
+
+      // EXACT FORS COST: PRF + Leaf Hash (C_Th1) + Internal Nodes (C_Th2) + Root compress (Thk)
+      const c_fors_fixed = (p.k * forsLeaves * C_PRF) +
+        (p.k * forsLeaves * C_Th1) +
+        (p.k * (forsLeaves - 1) * C_Th2) +
+        Thk;
+
+      const c_msg = C_Hmsg + C_PRFmsg; // Cost to hash message
+      const sg = c_fors_fixed + c_msg + (p.d * c_merkle);
+
+      // 5. Signature Verification
+      // Expected WOTS chain completions: roughly half the chain
+      const c_wots = ((p.w - 1) * len / 2 * C_Th1) + Thl;
+      // FORS path verify: k leaves (C_Th1) + k*a internal nodes (C_Th2) + root (Thk)
+      const c_fts = (p.k * C_Th1) + (p.k * p.a * C_Th2) + Thk;
+      // Total SV: Msg Hash + FORS + d * WOTS + h * Hypertree Auth (C_Th2)
+      const sv = C_Hmsg + c_fts + (p.d * c_wots) + (p.h * C_Th2);
+
+      // 6. Density (Compressions per byte)
+      const cb = sv / size;
+
+      return { size, kg, sg, sv, cb };
+    }
+
+    const STD_M = metrics(STD);
+
+    // ---------- Sweep ----------
+    // Parameter ranges from the report
+    function sweep() {
+      const candidates = [];
+      for (let h = 40; h <= 52; h++) {
+        for (let d = 2; d <= 26; d++) {
+          if (h % d !== 0) continue;
+          for (let k = 2; k <= 25; k++) {
+            for (let a = 8; a <= 21; a++) {
+              for (const w of [16, 32, 256]) {
+                const p = { h, d, k, a, w };
+                const m = metrics(p);
+                // Skip pathological/infinite candidates
+                if (!isFinite(m.kg) || !isFinite(m.sg)) continue;
+                candidates.push({ ...p, ...m });
+              }
+            }
           }
         }
       }
+      return candidates;
     }
-  }
-  return candidates;
-}
 
-// ---------- Security ----------
-// Port of compute_security from BlockstreamResearch/SPHINCS-Parameters/security.sage.
-// Computes SLH-DSA bit security against FORS subset-forgery attacks for q_s signatures.
-// All probabilities accumulated in log2-space to avoid double-precision underflow.
-const _LOG2_E = 1 / Math.LN2;
+    // ---------- Security ----------
+    // Port of compute_security from BlockstreamResearch/SPHINCS-Parameters/security.sage.
+    // Computes SLH-DSA bit security against FORS subset-forgery attacks for q_s signatures.
+    // All probabilities accumulated in log2-space to avoid double-precision underflow.
+    const _LOG2_E = 1 / Math.LN2;
 
-function _lgamma(z) {
-  if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - _lgamma(1 - z);
-  z -= 1;
-  const c = [
-    0.99999999999980993, 676.5203681218851, -1259.1392167224028,
-    771.32342877765313, -176.61502916214059, 12.507343278686905,
-    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7,
-  ];
-  let x = c[0];
-  for (let i = 1; i < 9; i++) x += c[i] / (z + i);
-  const t = z + 7.5;
-  return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
-}
+    function _lgamma(z) {
+      if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - _lgamma(1 - z);
+      z -= 1;
+      const c = [
+        0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+        771.32342877765313, -176.61502916214059, 12.507343278686905,
+        -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7,
+      ];
+      let x = c[0];
+      for (let i = 1; i < 9; i++) x += c[i] / (z + i);
+      const t = z + 7.5;
+      return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+    }
 
-function _log2Binom(n, k) {
-  if (k < 0 || k > n) return -Infinity;
-  if (k === 0 || k === n) return 0;
-  // For small k, direct sum (more accurate than lgamma(huge) − lgamma(huge))
-  if (k <= 500) {
-    let num = 0, denom = 0;
-    for (let i = 0; i < k; i++) num += Math.log2(n - i);
-    for (let i = 2; i <= k; i++) denom += Math.log2(i);
-    return num - denom;
-  }
-  return (_lgamma(n + 1) - _lgamma(k + 1) - _lgamma(n - k + 1)) * _LOG2_E;
-}
-
-function _log2OneMinusExp(x) {
-  if (x >= 0) return -Infinity;
-  return Math.log(-Math.expm1(x)) * _LOG2_E;
-}
-
-function _log2SumExp(a, b) {
-  if (a === -Infinity) return b;
-  if (b === -Infinity) return a;
-  if (a < b) { const tmp = a; a = b; b = tmp; }
-  return a + Math.log1p(Math.pow(2, b - a)) * _LOG2_E;
-}
-
-/**
- * Compute bit security against FORS subset-forgery for q_s = 2^q_s_log2 signatures.
- * Returns floor(min(8·hashbytes, -log2(forgery_probability))) — i.e., capped by
- * the hash preimage bound. hashbytes=16 ⇒ 128-bit cap.
- */
-function computeSecurityBits(q_s_log2, h, k, a, hashbytes = 16) {
-  const q_s = Math.pow(2, q_s_log2);
-  const t = Math.pow(2, a);
-  const log2_p = -h;
-  const p = Math.pow(2, -h);
-  const log2_one_minus_p = p < 1e-15 ? -p * _LOG2_E : Math.log1p(-p) * _LOG2_E;
-  const ln_one_minus_1_over_t = 1 / t < 1e-15 ? -1 / t : Math.log1p(-1 / t);
-  const lambda = Math.pow(2, q_s_log2 - h);
-  let log2_sigma = -Infinity;
-  const r_max = Math.max(Math.ceil(lambda + 30 * Math.sqrt(lambda + 1)) + 30, 200);
-  for (let r = 1; r <= r_max; r++) {
-    const log2_C = _log2Binom(q_s, r);
-    if (!isFinite(log2_C)) continue;
-    const log2_qhp = log2_C + r * log2_p + (q_s - r) * log2_one_minus_p;
-    const log2_pf  = k * _log2OneMinusExp(r * ln_one_minus_1_over_t);
-    const log2_contrib = log2_qhp + log2_pf;
-    if (isFinite(log2_contrib)) log2_sigma = _log2SumExp(log2_sigma, log2_contrib);
-    if (r > Math.max(lambda, 5) && log2_contrib < -500) break;
-  }
-  return Math.min(8 * hashbytes, -log2_sigma);
-}
-
-// Report's q_s = 2^40
-const Q_S_LOG2 = 40;
-
-// 128-bit security check using the real FORS forgery analysis
-function passesSecurity(c) {
-  return computeSecurityBits(Q_S_LOG2, c.h, c.k, c.a) >= 128;
-}
-
-// Combined initial bounds: security + size strictly less than SLH-DSA-128s
-// (the report's Sage script uses MAX_SIZE = 7856, matching the FIPS 205 reference value)
-const MAX_SIZE = 7856;
-function passesInitial(c) {
-  return passesSecurity(c) && c.size < MAX_SIZE;
-}
-
-// ---------- Filter pipeline ----------
-const FILTER_STEPS = [
-  { key: 'size', metric: 'size', label: 'Size',     stdLabel: '·std' },
-  { key: 'kg',   metric: 'kg',   label: 'KeyGen',   stdLabel: '·std' },
-  { key: 'sg',   metric: 'sg',   label: 'SigGen',   stdLabel: '·std' },
-  { key: 'sv',   metric: 'sv',   label: 'SigVer',   stdLabel: '·std' },
-  { key: 'cb',   metric: 'cb',   label: 'Comp/Byte', stdLabel: '·std' },
-];
-
-// Returns an array: each element holds the survivors after step i, and which step eliminated each candidate
-function runFilters(pool, X) {
-  const eliminatedAt = new Map(); // candidate -> step index (or null if survived all)
-  pool.forEach(c => eliminatedAt.set(c, null));
-
-  const stepCounts = [{ name: 'Initial pool', count: pool.length }];
-  let cur = pool;
-  FILTER_STEPS.forEach((step, idx) => {
-    const stdVal = STD_M[step.metric];
-    const next = [];
-    for (const c of cur) {
-      if (c[step.metric] <= X[step.key] * stdVal) {
-        next.push(c);
-      } else {
-        if (eliminatedAt.get(c) === null) eliminatedAt.set(c, idx);
+    function _log2Binom(n, k) {
+      if (k < 0 || k > n) return -Infinity;
+      if (k === 0 || k === n) return 0;
+      // For small k, direct sum (more accurate than lgamma(huge) − lgamma(huge))
+      if (k <= 500) {
+        let num = 0, denom = 0;
+        for (let i = 0; i < k; i++) num += Math.log2(n - i);
+        for (let i = 2; i <= k; i++) denom += Math.log2(i);
+        return num - denom;
       }
+      return (_lgamma(n + 1) - _lgamma(k + 1) - _lgamma(n - k + 1)) * _LOG2_E;
     }
-    cur = next;
-    stepCounts.push({
-      name: `${step.label} ≤ ${X[step.key].toFixed(2)}·std`,
-      count: cur.length
-    });
-  });
 
-  return { stepCounts, survivors: cur, eliminatedAt };
-}
+    function _log2OneMinusExp(x) {
+      if (x >= 0) return -Infinity;
+      return Math.log(-Math.expm1(x)) * _LOG2_E;
+    }
 
-// ---------- Distance ----------
-function weightedDistance(c, W) {
-  const sum = W.size + W.kg + W.sg + W.sv + W.cb;
-  const p = {
-    size: W.size / sum, kg: W.kg / sum, sg: W.sg / sum, sv: W.sv / sum, cb: W.cb / sum
-  };
-  const X = {
-    size: c.size / STD_M.size,
-    kg:   c.kg   / STD_M.kg,
-    sg:   c.sg   / STD_M.sg,
-    sv:   c.sv   / STD_M.sv,
-    cb:   c.cb   / STD_M.cb,
-  };
-  return Math.sqrt(
-    p.size * X.size*X.size +
-    p.kg   * X.kg*X.kg +
-    p.sg   * X.sg*X.sg +
-    p.sv   * X.sv*X.sv +
-    p.cb   * X.cb*X.cb
-  );
-}
+    function _log2SumExp(a, b) {
+      if (a === -Infinity) return b;
+      if (b === -Infinity) return a;
+      if (a < b) { const tmp = a; a = b; b = tmp; }
+      return a + Math.log1p(Math.pow(2, b - a)) * _LOG2_E;
+    }
 
-// ---------- State ----------
-const DEFAULTS_X = { size: 1.00, kg: 1.00, sg: 1.00, sv: 1.00, cb: 1.00 };
-const DEFAULTS_W = { size: 1.0,  kg: 1.0,  sg: 1.0,  sv: 1.0,  cb: 1.0 };
+    /**
+     * Compute bit security against FORS subset-forgery for q_s = 2^q_s_log2 signatures.
+     * Returns floor(min(8·hashbytes, -log2(forgery_probability))) — i.e., capped by
+     * the hash preimage bound. hashbytes=16 ⇒ 128-bit cap.
+     */
+    function computeSecurityBits(q_s_log2, h, k, a, hashbytes = 16) {
+      const q_s = Math.pow(2, q_s_log2);
+      const t = Math.pow(2, a);
+      const log2_p = -h;
+      const p = Math.pow(2, -h);
+      const log2_one_minus_p = p < 1e-15 ? -p * _LOG2_E : Math.log1p(-p) * _LOG2_E;
+      const ln_one_minus_1_over_t = 1 / t < 1e-15 ? -1 / t : Math.log1p(-1 / t);
+      const lambda = Math.pow(2, q_s_log2 - h);
+      let log2_sigma = -Infinity;
+      const r_max = Math.max(Math.ceil(lambda + 30 * Math.sqrt(lambda + 1)) + 30, 200);
+      for (let r = 1; r <= r_max; r++) {
+        const log2_C = _log2Binom(q_s, r);
+        if (!isFinite(log2_C)) continue;
+        const log2_qhp = log2_C + r * log2_p + (q_s - r) * log2_one_minus_p;
+        const log2_pf = k * _log2OneMinusExp(r * ln_one_minus_1_over_t);
+        const log2_contrib = log2_qhp + log2_pf;
+        if (isFinite(log2_contrib)) log2_sigma = _log2SumExp(log2_sigma, log2_contrib);
+        if (r > Math.max(lambda, 5) && log2_contrib < -500) break;
+      }
+      return Math.min(8 * hashbytes, -log2_sigma);
+    }
 
-const state = {
-  candidates: [],
-  initialPool: [],
-  X: { ...DEFAULTS_X },
-  W: { ...DEFAULTS_W },
-  // Live filter results (refreshed every update)
-  lastEliminatedAt: null,
-  lastSurvivors: [],
-  lastWinner: null,
-  // Layout cache for hit-testing
-  scatterLayout: { pad: 12, w: 0, h: 0 },
-};
+    // Report's q_s = 2^40
+    const Q_S_LOG2 = 40;
 
-// Stable seeded RNG for scatter positions
-function mulberry32(seed) {
-  let s = seed | 0;
-  return () => {
-    s = (s + 0x6D2B79F5) | 0;
-    let t = s;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+    // 128-bit security check using the real FORS forgery analysis
+    function passesSecurity(c) {
+      return computeSecurityBits(Q_S_LOG2, c.h, c.k, c.a) >= 128;
+    }
 
-// ---------- Rendering ----------
-function fmt(n) {
-  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
-  if (n >= 1e3) return n.toLocaleString();
-  return n.toFixed(0);
-}
-function fmtRatio(r) {
-  return r.toFixed(3) + '×';
-}
+    // Combined initial bounds: security + size strictly less than SLH-DSA-128s
+    // (the report's Sage script uses MAX_SIZE = 7856, matching the FIPS 205 reference value)
+    const MAX_SIZE = 7856;
+    function passesInitial(c) {
+      return passesSecurity(c) && c.size < MAX_SIZE;
+    }
 
-function renderControls() {
-  const filterDefs = [
-    { key: 'size', label: 'X<sub>size</sub>', min: 0.30, max: 1.00,  step: 0.01, dp: 2 },
-    { key: 'kg',   label: 'X<sub>kg</sub>',   min: 0.10, max: 20.00, step: 0.10, dp: 2 },
-    { key: 'sg',   label: 'X<sub>sg</sub>',   min: 0.10, max: 20.00, step: 0.10, dp: 2 },
-    { key: 'sv',   label: 'X<sub>sv</sub>',   min: 0.10, max: 20.00, step: 0.10, dp: 2 },
-    { key: 'cb',   label: 'X<sub>cb</sub>',   min: 0.10, max: 20.00, step: 0.10, dp: 2 },
-  ];
-  document.getElementById('filter-controls').innerHTML = filterDefs.map(d => `
+    // ---------- Filter pipeline ----------
+    const FILTER_STEPS = [
+      { key: 'size', metric: 'size', label: 'Size', stdLabel: '·std' },
+      { key: 'kg', metric: 'kg', label: 'KeyGen', stdLabel: '·std' },
+      { key: 'sg', metric: 'sg', label: 'SigGen', stdLabel: '·std' },
+      { key: 'sv', metric: 'sv', label: 'SigVer', stdLabel: '·std' },
+      { key: 'cb', metric: 'cb', label: 'Comp/Byte', stdLabel: '·std' },
+    ];
+
+    // Returns an array: each element holds the survivors after step i, and which step eliminated each candidate
+    function runFilters(pool, X) {
+      const eliminatedAt = new Map(); // candidate -> step index (or null if survived all)
+      pool.forEach(c => eliminatedAt.set(c, null));
+
+      const stepCounts = [{ name: 'Initial pool', count: pool.length }];
+      let cur = pool;
+      FILTER_STEPS.forEach((step, idx) => {
+        const stdVal = STD_M[step.metric];
+        const next = [];
+        for (const c of cur) {
+          if (c[step.metric] <= X[step.key] * stdVal) {
+            next.push(c);
+          } else {
+            if (eliminatedAt.get(c) === null) eliminatedAt.set(c, idx);
+          }
+        }
+        cur = next;
+        stepCounts.push({
+          name: `${step.label} ≤ ${X[step.key].toFixed(2)}·std`,
+          count: cur.length
+        });
+      });
+
+      return { stepCounts, survivors: cur, eliminatedAt };
+    }
+
+    // ---------- Distance ----------
+    function weightedDistance(c, W) {
+      const sum = W.size + W.kg + W.sg + W.sv + W.cb;
+      const p = {
+        size: W.size / sum, kg: W.kg / sum, sg: W.sg / sum, sv: W.sv / sum, cb: W.cb / sum
+      };
+      const X = {
+        size: c.size / STD_M.size,
+        kg: c.kg / STD_M.kg,
+        sg: c.sg / STD_M.sg,
+        sv: c.sv / STD_M.sv,
+        cb: c.cb / STD_M.cb,
+      };
+      return Math.sqrt(
+        p.size * X.size * X.size +
+        p.kg * X.kg * X.kg +
+        p.sg * X.sg * X.sg +
+        p.sv * X.sv * X.sv +
+        p.cb * X.cb * X.cb
+      );
+    }
+
+    // ---------- State ----------
+    const DEFAULTS_X = { size: 1.00, kg: 1.00, sg: 1.00, sv: 1.00, cb: 1.00 };
+    const DEFAULTS_W = { size: 1.0, kg: 1.0, sg: 1.0, sv: 1.0, cb: 1.0 };
+
+    const state = {
+      candidates: [],
+      initialPool: [],
+      X: { ...DEFAULTS_X },
+      W: { ...DEFAULTS_W },
+      // Live filter results (refreshed every update)
+      lastEliminatedAt: null,
+      lastSurvivors: [],
+      lastWinner: null,
+      // Layout cache for hit-testing
+      scatterLayout: { pad: 12, w: 0, h: 0 },
+    };
+
+    // Stable seeded RNG for scatter positions
+    function mulberry32(seed) {
+      let s = seed | 0;
+      return () => {
+        s = (s + 0x6D2B79F5) | 0;
+        let t = s;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    // ---------- Rendering ----------
+    function fmt(n) {
+      if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+      if (n >= 1e3) return n.toLocaleString();
+      return n.toFixed(0);
+    }
+    function fmtRatio(r) {
+      return r.toFixed(3) + '×';
+    }
+
+    function renderControls() {
+      const filterDefs = [
+        { key: 'size', label: 'X<sub>size</sub>', min: 0.30, max: 1.00, step: 0.01, dp: 2 },
+        { key: 'kg', label: 'X<sub>kg</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 2 },
+        { key: 'sg', label: 'X<sub>sg</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 2 },
+        { key: 'sv', label: 'X<sub>sv</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 2 },
+        { key: 'cb', label: 'X<sub>cb</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 2 },
+      ];
+      document.getElementById('filter-controls').innerHTML = filterDefs.map(d => `
     <div class="control">
       <label>
         <span class="name">${d.label}</span>
@@ -762,14 +899,14 @@ function renderControls() {
     </div>
   `).join('');
 
-  const weightDefs = [
-    { key: 'size', label: 'w<sub>size</sub>', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
-    { key: 'kg',   label: 'w<sub>kg</sub>',   min: 0.10, max: 10.00, step: 0.10, dp: 1 },
-    { key: 'sg',   label: 'w<sub>sg</sub>',   min: 0.10, max: 10.00, step: 0.10, dp: 1 },
-    { key: 'sv',   label: 'w<sub>sv</sub>',   min: 0.10, max: 10.00, step: 0.10, dp: 1 },
-    { key: 'cb',   label: 'w<sub>cb</sub>',   min: 0.10, max: 10.00, step: 0.10, dp: 1 },
-  ];
-  document.getElementById('weight-controls').innerHTML = weightDefs.map(d => `
+      const weightDefs = [
+        { key: 'size', label: 'w<sub>size</sub>', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+        { key: 'kg', label: 'w<sub>kg</sub>', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+        { key: 'sg', label: 'w<sub>sg</sub>', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+        { key: 'sv', label: 'w<sub>sv</sub>', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+        { key: 'cb', label: 'w<sub>cb</sub>', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+      ];
+      document.getElementById('weight-controls').innerHTML = weightDefs.map(d => `
     <div class="control">
       <label>
         <span class="name">${d.label}</span>
@@ -784,192 +921,192 @@ function renderControls() {
     </div>
   `).join('');
 
-  // --- Wire bidirectional input <-> slider for both X and W ---
-  function bindPair(group, store) {
-    // Slider -> store + number-input
-    document.querySelectorAll(`input[data-${group}]`).forEach(slider => {
-      slider.addEventListener('input', e => {
-        const key = e.target.dataset[group];
-        const v = parseFloat(e.target.value);
-        store[key] = v;
-        const numInp = document.querySelector(`input[data-${group}-input="${key}"]`);
-        const dp = parseInt(numInp.dataset.dp, 10);
-        numInp.value = v.toFixed(dp);
+      // --- Wire bidirectional input <-> slider for both X and W ---
+      function bindPair(group, store) {
+        // Slider -> store + number-input
+        document.querySelectorAll(`input[data-${group}]`).forEach(slider => {
+          slider.addEventListener('input', e => {
+            const key = e.target.dataset[group];
+            const v = parseFloat(e.target.value);
+            store[key] = v;
+            const numInp = document.querySelector(`input[data-${group}-input="${key}"]`);
+            const dp = parseInt(numInp.dataset.dp, 10);
+            numInp.value = v.toFixed(dp);
+            update();
+          });
+        });
+        // Number input -> store + slider
+        document.querySelectorAll(`input[data-${group}-input]`).forEach(inp => {
+          inp.addEventListener('input', e => {
+            const key = e.target.dataset[`${group}Input`];
+            let v = parseFloat(e.target.value);
+            if (!isFinite(v)) return;
+            const min = parseFloat(e.target.min);
+            const max = parseFloat(e.target.max);
+            const clamped = Math.max(min, Math.min(max, v));
+            store[key] = clamped;
+            document.querySelector(`input[data-${group}="${key}"]`).value = clamped;
+            update();
+          });
+          // On blur, reformat to canonical precision and re-clamp the displayed value
+          inp.addEventListener('blur', e => {
+            const key = e.target.dataset[`${group}Input`];
+            const dp = parseInt(e.target.dataset.dp, 10);
+            e.target.value = store[key].toFixed(dp);
+          });
+        });
+      }
+
+      bindPair('coef', state.X);
+      bindPair('weight', state.W);
+
+      document.getElementById('reset-btn').addEventListener('click', () => {
+        state.X = { ...DEFAULTS_X };
+        state.W = { ...DEFAULTS_W };
+        renderControls();
         update();
       });
-    });
-    // Number input -> store + slider
-    document.querySelectorAll(`input[data-${group}-input]`).forEach(inp => {
-      inp.addEventListener('input', e => {
-        const key = e.target.dataset[`${group}Input`];
-        let v = parseFloat(e.target.value);
-        if (!isFinite(v)) return;
-        const min = parseFloat(e.target.min);
-        const max = parseFloat(e.target.max);
-        const clamped = Math.max(min, Math.min(max, v));
-        store[key] = clamped;
-        document.querySelector(`input[data-${group}="${key}"]`).value = clamped;
-        update();
-      });
-      // On blur, reformat to canonical precision and re-clamp the displayed value
-      inp.addEventListener('blur', e => {
-        const key = e.target.dataset[`${group}Input`];
-        const dp = parseInt(e.target.dataset.dp, 10);
-        e.target.value = store[key].toFixed(dp);
-      });
-    });
-  }
+    }
 
-  bindPair('coef', state.X);
-  bindPair('weight', state.W);
-
-  document.getElementById('reset-btn').addEventListener('click', () => {
-    state.X = { ...DEFAULTS_X };
-    state.W = { ...DEFAULTS_W };
-    renderControls();
-    update();
-  });
-}
-
-function renderFunnel(stepCounts) {
-  const max = stepCounts[0].count || 1;
-  const html = stepCounts.map((s, i) => {
-    const widthPct = (s.count / max) * 100;
-    const prev = i > 0 ? stepCounts[i - 1].count : null;
-    const eliminated = prev !== null && s.count === 0 ? 'eliminated' : '';
-    return `
+    function renderFunnel(stepCounts) {
+      const max = stepCounts[0].count || 1;
+      const html = stepCounts.map((s, i) => {
+        const widthPct = (s.count / max) * 100;
+        const prev = i > 0 ? stepCounts[i - 1].count : null;
+        const eliminated = prev !== null && s.count === 0 ? 'eliminated' : '';
+        return `
       <div class="funnel-row ${eliminated}">
         <div class="label">${s.name}</div>
         <div><div class="bar" style="width: ${widthPct}%;"></div></div>
         <div class="count">${s.count.toLocaleString()}</div>
       </div>
     `;
-  }).join('');
-  document.getElementById('funnel').innerHTML = html;
-}
+      }).join('');
+      document.getElementById('funnel').innerHTML = html;
+    }
 
-// Colour scale: blue (low distance) → red (high distance)
-function distanceColor(t) {
-  // t in [0, 1]; 0 = best (blue), 1 = worst (red)
-  // Use HSL: 220° (blue) → 0° (red), going through purple
-  t = Math.max(0, Math.min(1, t));
-  const hue = 220 - 220 * t;
-  return `hsl(${hue}, 70%, 50%)`;
-}
+    // Colour scale: blue (low distance) → red (high distance)
+    function distanceColor(t) {
+      // t in [0, 1]; 0 = best (blue), 1 = worst (red)
+      // Use HSL: 220° (blue) → 0° (red), going through purple
+      t = Math.max(0, Math.min(1, t));
+      const hue = 220 - 220 * t;
+      return `hsl(${hue}, 70%, 50%)`;
+    }
 
-const STEP_COLORS = ['#f87171', '#fb923c', '#facc15', '#a3e635', '#22d3ee'];
+    const STEP_COLORS = ['#f87171', '#fb923c', '#facc15', '#a3e635', '#22d3ee'];
 
-function renderScatter(eliminatedAt, survivors, winner) {
-  const canvas = document.getElementById('scatter');
-  // Set internal resolution from CSS size.
-  // CSS-driven height (300px on narrow viewports via media query, else 500 default).
-  const dpr = window.devicePixelRatio || 1;
-  const cssW = canvas.clientWidth || 800;
-  const cssH = canvas.clientHeight || 500;
-  canvas.width = cssW * dpr;
-  canvas.height = cssH * dpr;
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0, 0, cssW, cssH);
+    function renderScatter(eliminatedAt, survivors, winner) {
+      const canvas = document.getElementById('scatter');
+      // Set internal resolution from CSS size
+      const dpr = window.devicePixelRatio || 1;
+      const cssW = canvas.clientWidth || 800;
+      const cssH = 500;
+      canvas.width = cssW * dpr;
+      canvas.height = cssH * dpr;
+      canvas.style.height = cssH + 'px';
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, cssW, cssH);
 
-  // Background
-  ctx.fillStyle = '#fafafa';
-  ctx.fillRect(0, 0, cssW, cssH);
+      // Background
+      ctx.fillStyle = '#fafafa';
+      ctx.fillRect(0, 0, cssW, cssH);
 
-  const pad = 12;
-  const w = cssW - 2 * pad;
-  const h = cssH - 2 * pad;
-  // Cache layout for hit-testing
-  state.scatterLayout = { pad, w, h, cssW, cssH };
+      const pad = 12;
+      const w = cssW - 2 * pad;
+      const h = cssH - 2 * pad;
+      // Cache layout for hit-testing
+      state.scatterLayout = { pad, w, h, cssW, cssH };
 
-  // Compute distance for survivors to drive colour
-  const dists = survivors.map(c => weightedDistance(c, state.W));
-  const dmin = dists.length ? Math.min(...dists) : 0;
-  const dmax = dists.length ? Math.max(...dists) : 1;
-  const drange = (dmax - dmin) || 1;
+      // Compute distance for survivors to drive colour
+      const dists = survivors.map(c => weightedDistance(c, state.W));
+      const dmin = dists.length ? Math.min(...dists) : 0;
+      const dmax = dists.length ? Math.max(...dists) : 1;
+      const drange = (dmax - dmin) || 1;
 
-  // Draw eliminated first (grey, small), then survivors (coloured), then winner
-  for (const c of state.initialPool) {
-    const step = eliminatedAt.get(c);
-    if (step === null) continue; // survived; draw later
-    const x = pad + c._sx * w;
-    const y = pad + c._sy * h;
-    ctx.fillStyle = '#d4d4d0';
-    ctx.globalAlpha = 0.45;
-    ctx.beginPath();
-    ctx.arc(x, y, 1.6, 0, 2 * Math.PI);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
+      // Draw eliminated first (grey, small), then survivors (coloured), then winner
+      for (const c of state.initialPool) {
+        const step = eliminatedAt.get(c);
+        if (step === null) continue; // survived; draw later
+        const x = pad + c._sx * w;
+        const y = pad + c._sy * h;
+        ctx.fillStyle = '#d4d4d0';
+        ctx.globalAlpha = 0.45;
+        ctx.beginPath();
+        ctx.arc(x, y, 1.6, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
 
-  for (let i = 0; i < survivors.length; i++) {
-    const c = survivors[i];
-    const x = pad + c._sx * w;
-    const y = pad + c._sy * h;
-    const t = (dists[i] - dmin) / drange;
-    ctx.fillStyle = distanceColor(t);
-    ctx.beginPath();
-    ctx.arc(x, y, 3.2, 0, 2 * Math.PI);
-    ctx.fill();
-  }
+      for (let i = 0; i < survivors.length; i++) {
+        const c = survivors[i];
+        const x = pad + c._sx * w;
+        const y = pad + c._sy * h;
+        const t = (dists[i] - dmin) / drange;
+        ctx.fillStyle = distanceColor(t);
+        ctx.beginPath();
+        ctx.arc(x, y, 3.2, 0, 2 * Math.PI);
+        ctx.fill();
+      }
 
-  // Winner ring
-  if (winner) {
-    const x = pad + winner._sx * w;
-    const y = pad + winner._sy * h;
-    ctx.strokeStyle = '#1a1a1a';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(x, y, 8, 0, 2 * Math.PI);
-    ctx.stroke();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(x, y, 6, 0, 2 * Math.PI);
-    ctx.stroke();
-  }
+      // Winner ring
+      if (winner) {
+        const x = pad + winner._sx * w;
+        const y = pad + winner._sy * h;
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, 2 * Math.PI);
+        ctx.stroke();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, 2 * Math.PI);
+        ctx.stroke();
+      }
 
-  // Legend
-  const legendHTML = `
+      // Legend
+      const legendHTML = `
     <div class="item"><span class="swatch" style="background:#d4d4d0;"></span>filtered out</div>
     <div class="item"><span class="swatch" style="background:${distanceColor(0)};"></span>survivor (closer to ideal)</div>
     <div class="item"><span class="swatch" style="background:${distanceColor(0.5)};"></span>survivor (mid)</div>
     <div class="item"><span class="swatch" style="background:${distanceColor(1)};"></span>survivor (farther)</div>
     <div class="item"><span class="swatch" style="background:#1a1a1a;"></span>winner</div>
   `;
-  document.getElementById('scatter-legend').innerHTML = legendHTML;
-}
+      document.getElementById('scatter-legend').innerHTML = legendHTML;
+    }
 
-function ratioClass(r, inverse = false) {
-  // r is target/std. inverse=true means lower is better (default for cost metrics)
-  if (inverse) {
-    if (r <= 0.8) return 'good';
-    if (r <= 1.05) return 'warn';
-    return 'bad';
-  }
-  if (r >= 1.2) return 'good';
-  if (r >= 0.95) return 'warn';
-  return 'bad';
-}
+    function ratioClass(r, inverse = false) {
+      // r is target/std. inverse=true means lower is better (default for cost metrics)
+      if (inverse) {
+        if (r <= 0.8) return 'good';
+        if (r <= 1.05) return 'warn';
+        return 'bad';
+      }
+      if (r >= 1.2) return 'good';
+      if (r >= 0.95) return 'warn';
+      return 'bad';
+    }
 
-function renderWinner(winner) {
-  const el = document.getElementById('winner');
-  if (!winner) {
-    el.innerHTML = '<div class="empty-state">No candidates survived all filters. Relax a bound and try again.</div>';
-    return;
-  }
-  const d = weightedDistance(winner, state.W);
-  const rows = [
-    ['Signature size (B)', winner.size, STD_M.size],
-    ['KeyGen cost',        winner.kg,   STD_M.kg],
-    ['SigGen cost',        winner.sg,   STD_M.sg],
-    ['SigVer cost',        winner.sv,   STD_M.sv],
-    ['Comp/Byte (ρ)',      winner.cb,   STD_M.cb],
-  ];
-  const rowsHTML = rows.map(([name, target, std]) => {
-    const ratio = target / std;
-    const cls = ratioClass(ratio, true);
-    return `
+    function renderWinner(winner) {
+      const el = document.getElementById('winner');
+      if (!winner) {
+        el.innerHTML = '<div class="empty-state">No candidates survived all filters. Relax a bound and try again.</div>';
+        return;
+      }
+      const d = weightedDistance(winner, state.W);
+      const rows = [
+        ['Signature size (B)', winner.size, STD_M.size],
+        ['KeyGen cost', winner.kg, STD_M.kg],
+        ['SigGen cost', winner.sg, STD_M.sg],
+        ['SigVer cost', winner.sv, STD_M.sv],
+        ['Comp/Byte (ρ)', winner.cb, STD_M.cb],
+      ];
+      const rowsHTML = rows.map(([name, target, std]) => {
+        const ratio = target / std;
+        const cls = ratioClass(ratio, true);
+        return `
       <tr>
         <td>${name}</td>
         <td>${typeof target === 'number' && target < 10 ? target.toFixed(4) : fmt(target)}</td>
@@ -977,9 +1114,9 @@ function renderWinner(winner) {
         <td class="ratio ${cls}">${fmtRatio(ratio)}</td>
       </tr>
     `;
-  }).join('');
+      }).join('');
 
-  el.innerHTML = `
+      el.innerHTML = `
     <div class="winner-grid">
       <div>
         <p class="winner-tuple">(${winner.h}, ${winner.d}, ${winner.k}, ${winner.a}, ${winner.w})</p>
@@ -996,76 +1133,76 @@ function renderWinner(winner) {
       </div>
     </div>
   `;
-}
-
-// ---------- Main update loop ----------
-function update() {
-  const { stepCounts, survivors, eliminatedAt } = runFilters(state.initialPool, state.X);
-  renderFunnel(stepCounts);
-  let winner = null;
-  if (survivors.length > 0) {
-    winner = survivors[0];
-    let bestD = weightedDistance(winner, state.W);
-    for (let i = 1; i < survivors.length; i++) {
-      const d = weightedDistance(survivors[i], state.W);
-      if (d < bestD) { bestD = d; winner = survivors[i]; }
     }
-  }
-  state.lastEliminatedAt = eliminatedAt;
-  state.lastSurvivors = survivors;
-  state.lastWinner = winner;
-  renderScatter(eliminatedAt, survivors, winner);
-  renderWinner(winner);
-}
 
-// ---------- Hover tooltip ----------
-function findNearestCandidate(mx, my) {
-  const { pad, w, h } = state.scatterLayout;
-  let best = null, bestD = 12 * 12; // 12px hit radius (squared)
-  for (const c of state.initialPool) {
-    const x = pad + c._sx * w;
-    const y = pad + c._sy * h;
-    const dx = mx - x, dy = my - y;
-    const d2 = dx * dx + dy * dy;
-    if (d2 < bestD) { bestD = d2; best = c; }
-  }
-  return best;
-}
+    // ---------- Main update loop ----------
+    function update() {
+      const { stepCounts, survivors, eliminatedAt } = runFilters(state.initialPool, state.X);
+      renderFunnel(stepCounts);
+      let winner = null;
+      if (survivors.length > 0) {
+        winner = survivors[0];
+        let bestD = weightedDistance(winner, state.W);
+        for (let i = 1; i < survivors.length; i++) {
+          const d = weightedDistance(survivors[i], state.W);
+          if (d < bestD) { bestD = d; winner = survivors[i]; }
+        }
+      }
+      state.lastEliminatedAt = eliminatedAt;
+      state.lastSurvivors = survivors;
+      state.lastWinner = winner;
+      renderScatter(eliminatedAt, survivors, winner);
+      renderWinner(winner);
+    }
 
-function statusFor(c) {
-  if (c === state.lastWinner) return { cls: 'winner', text: '★ Winner — minimum weighted distance' };
-  const elimStep = state.lastEliminatedAt ? state.lastEliminatedAt.get(c) : null;
-  if (elimStep === null || elimStep === undefined) {
-    return { cls: 'survivor', text: 'Survivor — passed all filters' };
-  }
-  return { cls: 'eliminated', text: `Eliminated at step ${elimStep + 1}: ${FILTER_STEPS[elimStep].label}` };
-}
+    // ---------- Hover tooltip ----------
+    function findNearestCandidate(mx, my) {
+      const { pad, w, h } = state.scatterLayout;
+      let best = null, bestD = 12 * 12; // 12px hit radius (squared)
+      for (const c of state.initialPool) {
+        const x = pad + c._sx * w;
+        const y = pad + c._sy * h;
+        const dx = mx - x, dy = my - y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < bestD) { bestD = d2; best = c; }
+      }
+      return best;
+    }
 
-function renderTooltip(c, clientX, clientY) {
-  const tt = document.getElementById('tooltip');
-  if (!c) { tt.style.display = 'none'; document.getElementById('hover-ring').style.display = 'none'; return; }
-  const st = statusFor(c);
-  const rows = [
-    ['Signature size (B)', c.size, STD_M.size],
-    ['KeyGen cost',        c.kg,   STD_M.kg],
-    ['SigGen cost',        c.sg,   STD_M.sg],
-    ['SigVer cost',        c.sv,   STD_M.sv],
-    ['Comp/Byte (ρ)',      c.cb,   STD_M.cb],
-  ];
-  const tbody = rows.map(([name, target, std]) => {
-    const r = target / std;
-    const cls = ratioClass(r, true);
-    const tval = target < 10 ? target.toFixed(4) : fmt(target);
-    const sval = std < 10 ? std.toFixed(4) : fmt(std);
-    return `<tr><td>${name}</td><td>${tval}</td><td>${sval}</td><td class="ratio ${cls}">${fmtRatio(r)}</td></tr>`;
-  }).join('');
+    function statusFor(c) {
+      if (c === state.lastWinner) return { cls: 'winner', text: '★ Winner — minimum weighted distance' };
+      const elimStep = state.lastEliminatedAt ? state.lastEliminatedAt.get(c) : null;
+      if (elimStep === null || elimStep === undefined) {
+        return { cls: 'survivor', text: 'Survivor — passed all filters' };
+      }
+      return { cls: 'eliminated', text: `Eliminated at step ${elimStep + 1}: ${FILTER_STEPS[elimStep].label}` };
+    }
 
-  const isSurvivor = st.cls === 'survivor' || st.cls === 'winner';
-  const distHTML = isSurvivor
-    ? `<div class="tt-distance">Weighted distance: <strong>${weightedDistance(c, state.W).toFixed(4)}</strong></div>`
-    : '';
+    function renderTooltip(c, clientX, clientY) {
+      const tt = document.getElementById('tooltip');
+      if (!c) { tt.style.display = 'none'; document.getElementById('hover-ring').style.display = 'none'; return; }
+      const st = statusFor(c);
+      const rows = [
+        ['Signature size (B)', c.size, STD_M.size],
+        ['KeyGen cost', c.kg, STD_M.kg],
+        ['SigGen cost', c.sg, STD_M.sg],
+        ['SigVer cost', c.sv, STD_M.sv],
+        ['Comp/Byte (ρ)', c.cb, STD_M.cb],
+      ];
+      const tbody = rows.map(([name, target, std]) => {
+        const r = target / std;
+        const cls = ratioClass(r, true);
+        const tval = target < 10 ? target.toFixed(4) : fmt(target);
+        const sval = std < 10 ? std.toFixed(4) : fmt(std);
+        return `<tr><td>${name}</td><td>${tval}</td><td>${sval}</td><td class="ratio ${cls}">${fmtRatio(r)}</td></tr>`;
+      }).join('');
 
-  tt.innerHTML = `
+      const isSurvivor = st.cls === 'survivor' || st.cls === 'winner';
+      const distHTML = isSurvivor
+        ? `<div class="tt-distance">Weighted distance: <strong>${weightedDistance(c, state.W).toFixed(4)}</strong></div>`
+        : '';
+
+      tt.innerHTML = `
     <p class="tt-tuple">(${c.h}, ${c.d}, ${c.k}, ${c.a}, ${c.w})</p>
     <div class="tt-status ${st.cls}">${st.text}</div>
     <table>
@@ -1074,120 +1211,120 @@ function renderTooltip(c, clientX, clientY) {
     </table>
     ${distHTML}
   `;
-  tt.style.display = 'block';
+      tt.style.display = 'block';
 
-  // Position: prefer to the right of the cursor, flip if off-screen
-  const ttRect = tt.getBoundingClientRect();
-  const pad = 12;
-  let x = clientX + pad;
-  let y = clientY + pad;
-  if (x + ttRect.width > window.innerWidth - 8) x = clientX - ttRect.width - pad;
-  if (y + ttRect.height > window.innerHeight - 8) y = clientY - ttRect.height - pad;
-  tt.style.left = Math.max(8, x) + 'px';
-  tt.style.top = Math.max(8, y) + 'px';
+      // Position: prefer to the right of the cursor, flip if off-screen
+      const ttRect = tt.getBoundingClientRect();
+      const pad = 12;
+      let x = clientX + pad;
+      let y = clientY + pad;
+      if (x + ttRect.width > window.innerWidth - 8) x = clientX - ttRect.width - pad;
+      if (y + ttRect.height > window.innerHeight - 8) y = clientY - ttRect.height - pad;
+      tt.style.left = Math.max(8, x) + 'px';
+      tt.style.top = Math.max(8, y) + 'px';
 
-  // Hover ring (positioned over the scatter)
-  const canvas = document.getElementById('scatter');
-  const rect = canvas.getBoundingClientRect();
-  const { pad: scPad, w, h } = state.scatterLayout;
-  const ring = document.getElementById('hover-ring');
-  ring.style.left = (rect.left + scPad + c._sx * w) - canvas.parentElement.getBoundingClientRect().left + 'px';
-  ring.style.top  = (rect.top  + scPad + c._sy * h) - canvas.parentElement.getBoundingClientRect().top + 'px';
-  ring.style.display = 'block';
-}
+      // Hover ring (positioned over the scatter)
+      const canvas = document.getElementById('scatter');
+      const rect = canvas.getBoundingClientRect();
+      const { pad: scPad, w, h } = state.scatterLayout;
+      const ring = document.getElementById('hover-ring');
+      ring.style.left = (rect.left + scPad + c._sx * w) - canvas.parentElement.getBoundingClientRect().left + 'px';
+      ring.style.top = (rect.top + scPad + c._sy * h) - canvas.parentElement.getBoundingClientRect().top + 'px';
+      ring.style.display = 'block';
+    }
 
-// ---------- Custom candidate panel ----------
-function validateCustom(p) {
-  const errors = [];
-  const warnings = [];
-  const isPosInt = v => Number.isFinite(v) && v > 0 && Math.floor(v) === v;
+    // ---------- Custom candidate panel ----------
+    function validateCustom(p) {
+      const errors = [];
+      const warnings = [];
+      const isPosInt = v => Number.isFinite(v) && v > 0 && Math.floor(v) === v;
 
-  if (!isPosInt(p.h)) errors.push('h must be a positive integer.');
-  if (!isPosInt(p.d)) errors.push('d must be a positive integer.');
-  if (!isPosInt(p.k)) errors.push('k must be a positive integer.');
-  if (!isPosInt(p.a)) errors.push('a must be a positive integer.');
-  if (!isPosInt(p.w) || p.w < 2) errors.push('w must be an integer ≥ 2.');
+      if (!isPosInt(p.h)) errors.push('h must be a positive integer.');
+      if (!isPosInt(p.d)) errors.push('d must be a positive integer.');
+      if (!isPosInt(p.k)) errors.push('k must be a positive integer.');
+      if (!isPosInt(p.a)) errors.push('a must be a positive integer.');
+      if (!isPosInt(p.w) || p.w < 2) errors.push('w must be an integer ≥ 2.');
 
-  if (errors.length) return { valid: false, errors, warnings };
+      if (errors.length) return { valid: false, errors, warnings };
 
-  if (p.h % p.d !== 0) {
-    errors.push(`d must divide h evenly — h/d = ${(p.h / p.d).toFixed(3)} is not an integer.`);
-  }
-  // w should be a power of 2 for the standard WOTS+ construction
-  if ((p.w & (p.w - 1)) !== 0) {
-    warnings.push(`w = ${p.w} is not a power of 2. Standard WOTS+ uses w ∈ {16, 32, 256}; metrics are still computed but may not match a real implementation.`);
-  } else if (![16, 32, 256].includes(p.w)) {
-    warnings.push(`w = ${p.w} is a power of 2 but outside the standard set {16, 32, 256}. Metrics are computed but the tuple is non-standard.`);
-  }
+      if (p.h % p.d !== 0) {
+        errors.push(`d must divide h evenly — h/d = ${(p.h / p.d).toFixed(3)} is not an integer.`);
+      }
+      // w should be a power of 2 for the standard WOTS+ construction
+      if ((p.w & (p.w - 1)) !== 0) {
+        warnings.push(`w = ${p.w} is not a power of 2. Standard WOTS+ uses w ∈ {16, 32, 256}; metrics are still computed but may not match a real implementation.`);
+      } else if (![16, 32, 256].includes(p.w)) {
+        warnings.push(`w = ${p.w} is a power of 2 but outside the standard set {16, 32, 256}. Metrics are computed but the tuple is non-standard.`);
+      }
 
-  if (errors.length) return { valid: false, errors, warnings };
+      if (errors.length) return { valid: false, errors, warnings };
 
-  // Real security check (FORS subset-forgery analysis, q_s = 2^40)
-  const secBits = computeSecurityBits(Q_S_LOG2, p.h, p.k, p.a);
-  if (secBits < 128) {
-    warnings.push(`Does not reach 128-bit security: computed security ≈ ${secBits.toFixed(1)} bits at q_s = 2⁴⁰.`);
-  }
+      // Real security check (FORS subset-forgery analysis, q_s = 2^40)
+      const secBits = computeSecurityBits(Q_S_LOG2, p.h, p.k, p.a);
+      if (secBits < 128) {
+        warnings.push(`Does not reach 128-bit security: computed security ≈ ${secBits.toFixed(1)} bits at q_s = 2⁴⁰.`);
+      }
 
-  return { valid: true, errors: [], warnings, secBits };
-}
+      return { valid: true, errors: [], warnings, secBits };
+    }
 
-function renderCustom() {
-  const p = {
-    h: parseInt(document.getElementById('cust-h').value, 10),
-    d: parseInt(document.getElementById('cust-d').value, 10),
-    k: parseInt(document.getElementById('cust-k').value, 10),
-    a: parseInt(document.getElementById('cust-a').value, 10),
-    w: parseInt(document.getElementById('cust-w').value, 10),
-  };
+    function renderCustom() {
+      const p = {
+        h: parseInt(document.getElementById('cust-h').value, 10),
+        d: parseInt(document.getElementById('cust-d').value, 10),
+        k: parseInt(document.getElementById('cust-k').value, 10),
+        a: parseInt(document.getElementById('cust-a').value, 10),
+        w: parseInt(document.getElementById('cust-w').value, 10),
+      };
 
-  const v = validateCustom(p);
-  const statusEl = document.getElementById('custom-status');
-  const resultEl = document.getElementById('custom-result');
+      const v = validateCustom(p);
+      const statusEl = document.getElementById('custom-status');
+      const resultEl = document.getElementById('custom-result');
 
-  if (!v.valid) {
-    statusEl.className = 'custom-status invalid';
-    statusEl.innerHTML = `<strong>Invalid tuple.</strong><ul>${v.errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
-    resultEl.innerHTML = '';
-    return;
-  }
+      if (!v.valid) {
+        statusEl.className = 'custom-status invalid';
+        statusEl.innerHTML = `<strong>Invalid tuple.</strong><ul>${v.errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
+        resultEl.innerHTML = '';
+        return;
+      }
 
-  // Compute metrics
-  const m = metrics(p);
+      // Compute metrics
+      const m = metrics(p);
 
-  // Status banner
-  if (v.warnings.length) {
-    statusEl.className = 'custom-status warn';
-    statusEl.innerHTML = `<strong>Valid, with notes:</strong><ul>${v.warnings.map(w => `<li>${w}</li>`).join('')}</ul>`;
-  } else {
-    statusEl.className = 'custom-status ok';
-    const sameAsStd = p.h === STD.h && p.d === STD.d && p.k === STD.k && p.a === STD.a && p.w === STD.w;
-    statusEl.innerHTML = `<strong>Valid tuple.</strong>${sameAsStd ? ' (This is the SLH-DSA-128s baseline.)' : ''}`;
-  }
+      // Status banner
+      if (v.warnings.length) {
+        statusEl.className = 'custom-status warn';
+        statusEl.innerHTML = `<strong>Valid, with notes:</strong><ul>${v.warnings.map(w => `<li>${w}</li>`).join('')}</ul>`;
+      } else {
+        statusEl.className = 'custom-status ok';
+        const sameAsStd = p.h === STD.h && p.d === STD.d && p.k === STD.k && p.a === STD.a && p.w === STD.w;
+        statusEl.innerHTML = `<strong>Valid tuple.</strong>${sameAsStd ? ' (This is the SLH-DSA-128s baseline.)' : ''}`;
+      }
 
-  // Comparison table
-  const rows = [
-    ['Signature size (B)', m.size, STD_M.size],
-    ['KeyGen cost',        m.kg,   STD_M.kg],
-    ['SigGen cost',        m.sg,   STD_M.sg],
-    ['SigVer cost',        m.sv,   STD_M.sv],
-    ['Comp/Byte (ρ)',      m.cb,   STD_M.cb],
-  ];
-  const rowsHTML = rows.map(([name, target, std]) => {
-    const r = target / std;
-    const cls = ratioClass(r, true);
-    const tval = target < 10 ? target.toFixed(4) : fmt(target);
-    const sval = std < 10 ? std.toFixed(4) : fmt(std);
-    return `<tr><td>${name}</td><td>${tval}</td><td>${sval}</td><td class="ratio ${cls}">${fmtRatio(r)}</td></tr>`;
-  }).join('');
+      // Comparison table
+      const rows = [
+        ['Signature size (B)', m.size, STD_M.size],
+        ['KeyGen cost', m.kg, STD_M.kg],
+        ['SigGen cost', m.sg, STD_M.sg],
+        ['SigVer cost', m.sv, STD_M.sv],
+        ['Comp/Byte (ρ)', m.cb, STD_M.cb],
+      ];
+      const rowsHTML = rows.map(([name, target, std]) => {
+        const r = target / std;
+        const cls = ratioClass(r, true);
+        const tval = target < 10 ? target.toFixed(4) : fmt(target);
+        const sval = std < 10 ? std.toFixed(4) : fmt(std);
+        return `<tr><td>${name}</td><td>${tval}</td><td>${sval}</td><td class="ratio ${cls}">${fmtRatio(r)}</td></tr>`;
+      }).join('');
 
-  const hp = p.h / p.d;
-  const wotsL = wotsLen(STD.n, p.w);
-  const secBits = v.secBits !== undefined ? v.secBits : computeSecurityBits(Q_S_LOG2, p.h, p.k, p.a);
-  const secLabel = secBits >= 128
-    ? `<span style="color:var(--good);">≥ 128 bits ✓</span>`
-    : `<span style="color:var(--bad);">${secBits.toFixed(1)} bits</span>`;
+      const hp = p.h / p.d;
+      const wotsL = wotsLen(STD.n, p.w);
+      const secBits = v.secBits !== undefined ? v.secBits : computeSecurityBits(Q_S_LOG2, p.h, p.k, p.a);
+      const secLabel = secBits >= 128
+        ? `<span style="color:var(--good);">≥ 128 bits ✓</span>`
+        : `<span style="color:var(--bad);">${secBits.toFixed(1)} bits</span>`;
 
-  resultEl.innerHTML = `
+      resultEl.innerHTML = `
     <div class="winner-grid">
       <div>
         <p class="winner-tuple">(${p.h}, ${p.d}, ${p.k}, ${p.a}, ${p.w})</p>
@@ -1207,111 +1344,64 @@ function renderCustom() {
       </div>
     </div>
   `;
-}
-
-function attachCustomCandidate() {
-  ['cust-h','cust-d','cust-k','cust-a','cust-w'].forEach(id => {
-    document.getElementById(id).addEventListener('input', renderCustom);
-  });
-  renderCustom();
-}
-
-function attachScatterHover() {
-  const canvas = document.getElementById('scatter');
-  let last = null;
-
-  // --- Mouse: hover to inspect ---
-  canvas.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-    const c = findNearestCandidate(mx, my);
-    if (c !== last || c) {
-      last = c;
-      renderTooltip(c, e.clientX, e.clientY);
     }
-  });
-  canvas.addEventListener('mouseleave', () => {
-    last = null;
-    renderTooltip(null);
-  });
 
-  // --- Touch: tap to inspect; tap blank space (or outside) to dismiss ---
-  // Use a slightly wider hit radius on touch since fingertips are imprecise.
-  function touchHit(touch) {
-    const rect = canvas.getBoundingClientRect();
-    const mx = touch.clientX - rect.left;
-    const my = touch.clientY - rect.top;
-    // Reuse the mouse hit-test, but with a forgiving radius for touch.
-    const { pad, w, h } = state.scatterLayout;
-    let best = null, bestD = 22 * 22; // 22px touch radius (squared)
-    for (const c of state.initialPool) {
-      const x = pad + c._sx * w;
-      const y = pad + c._sy * h;
-      const dx = mx - x, dy = my - y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 < bestD) { bestD = d2; best = c; }
+    function attachCustomCandidate() {
+      ['cust-h', 'cust-d', 'cust-k', 'cust-a', 'cust-w'].forEach(id => {
+        document.getElementById(id).addEventListener('input', renderCustom);
+      });
+      renderCustom();
     }
-    return best;
-  }
 
-  canvas.addEventListener('touchstart', (e) => {
-    if (e.touches.length !== 1) return;
-    e.preventDefault(); // suppress synthetic mouse events & page scrolling on the canvas
-    const t = e.touches[0];
-    const c = touchHit(t);
-    last = c;
-    renderTooltip(c, t.clientX, t.clientY);
-  }, { passive: false });
-
-  canvas.addEventListener('touchmove', (e) => {
-    if (e.touches.length !== 1) return;
-    e.preventDefault();
-    const t = e.touches[0];
-    const c = touchHit(t);
-    if (c !== last || c) {
-      last = c;
-      renderTooltip(c, t.clientX, t.clientY);
+    function attachScatterHover() {
+      const canvas = document.getElementById('scatter');
+      let last = null;
+      canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const c = findNearestCandidate(mx, my);
+        if (c !== last || c) {
+          last = c;
+          renderTooltip(c, e.clientX, e.clientY);
+        }
+      });
+      canvas.addEventListener('mouseleave', () => {
+        last = null;
+        renderTooltip(null);
+      });
     }
-  }, { passive: false });
 
-  // Tapping anywhere outside the scatter dismisses the tooltip.
-  document.addEventListener('touchstart', (e) => {
-    if (e.target === canvas) return;
-    last = null;
-    renderTooltip(null);
-  });
-}
+    // ---------- Setup ----------
+    function setup() {
+      state.candidates = sweep();
+      state.initialPool = state.candidates.filter(passesInitial);
 
-// ---------- Setup ----------
-function setup() {
-  state.candidates = sweep();
-  state.initialPool = state.candidates.filter(passesInitial);
+      // Assign stable scatter positions
+      const rand = mulberry32(42);
+      for (const c of state.initialPool) {
+        c._sx = rand();
+        c._sy = rand();
+      }
 
-  // Assign stable scatter positions
-  const rand = mulberry32(42);
-  for (const c of state.initialPool) {
-    c._sx = rand();
-    c._sy = rand();
-  }
+      document.getElementById('initial-info').innerHTML =
+        `Sweep: <strong>${state.candidates.length.toLocaleString()}</strong> tuples · ` +
+        `<strong>${state.initialPool.length.toLocaleString()}</strong> pass the initial bounds ` +
+        `(≥ 128-bit security at q<sub>s</sub> = 2⁴⁰, size &lt; 7,856 B). ` +
+        `<span style="opacity:0.65;font-size:11px;">` +
+        `Security computed via the FORS subset-forgery analysis ported from the report's ` +
+        `<a href="https://github.com/BlockstreamResearch/SPHINCS-Parameters/blob/main/security.sage" style="color:inherit;">security.sage</a>.` +
+        `</span>`;
 
-  document.getElementById('initial-info').innerHTML =
-    `Sweep: <strong>${state.candidates.length.toLocaleString()}</strong> tuples · ` +
-    `<strong>${state.initialPool.length.toLocaleString()}</strong> pass the initial bounds ` +
-    `(≥ 128-bit security at q<sub>s</sub> = 2⁴⁰, size &lt; 7,856 B). ` +
-    `<span style="opacity:0.65;font-size:11px;">` +
-    `Security computed via the FORS subset-forgery analysis ported from the report's ` +
-    `<a href="https://github.com/BlockstreamResearch/SPHINCS-Parameters/blob/main/security.sage" style="color:inherit;">security.sage</a>.` +
-    `</span>`;
+      renderControls();
+      update();
+      attachScatterHover();
+      attachCustomCandidate();
+    }
 
-  renderControls();
-  update();
-  attachScatterHover();
-  attachCustomCandidate();
-}
-
-setup();
-</script>
+    setup();
+  </script>
 
 </body>
+
 </html>
