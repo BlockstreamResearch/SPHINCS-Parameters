@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -901,10 +902,10 @@
 
       const weightDefs = [
         { key: 'size', label: 'w<sub>size</sub>', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
-        { key: 'kg', label: 'w<sub>kg</sub>', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
-        { key: 'sg', label: 'w<sub>sg</sub>', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
-        { key: 'sv', label: 'w<sub>sv</sub>', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
-        { key: 'cb', label: 'w<sub>cb</sub>', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+        { key: 'kg', label: 'w<sub>kg</sub>', min: 0.10, max: 25.00, step: 0.10, dp: 1 },
+        { key: 'sg', label: 'w<sub>sg</sub>', min: 0.10, max: 25.00, step: 0.10, dp: 1 },
+        { key: 'sv', label: 'w<sub>sv</sub>', min: 0.10, max: 25.00, step: 0.10, dp: 1 },
+        { key: 'cb', label: 'w<sub>cb</sub>', min: 0.10, max: 25.00, step: 0.10, dp: 1 },
       ];
       document.getElementById('weight-controls').innerHTML = weightDefs.map(d => `
     <div class="control">
