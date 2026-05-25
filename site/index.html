@@ -544,7 +544,9 @@
       <div id="filter-controls"></div>
 
       <h2 class="section-title">Importance weights</h2>
-      <p class="hint">Higher weight = more important when picking the winner from the survivors.</p>
+      <p class="hint">Higher weight = more important. Each metric's ratio is <strong>range-normalised across the
+          surviving pool</strong> before scoring, so weights are truly comparable regardless of how tightly each filter
+        is set.</p>
       <div id="weight-controls"></div>
 
       <button class="reset-btn" id="reset-btn">Reset to defaults</button>
@@ -576,6 +578,10 @@
 
       <div class="panel">
         <h2>Best candidate (minimum weighted distance)</h2>
+        <p class="hint" style="margin-bottom:10px;">Formula: <code>d(P) = √Σ pᵢ·n̂ᵢ²</code> where
+          <code>n̂ᵢ = (X̃ᵢ − minⱼX̃ᵢⱼ) / (maxⱼX̃ᵢⱼ − minⱼX̃ᵢⱼ)</code> and <code>pᵢ = wᵢ / Σwⱼ</code>. Each axis spans
+          [0, 1] across survivors.
+        </p>
         <div id="winner"></div>
       </div>
 
@@ -817,25 +823,38 @@
     }
 
     // ---------- Distance ----------
+    // Compute per-metric ratio range across the survivor pool so that
+    // weights have equal leverage regardless of filter tightness.
+    const METRIC_KEYS = ['size', 'kg', 'sg', 'sv', 'cb'];
+
+    function computeRanges(survivors) {
+      const ranges = {};
+      METRIC_KEYS.forEach(key => {
+        const stdVal = STD_M[key];
+        if (!survivors.length) { ranges[key] = { min: 0, max: 1 }; return; }
+        const vals = survivors.map(c => c[key] / stdVal);
+        const lo = Math.min(...vals), hi = Math.max(...vals);
+        ranges[key] = { min: lo, max: hi === lo ? lo + 1 : hi }; // avoid /0
+      });
+      return ranges;
+    }
+
     function weightedDistance(c, W) {
       const sum = W.size + W.kg + W.sg + W.sv + W.cb;
       const p = {
-        size: W.size / sum, kg: W.kg / sum, sg: W.sg / sum, sv: W.sv / sum, cb: W.cb / sum
+        size: W.size / sum, kg: W.kg / sum, sg: W.sg / sum,
+        sv: W.sv / sum, cb: W.cb / sum
       };
-      const X = {
-        size: c.size / STD_M.size,
-        kg: c.kg / STD_M.kg,
-        sg: c.sg / STD_M.sg,
-        sv: c.sv / STD_M.sv,
-        cb: c.cb / STD_M.cb,
-      };
-      return Math.sqrt(
-        p.size * X.size * X.size +
-        p.kg * X.kg * X.kg +
-        p.sg * X.sg * X.sg +
-        p.sv * X.sv * X.sv +
-        p.cb * X.cb * X.cb
-      );
+      const ranges = state.lastRanges;
+      let dist2 = 0;
+      METRIC_KEYS.forEach(key => {
+        const wKey = key; // same key names in W
+        const ratio = c[key] / STD_M[key];
+        const { min, max } = ranges[key];
+        const norm = (ratio - min) / (max - min); // in [0,1] for survivors
+        dist2 += p[wKey] * norm * norm;
+      });
+      return Math.sqrt(dist2);
     }
 
     // ---------- State ----------
@@ -853,6 +872,8 @@
       lastWinner: null,
       // Layout cache for hit-testing
       scatterLayout: { pad: 12, w: 0, h: 0 },
+      // Per-metric ratio ranges across current survivors (for normalisation)
+      lastRanges: Object.fromEntries(['size', 'kg', 'sg', 'sv', 'cb'].map(k => [k, { min: 0, max: 1 }])),
     };
 
     // Stable seeded RNG for scatter positions
@@ -901,11 +922,11 @@
   `).join('');
 
       const weightDefs = [
-        { key: 'size', label: 'w<sub>size</sub>', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
-        { key: 'kg', label: 'w<sub>kg</sub>', min: 0.10, max: 25.00, step: 0.10, dp: 1 },
-        { key: 'sg', label: 'w<sub>sg</sub>', min: 0.10, max: 25.00, step: 0.10, dp: 1 },
-        { key: 'sv', label: 'w<sub>sv</sub>', min: 0.10, max: 25.00, step: 0.10, dp: 1 },
-        { key: 'cb', label: 'w<sub>cb</sub>', min: 0.10, max: 25.00, step: 0.10, dp: 1 },
+        { key: 'size', label: 'w<sub>size</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 1 },
+        { key: 'kg', label: 'w<sub>kg</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 1 },
+        { key: 'sg', label: 'w<sub>sg</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 1 },
+        { key: 'sv', label: 'w<sub>sv</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 1 },
+        { key: 'cb', label: 'w<sub>cb</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 1 },
       ];
       document.getElementById('weight-controls').innerHTML = weightDefs.map(d => `
     <div class="control">
@@ -1140,6 +1161,8 @@
     function update() {
       const { stepCounts, survivors, eliminatedAt } = runFilters(state.initialPool, state.X);
       renderFunnel(stepCounts);
+      // Recompute normalisation ranges for this survivor pool
+      state.lastRanges = computeRanges(survivors);
       let winner = null;
       if (survivors.length > 0) {
         winner = survivors[0];
