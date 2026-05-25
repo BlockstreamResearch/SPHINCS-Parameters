@@ -279,7 +279,118 @@ The resulting values are shown in Table~\ref{tab:euclidean_candidate_metrics_cas
     \end{tabular}
 \end{table}
 
-Comparing the two cases, the resulting metrics differ noticeably. The first case yields more balanced costs across the board, while the second case clearly favours signature size and verification at the expense of a heavier signing operation - exactly the trade-off we asked the weights to enforce.
+Comparing the two cases, the resulting metrics differ noticeably. The first case yields more balanced costs across the board, while the second case clearly favours signature size and verification at the expense of a heavier signing operation - exactly the trade-off we asked the weights to enforce. 
+
+\subsection{Metric-Normalized Weighted Distance} \label{sec:normalized-weights}
+
+The weighted distance introduced in Section~\ref{sec:decisional-weights} correctly encodes relative priorities when the five ratio axes $\widetilde{X}_i$ vary over comparable ranges.
+In practice, however, the filter pipeline disturbs this assumption.
+Consider the signature-size filter: after it is applied with a tight coefficient $X_{\text{size}} \ll 1$, every surviving candidate has a ratio $\widetilde{X}_{\text{size}}$ that lies in a narrow band close to $X_{\text{size}}$.
+The range of $\widetilde{X}_{\text{size}}$ values across survivors is therefore small relative to the variation of cost metrics such as $\widetilde{X}_{\text{kg}}$ or $\widetilde{X}_{\text{sg}}$, which the filter may leave nearly unconstrained.
+As a result, the size term contributes almost the same value to $d(P)$ for every candidate in the pool, regardless of the weight $p_{\text{size}}$ attached to it.
+The ranking is then dominated by the high-variance axes, and increasing $w_{\text{size}}$ produces little to no change in which candidate is selected.
+
+The remedy is to remove the scale imbalance before applying the weights.
+For each metric $i$ and each surviving candidate $P_j$ in the current pool, define the cross-pool minimum and maximum of the ratios:
+
+\begin{equation}
+    m_i = \min_j \widetilde{X}_i(P_j), \qquad
+    M_i = \max_j \widetilde{X}_i(P_j).
+    \label{eq:metric_range}
+\end{equation}
+
+The \emph{metric-normalized ratio} of candidate $P$ on axis $i$ is then
+
+\begin{equation}
+    \widehat{X}_i(P) = \frac{\widetilde{X}_i(P) - m_i}{M_i - m_i},
+    \label{eq:metric_norm}
+\end{equation}
+
+which maps every axis to $[0, 1]$ across the survivor pool, with $\widehat{X}_i = 0$ identifying the best-performing candidate on that axis and $\widehat{X}_i = 1$ the worst-performing one.
+
+Replacing $\widetilde{X}_i$ with $\widehat{X}_i$ in Equation~\eqref{eq:weighted_euclidean_distance} yields the \emph{metric-normalized weighted Euclidean distance}:
+
+\begin{equation}
+    d(P) = \sqrt{
+        p_{\text{size}}\,\widehat{X}_{\text{size}}^2 +
+        p_{\text{kg}}\,\widehat{X}_{\text{kg}}^2 +
+        p_{\text{sg}}\,\widehat{X}_{\text{sg}}^2 +
+        p_{\text{sv}}\,\widehat{X}_{\text{sv}}^2 +
+        p_{\text{cb}}\,\widehat{X}_{\text{cb}}^2
+    },
+    \label{eq:normalized_weighted_distance}
+\end{equation}
+
+where the $p_i$ are the normalized weight coefficients from Equation~\eqref{eq:weight_normalization}.
+The winner is still the candidate minimising $d(P)$, but now the weight $p_i$ faithfully controls how much axis $i$ influences the ranking: because every $\widehat{X}_i$ spans the same $[0, 1]$ interval, a coefficient $p_{\text{size}} = 0.5$ means that signature size drives exactly half of the squared distance, independently of how tightly the size filter was set.
+
+\paragraph{Note:}
+The normalization is computed fresh from the survivors after each change to the filter coefficients.
+This means that the same weight vector $\mathbf{w}$ can produce a different winner when the filter is tightened, because the pool shrinks and the per-axis ranges change accordingly.
+This behaviour is intentional: the weights express relative importance \emph{within the feasible region}, and that region is itself defined by the filter.
+
+Consider the following filtering parameters and weights set for comparison of methods for finding the shortest vector with weights: 
+
+\begin{itemize}
+    \item Filtering parameters: $X_{\text{size}} = 0.75, \ X_{\text{kg}} = 5, \ X_{\text{sg}} = 5, \ X_{\text{sv}} = 1.5, \ X_{\text{cb}} = 1$;
+    \item Weights coefficients: $w_{\text{size}} = 5, \ w_{\text{kg}} = 1.5, \ w_{\text{sg}} = 1.5, \ w_{\text{sv}} = 2, \ w_{\text{cb}} = 1$.
+\end{itemize}
+
+The resulting best candidates for each method shown in the Table~\ref{tab:distance_method_comparison}.
+
+\begin{table}[htbp]
+\centering
+\small
+\raggedright
+\caption{Comparison between the Best Candidates under the Regular Weighted and Metric-Normalised Weighted Distance Criteria}
+\label{tab:distance_method_comparison}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Metric} &
+\textbf{Standard Baseline} &
+\textbf{Metric-Normalized} &
+\textbf{Ratio to Std.} &
+\textbf{Regular Weighted} &
+\textbf{Ratio to Std.} \\
+\midrule
+Parameters $(h, d, k, a, w)$  & $(63, 7, 14, 12, 16)$ & $(40, 4, 9, 16, 16)$  & --             & $(45, 5, 12, 11, 16)$ & --             \\
+Signature Size (Bytes)        & $7{,}872$             & $5{,}360$             & $0.6810\times$ & $5{,}856$             & $0.7440\times$ \\
+Key Generation Cost           & $305{,}662.0$         & $611{,}326.0$         & $2.0000\times$ & $305{,}662.0$         & $1.0000\times$ \\
+Signing Cost                  & $2{,}370{,}000.0$     & $4{,}800{,}000.0$     & $2.0253\times$ & $1{,}630{,}000.0$     & $0.6878\times$ \\
+Verification Cost             & $2{,}574.5$           & $1{,}578.0$           & $0.6130\times$ & $1{,}867.5$           & $0.7254\times$ \\
+Compression per Byte ($\rho$) & $0.327000$            & $0.294400$            & $0.9003\times$ & $0.318900$            & $0.9752\times$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Comparing the two cases, the resulting metrics are different.
+The regular weighted distance chooses more balanced best candidate, while the metric-normilized weighted distance selects candidate with noticeably smaller signature size, trading the key and signature generation costs.
+
+The outcome of each distance method shown in the Figure~\ref{fig:distance_result_comparison}.
+
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{content/images/comparison_regular.png}
+        \caption{Regular Weighted Distance Result}
+        \label{fig:regular-weighted}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{content/images/comparison_normalized.png}
+        \caption{Metric-Normalised Weighted Distance Result}
+        \label{fig:metric-normalised}
+    \end{subfigure}
+    \caption{Visualization of each Distance Method Result for Finding the Shortest Vector}
+    \label{fig:distance_result_comparison}
+\end{figure}
+
+
 
 \section{Recommended Candidate Tuple} \label{sec:ideal-examples}
 
@@ -321,29 +432,26 @@ As the table makes clear, the two survivors represent distinct operational trade
     \item Candidate~2 pushes further on size and verification, but at a concrete price - its signing cost exceeds the standard by more than $1.5\times$, making it suitable only in contexts where signing latency is secondary.
 \end{itemize}
 
-
-To determine which candidate is preferable, we specify the optimization priorities via the weight coefficients introduced in Section~\ref{sec:decisional-weights}. We consider two illustrative settings:
-\begin{itemize}
-    \item \textbf{Case 1:} $w_{\text{size}} = w_{\text{kg}} = w_{\text{sg}} = w_{\text{sv}} = w_{\text{cb}} = 1$;
-    \item \textbf{Case 2:} $w_{\text{size}} = 15, w_{\text{kg}} = 0.1, w_{\text{sg}} = 0.1, w_{\text{sv}} = 15, w_{\text{cb}} = 0.1$.
-\end{itemize}
-
-Under the uniform weights of Case~1, Candidate~1 achieves the smallest weighted distance and is therefore selected as the optimal configuration. The search outcome is visualized in Figure~\ref{fig:ideal_distance_plot_1}.
-
+After finding the shortest vector, we get that the Candidate~1 is the best, having the smallest distance.
+The results of search presented in the Figure~\ref{fig:ideal_distance_plot}.
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.75\textwidth]{content/images/ideal_candidate_case_1.png}
-\caption{Visualization of the search process under balanced weights (Case~1).}
-\label{fig:ideal_distance_plot_1}
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{content/images/ideal_candidate_case_1.png}
+        \caption{Balanced Candidate}
+        \label{fig:regular-weighted}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{content/images/ideal_candidate_case_2_.png}
+        \caption{The Best Candidate}
+        \label{fig:metric-normalised}
+    \end{subfigure}
+        \caption{The Best Candidate}
+\caption{Visualization of Found Candidates After the Search}
+\label{fig:ideal_distance_plot}
 \end{figure}
 
-Under Case~2, the heavy penalties attached to size and verification are sufficient to overcome Candidate~2's signing-cost disadvantage: its gains on the two prioritized axes yield a strictly shorter weighted distance than Candidate~1, shifting the optimum accordingly. This outcome is shown in Figure~\ref{fig:ideal_distance_plot_2}.
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.75\textwidth]{content/images/ideal_candidate_case_2.png}
-\caption{Visualization of the search process under size- and verification-weighted priorities (Case~2).}
-\label{fig:ideal_distance_plot_2}
-\end{figure}
-
-The interactive visualization used to produce Figure~\ref{fig:ideal_distance_plot_1} and Figure~\ref{fig:ideal_distance_plot_2} is publicly available at \url{https://mjthatch.github.io/SPHINCS-Parameters/site/}.
+The interactive visualization used to produce Figure~\ref{fig:distance_result_comparison}, Figure~\ref{fig:ideal_distance_plot} is publicly available at \url{https://mjthatch.github.io/SPHINCS-Parameters/site/}.
