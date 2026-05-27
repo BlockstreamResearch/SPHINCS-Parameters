@@ -143,6 +143,25 @@ def compute_wots_l(scheme, w):
     else:
         return hashbytes*8//log(w,2)
 
+def compute_wots_tw_worst_steps(l1, l2, w):
+    """
+    Worst-case WOTS-TW verification steps per hypertree layer.
+
+    Worst case: all l1 message digits = 0, so the verifier traverses w-1
+    steps on every message chain. The checksum C = l1*(w-1) is then encoded
+    in base w as l2 digits c_j; the verifier traverses w-1-c_j steps on each
+    checksum chain. Total = l1*(w-1) + l2*(w-1) - digit_sum(C, w).
+
+    This is the correct model for WOTS-TW. The old average-case formula
+    (w-1)*l/2 was only valid for WOTS+C where chains sum to a constant.
+    """
+    C = l1 * (w - 1)
+    ds, rem = 0, int(C)
+    while rem > 0:
+        ds += rem % int(w)
+        rem //= int(w)
+    return int(l1) * (int(w) - 1) + int(l2) * (int(w) - 1) - ds
+
 def compute_nu(l: int, paramsum: int, w: int) -> int:
     """
     Compute ν (nu), the number of valid WOTS+C encodings for a given target sum.

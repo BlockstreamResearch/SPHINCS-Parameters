@@ -578,10 +578,6 @@
 
       <div class="panel">
         <h2>Best candidate (minimum weighted distance)</h2>
-        <p class="hint" style="margin-bottom:10px;">Formula: <code>d(P) = √Σ pᵢ·n̂ᵢ²</code> where
-          <code>n̂ᵢ = (X̃ᵢ − minⱼX̃ᵢⱼ) / (maxⱼX̃ᵢⱼ − minⱼX̃ᵢⱼ)</code> and <code>pᵢ = wᵢ / Σwⱼ</code>. Each axis spans
-          [0, 1] across survivors.
-        </p>
         <div id="winner"></div>
       </div>
 
@@ -610,18 +606,43 @@
     const STD = { n: 16, h: 63, d: 7, k: 14, a: 12, w: 16 };
 
     // ---------- Cost formulas ----------
-    // WOTS+ chain length: len_1 + len_2
-    function wotsLen(n, w) {
+    // WOTS+ chain components: { len1, len2, len }
+    // len1 = message chains, len2 = checksum chains, len = len1 + len2
+    function wotsComponents(n, w) {
       const log2w = Math.log2(w);
       const len1 = Math.ceil(8 * n / log2w);
       const len2 = Math.floor(Math.log2(len1 * (w - 1)) / log2w) + 1;
-      return len1 + len2;
+      return { len1, len2, len: len1 + len2 };
+    }
+
+    // Convenience wrapper kept for any callers that only need total length
+    function wotsLen(n, w) { return wotsComponents(n, w).len; }
+
+    // Worst-case WOTS-TW verification steps per hypertree layer.
+    //
+    // WOTS-TW has no constant-sum constraint (unlike WOTS+C), so the
+    // average formula (w-1)*len/2 is WRONG for worst-case analysis.
+    //
+    // Worst case: all len1 message digits = 0 → verifier walks w-1 steps
+    // on each message chain.  The checksum C = len1*(w-1) is then fixed,
+    // and its base-w digit sum determines the remaining checksum work.
+    //
+    //   worst_steps = len1*(w-1) + len2*(w-1) - digitSum(len1*(w-1), w)
+    //               = len*(w-1) - digitSum(len1*(w-1), w)
+    //
+    // Reference: costs.sage compute_verification_time(), SPX branch.
+    function wotsVerifyWorstSteps(n, w) {
+      const { len1, len2 } = wotsComponents(n, w);
+      const C = len1 * (w - 1);
+      let ds = 0, rem = C;
+      while (rem > 0) { ds += rem % w; rem = Math.floor(rem / w); }
+      return len1 * (w - 1) + len2 * (w - 1) - ds;
     }
 
     function metrics(p) {
       const n = STD.n; // 16 bytes (128-bit security)
       const hp = p.h / p.d;
-      const len = wotsLen(n, p.w);
+      const { len } = wotsComponents(n, p.w);
 
       // Compression function costs (Matching the math from costs.sage)
       const C_PRF = 1;  // PRF generation
@@ -660,18 +681,25 @@
       const c_msg = C_Hmsg + C_PRFmsg; // Cost to hash message
       const sg = c_fors_fixed + c_msg + (p.d * c_merkle);
 
-      // 5. Signature Verification
-      // Expected WOTS chain completions: roughly half the chain
-      const c_wots = ((p.w - 1) * len / 2 * C_Th1) + Thl;
+      // 5a. Signature Verification — average case
+      // Each WOTS digit is uniform in {0..w-1}, so the verifier walks (w-1)/2
+      // remaining steps on average. Used for filter thresholds and distance scoring.
+      const c_wots_avg = Math.ceil(((p.w - 1) * len / 2 * C_Th1)) + Thl;
       // FORS path verify: k leaves (C_Th1) + k*a internal nodes (C_Th2) + root (Thk)
       const c_fts = (p.k * C_Th1) + (p.k * p.a * C_Th2) + Thk;
-      // Total SV: Msg Hash + FORS + d * WOTS + h * Hypertree Auth (C_Th2)
-      const sv = C_Hmsg + c_fts + (p.d * c_wots) + (p.h * C_Th2);
+      const sv = C_Hmsg + c_fts + (p.d * c_wots_avg) + (p.h * C_Th2);
 
-      // 6. Density (Compressions per byte)
+      // 5b. Signature Verification — worst case (WOTS-TW)
+      // All len1 message digits = 0: verifier walks w-1 steps per message chain.
+      // Checksum C = len1*(w-1) is fixed; its base-w digit sum determines checksum work.
+      // See wotsVerifyWorstSteps(). Displayed alongside average for comparison.
+      const c_wots_worst = (wotsVerifyWorstSteps(n, p.w) * C_Th1) + Thl;
+      const sv_worst = C_Hmsg + c_fts + (p.d * c_wots_worst) + (p.h * C_Th2);
+
+      // 6. Density (Compressions per byte) — based on average SV
       const cb = sv / size;
 
-      return { size, kg, sg, sv, cb };
+      return { size, kg, sg, sv, sv_worst, cb };
     }
 
     const STD_M = metrics(STD);
@@ -1122,7 +1150,8 @@
         ['Signature size (B)', winner.size, STD_M.size],
         ['KeyGen cost', winner.kg, STD_M.kg],
         ['SigGen cost', winner.sg, STD_M.sg],
-        ['SigVer cost', winner.sv, STD_M.sv],
+        ['SigVer cost (avg)', winner.sv, STD_M.sv],
+        ['SigVer cost (worst)', winner.sv_worst, STD_M.sv_worst],
         ['Comp/Byte (ρ)', winner.cb, STD_M.cb],
       ];
       const rowsHTML = rows.map(([name, target, std]) => {
@@ -1210,7 +1239,8 @@
         ['Signature size (B)', c.size, STD_M.size],
         ['KeyGen cost', c.kg, STD_M.kg],
         ['SigGen cost', c.sg, STD_M.sg],
-        ['SigVer cost', c.sv, STD_M.sv],
+        ['SigVer cost (avg)', c.sv, STD_M.sv],
+        ['SigVer cost (worst)', c.sv_worst, STD_M.sv_worst],
         ['Comp/Byte (ρ)', c.cb, STD_M.cb],
       ];
       const tbody = rows.map(([name, target, std]) => {
@@ -1330,7 +1360,8 @@
         ['Signature size (B)', m.size, STD_M.size],
         ['KeyGen cost', m.kg, STD_M.kg],
         ['SigGen cost', m.sg, STD_M.sg],
-        ['SigVer cost', m.sv, STD_M.sv],
+        ['SigVer cost (avg)', m.sv, STD_M.sv],
+        ['SigVer cost (worst)', m.sv_worst, STD_M.sv_worst],
         ['Comp/Byte (ρ)', m.cb, STD_M.cb],
       ];
       const rowsHTML = rows.map(([name, target, std]) => {

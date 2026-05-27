@@ -29,6 +29,12 @@ We introduce the following filters\footnote{The coefficient for each filter, exc
     \item \textbf{Bound on the compressions-per-byte ratio}: $\mathsf{target.C/B} \leq c_{\text{cb}} \cdot \mathsf{std.C/B}$, where $c_{\text{cb}} > 0$.
 \end{itemize}
 
+
+\paragraph{Note:}
+All verification costs reported in this section are \emph{average-case}: they reflect the expected number of compressions for a uniformly random message.
+The \emph{worst-case} verification cost is approximately $1.94\times$ higher and depends solely on the message being signed — it cannot be influenced by the verifier.
+ 
+
 These filters can be combined and parameterized in different ways to produce different result sets. Below, we consider several cases to illustrate how the choice of filter parameters affects the resulting candidate set.
 
 \subsubsection{Case 1: Best in Class}
@@ -432,8 +438,8 @@ As the table makes clear, the two survivors represent distinct operational trade
     \item Candidate~2 pushes further on size and verification, but at a concrete price - its signing cost exceeds the standard by more than $1.5\times$, making it suitable only in contexts where signing latency is secondary.
 \end{itemize}
 
-After finding the shortest vector, we get that the Candidate~1 is the best, having the smallest distance.
-The results of search presented in the Figure~\ref{fig:ideal_distance_plot}.
+Regardless of the weights that prioritizes size and verification cost, we get that the Candidate~1 is the best, having the smallest distance. 
+The results of the search presented in the Figure~\ref{fig:ideal_distance_plot}.
 \begin{figure}[htbp]
 \centering
     \begin{subfigure}[b]{0.49\textwidth}
