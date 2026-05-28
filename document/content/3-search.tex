@@ -17,7 +17,7 @@ We choose SLH-DSA-128s as the baseline for the search; this gives us an intuitiv
 The methodology described here uses a set of SageMath scripts available at \url{https://github.com/BlockstreamResearch/SPHINCS-Parameters}.
 
 \subsection{Sweep Strategy} \label{sec:sweep-strategy}
-We start by enumerating all parameter tuples $(h, d, k, a, w)$. Applying the initial bounds (security level, size $\leq$ SLH-DSA, at least $2^{40}$ supported signatures) reduces the search space from \emph{41,328} candidates to \emph{9,229} - a $78\%$ cut. The remaining space is still too large to inspect by hand, so we need additional filters.
+We start by enumerating all parameter tuples $(h, d, k, a, w)$. Applying the initial bounds (security level, size $\leq$ SLH-DSA, at least $2^{40}$ supported signatures) reduces the search space from \emph{41,328} candidates to \emph{9,258} - a $78\%$ cut. The remaining space is still too large to inspect by hand, so we need additional filters.
 
 We introduce the following filters\footnote{The coefficient for each filter, except the signature size, may be greater than 1 (meaning we accept some regression on that metric in exchange for gains elsewhere).}:
 
@@ -31,8 +31,9 @@ We introduce the following filters\footnote{The coefficient for each filter, exc
 
 
 \paragraph{Note:}
-All verification costs reported in this section are \emph{average-case}: they reflect the expected number of compressions for a uniformly random message.
+All verification cost reported in this section are \emph{average-case}: they reflect the expected number of compressions for a uniformly random message.
 The \emph{worst-case} verification cost is approximately $1.94\times$ higher and depends solely on the message being signed — it cannot be influenced by the verifier.
+We also use an \emph{average-case} signing cost, while the \emph{worst-case} does not significantly increse the number of compressions after signature generation.
  
 
 These filters can be combined and parameterized in different ways to produce different result sets. Below, we consider several cases to illustrate how the choice of filter parameters affects the resulting candidate set.
@@ -51,21 +52,22 @@ In this case, we find the most efficient signature for a single metric at a time
 \textbf{Award Category} & \textbf{Tuple $(h, d, k, a, w)$} & \textbf{Size (B)} & \textbf{VS std, \%} & \textbf{KeyGen ($C$)} & \textbf{VS std, $\times$} & \textbf{SigGen ($C$)} & \textbf{VS std, $\times$} & \textbf{SigVer ($C$)} & \textbf{VS std, $\times$} & \textbf{$\rho$ ($C$/B)} \\
 \midrule
 %---
-\texttt{STANDARD} Baseline & $(63, 7, 14, 12, 16)$ & $7872$ & $+0.0\%$ & $2.93 \times 10^5$ & $1.00$ & $2.28 \times 10^6$ & $1.00$ & $2387$ & $1.00$ & $0.30$ \\
+\texttt{STANDARD} Baseline & $(63, 7, 14, 12, 16)$ & $7856$ & $+0.0\%$ & $2.93 \times 10^5$ & $1.00$ & $2.28 \times 10^6$ & $1.00$ & $2387$ & $1.00$ & $0.30$ \\
 %---
-Smallest Signature & $(50, 2, 6, 20, 256)$ & \textcolor{green}{$3424$} & \textcolor{green}{$-56.5\%$} & \textcolor{red}{$1.55 \times 10^{11}$} & \textcolor{red}{$5.29 \times 10^5$} & \textcolor{red}{$3.10 \times 10^{11}$} & \textcolor{red}{$1.36 \times 10^5$} & \textcolor{red}{$4953$} & \textcolor{red}{$2.08$} & \textcolor{red}{$1.45$} \\
+Smallest Signature & $(50, 2, 6, 20, 256)$ & \textcolor{green}{$3408$} & \textcolor{green}{$-56.6\%$} & \textcolor{red}{$1.55 \times 10^{11}$} & \textcolor{red}{$5.29 \times 10^5$} & \textcolor{red}{$3.10 \times 10^{11}$} & \textcolor{red}{$1.36 \times 10^5$} & \textcolor{red}{$4953$} & \textcolor{red}{$2.07$} & \textcolor{red}{$1.45$} \\
 %---
-Fastest Keygen & $(40, 10, 8, 20, 32)$ & \textcolor{red}{$7680$} & \textcolor{red}{$-2.4\%$} & \textcolor{green}{$1.40 \times 10^4$} & \textcolor{green}{$0.05$} & \textcolor{orange}{$3.37 \times 10^7$} & \textcolor{orange}{$14.78$} & \textcolor{orange}{$4673$} & \textcolor{orange}{$1.96$} & \textcolor{orange}{$0.61$} \\
+Fastest Keygen & $(44, 11, 7, 19, 32)$ & \textcolor{red}{$7712$} & \textcolor{red}{$-1.8\%$} & \textcolor{green}{$1.40 \times 10^4$} & \textcolor{green}{$0.05$} & \textcolor{orange}{$1.48 \times 10^7$} & \textcolor{orange}{$6.51$} & \textcolor{orange}{$5052$} & \textcolor{orange}{$2.12$} & \textcolor{orange}{$0.66$} \\
 %---
-Fastest Signing & $(40, 8, 23, 8, 32)$ & \textcolor{red}{$7440$} & \textcolor{red}{$-5.5\%$} & \textcolor{green}{$2.80 \times 10^4$} & \textcolor{green}{$0.10$} & \textcolor{green}{$2.47 \times 10^5$} & \textcolor{green}{$0.11$} & \textcolor{orange}{$3888$} & \textcolor{orange}{$1.63$} & \textcolor{orange}{$0.52$} \\
+Fastest Signing & $(40, 8, 23, 8, 32)$ & \textcolor{red}{$7424$} & \textcolor{red}{$-5.5\%$} & \textcolor{green}{$2.80 \times 10^4$} & \textcolor{green}{$0.10$} & \textcolor{green}{$2.47 \times 10^5$} & \textcolor{green}{$0.11$} & \textcolor{orange}{$3888$} & \textcolor{orange}{$1.63$} & \textcolor{orange}{$0.52$} \\
 %---
-Fastest Verification & $(50, 2, 7, 17, 16)$ & \textcolor{green}{$3968$} & \textcolor{green}{$-49.6\%$} & \textcolor{red}{$1.92 \times 10^{10}$} & \textcolor{red}{$6.55 \times 10^4$} & \textcolor{red}{$3.84 \times 10^{10}$} & \textcolor{red}{$1.68 \times 10^4$} & \textcolor{green}{$894$} & \textcolor{green}{$0.37$} & \textcolor{green}{$0.23$} \\
+Fastest Verification & $(50, 2, 7, 17, 16)$ & \textcolor{green}{$3952$} & \textcolor{green}{$-49.7\%$} & \textcolor{red}{$1.92 \times 10^{10}$} & \textcolor{red}{$6.55 \times 10^4$} & \textcolor{red}{$3.84 \times 10^{10}$} & \textcolor{red}{$1.68 \times 10^4$} & \textcolor{green}{$894$} & \textcolor{green}{$0.37$} & \textcolor{green}{$0.23$} \\
 %---
-Best Density Ratio (\texorpdfstring{$\rho$}{rho}) & $(50, 2, 23, 15, 16)$ & \textcolor{red}{$7840$} & \textcolor{red}{$-0.4\%$} & \textcolor{red}{$1.92 \times 10^{10}$} & \textcolor{red}{$6.55 \times 10^4$} & \textcolor{red}{$3.84 \times 10^{10}$} & \textcolor{red}{$1.68 \times 10^4$} & \textcolor{green}{$1366$} & \textcolor{green}{$0.57$} & \textcolor{green}{$0.17$} \\
+Best Density Ratio (\texorpdfstring{$\rho$}{rho}) & $(50, 2, 23, 15, 16)$ & \textcolor{red}{$7824$} & \textcolor{red}{$-0.4\%$} & \textcolor{red}{$1.92 \times 10^{10}$} & \textcolor{red}{$6.55 \times 10^4$} & \textcolor{red}{$3.84 \times 10^{10}$} & \textcolor{red}{$1.68 \times 10^4$} & \textcolor{green}{$1366$} & \textcolor{green}{$0.57$} & \textcolor{green}{$0.17$} \\
 \bottomrule
 \end{tabular}%
 }
 \end{table}
+
 
 Table~\ref{tab:minimal_metric_each} confirms what one would suspect: each metric can be minimized impressively in isolation, but only at a brutal cost to the others, leaving these parameter sets unusable in practice. We therefore consider a different strategy.
 
@@ -78,25 +80,25 @@ In the next experiment, we look for ``average'' candidates whose metrics all sta
     \label{fig:concentric_minimax}
 \end{figure}
 
-Naturally, the smaller the multiplier $X$, the fewer candidates survive the filter. A clear winner emerges at $X \approx 0.8840$; let us see how compelling it actually is (Table~\ref{tab:optimal_candidate_metrics}).
+Naturally, the smaller the multiplier $X$, the fewer candidates survive the filter. A clear winner emerges at $X \approx 0.8842$; let us see how compelling it actually is (Table~\ref{tab:optimal_candidate_metrics}).
 
 \begin{table}[h!]
     \centering
-    \small
-    \caption{Performance Comparison between the Standard Baseline and the Balanced Candidate}
-    \label{tab:optimal_candidate_metrics}
-    \begin{tabular}{lrrr}
-        \toprule
-        \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Optimal Candidate} & \textbf{Ratio} \\
-        \midrule
+\small
+\caption{Performance Comparison between the Standard Baseline and the Balanced Candidate}
+\label{tab:optimal_candidate_metrics}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Metric} & \textbf{Standard Baseline} & \textbf{Optimal Candidate} & \textbf{Ratio} \\
+\midrule
         Parameters $(h, d, k, a, w)$ & $(63, 7, 14, 12, 16)$ & $(40, 5, 24, 8, 16)$ & -- \\
-        Signature Size (Bytes) & $7,872$ & $6,928$ & $0.8801\times$ \\
-        Key Generation Cost & $292,862.0$ & $146,430.0$ & $0.5000\times$ \\
-        Signing Cost & $2,279,391.0$ & $756,689.0$ & $0.3320\times$ \\
-        Verification Cost & $2,387.0$ & $1,857.0$ & $0.7780\times$ \\
-        Compression per Byte ($\rho$) & $0.303227$ & $0.268043$ & $0.8840\times$ \\
-        \bottomrule
-    \end{tabular}
+        Signature Size (Bytes) & $7{,}856$ & $6{,}912$ & $0.8798\times$ \\
+        Key Generation Cost & $292{,}862$ & $146{,}430$ & $0.5000\times$ \\
+        Signing Cost & $2{,}279{,}391$ & $756{,}689$ & $0.3320\times$ \\
+        Verification Cost & $2{,}387$ & $1{,}857$ & $0.7780\times$ \\
+        Compression per Byte ($\rho$) & $0.303844$ & $0.268663$ & $0.8842\times$ \\
+\bottomrule
+\end{tabular}
 \end{table}
 
 One might call this a reasonable result. We are less impressed: a 12\% saving on signature size is not particularly attractive on its own (the goal is to materially close the gap with Schnorr).
@@ -244,11 +246,11 @@ The parameters and metric values of the best candidate are shown in Table~\ref{t
         \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Best Candidate} & \textbf{Ratio to Std.} \\
         \midrule
         Parameters $(h, d, k, a, w)$ & $(63, 7, 14, 12, 16)$ & $(40, 5, 19, 9, 16)$ & -- \\
-        Signature Size (Bytes) & $7,872$ & $6,512$ & $0.8272\times$ \\
-        Key Generation Cost & $292,862.0$ & $146,430.0$ & $0.5000\times$ \\
-        Signing Cost & $2,279,391.0$ & $771,034.0$ & $0.3383\times$ \\
-        Verification Cost & $2,387.0$ & $1,809.0$ & $0.7579\times$ \\
-        Compression per Byte ($\rho$) & $0.303227$ & $0.277795$ & $0.9161\times$ \\
+        Signature Size (Bytes) & $7,856$ & $6,496$ & $0.8269\times$ \\
+        Key Generation Cost & $292,862$ & $146,430$ & $0.5000\times$ \\
+        Signing Cost & $2,279,391$ & $771,034$ & $0.3383\times$ \\
+        Verification Cost & $2,387$ & $1,809$ & $0.7579\times$ \\
+        Compression per Byte ($\rho$) & $0.3038$ & $0.2785$ & $0.9167\times$ \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -276,11 +278,11 @@ The resulting values are shown in Table~\ref{tab:euclidean_candidate_metrics_cas
         \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Best Candidate} & \textbf{Ratio to Std.} \\
         \midrule
         Parameters $(h, d, k, a, w)$ & $(63, 7, 14, 12, 16)$ & $(40, 5, 13, 12, 16)$ & -- \\
-        Signature Size (Bytes) & $7,872$ & $6,176$ & $0.7846\times$ \\
-        Key Generation Cost & $292,862.0$ & $146,430.0$ & $0.5000\times$ \\
-        Signing Cost & $2,279,391.0$ & $945,124.0$ & $0.4146\times$ \\
-        Verification Cost & $2,387.0$ & $1,771.0$ & $0.7419\times$ \\
-        Compression per Byte ($\rho$) & $0.303227$ & $0.286755$ & $0.9457\times$ \\
+        Signature Size (Bytes) & $7,856$ & $6,160$ & $0.7841\times$ \\
+        Key Generation Cost & $292,862$ & $146,430$ & $0.5000\times$ \\
+        Signing Cost & $2,279,391.0$ & $945,124$ & $0.4146\times$ \\
+        Verification Cost & $2,387.0$ & $1,771$ & $0.7419\times$ \\
+        Compression per Byte ($\rho$) & $0.3038$ & $0.2875$ & $0.9463\times$ \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -361,11 +363,11 @@ The resulting best candidates for each method shown in the Table~\ref{tab:distan
 \textbf{Ratio to Std.} \\
 \midrule
 Parameters $(h, d, k, a, w)$  & $(63, 7, 14, 12, 16)$ & $(40, 4, 9, 16, 16)$  & --             & $(45, 5, 12, 11, 16)$ & --             \\
-Signature Size (Bytes)        & $7{,}872$             & $5{,}360$             & $0.6810\times$ & $5{,}856$             & $0.7440\times$ \\
-Key Generation Cost           & $305{,}662.0$         & $611{,}326.0$         & $2.0000\times$ & $305{,}662.0$         & $1.0000\times$ \\
-Signing Cost                  & $2{,}370{,}000.0$     & $4{,}800{,}000.0$     & $2.0253\times$ & $1{,}630{,}000.0$     & $0.6878\times$ \\
-Verification Cost             & $2{,}574.5$           & $1{,}578.0$           & $0.6130\times$ & $1{,}867.5$           & $0.7254\times$ \\
-Compression per Byte ($\rho$) & $0.327000$            & $0.294400$            & $0.9003\times$ & $0.318900$            & $0.9752\times$ \\
+Signature Size (Bytes)        & $7{,}856$             & $5{,}344$             & $0.6802\times$ & $5{,}840$             & $0.7434\times$ \\
+Key Generation Cost           & $292{,}862$           & $585{,}726$           & $2.0000\times$ & $292{,}862$           & $1.0000\times$ \\
+Signing Cost                  & $2{,}279{,}391$       & $4{,}702{,}189$       & $2.0629\times$ & $1{,}562{,}598$       & $0.6855\times$ \\
+Verification Cost             & $2{,}387$             & $1{,}470$             & $0.6158\times$ & $1{,}732$             & $0.7256\times$ \\
+Compression per Byte ($\rho$) & $0.3038$            & $0.2750$            & $0.9053\times$ & $0.2965$            & $0.9761\times$ \\
 \bottomrule
 \end{tabular}%
 }
@@ -421,12 +423,12 @@ Applying these constraints to the full parameter grid leaves exactly two survivi
 \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Candidate 1} &
 \textbf{Ratio to Std.} & \textbf{Candidate 2} & \textbf{Ratio to Std.} \\
 \midrule
-Parameters $(h, d, k, a, w)$      & $(63, 7, 14, 12, 16)$ & $(45, 5, 10, 13, 16)$ & --            & $(45, 5, 8, 16, 16)$ & --            \\
-Signature Size (Bytes)            & $7{,}872$             & $5{,}792$             & $0.7358\times$ & $5{,}728$            & $0.7276\times$ \\
-Key Generation Cost               & $292{,}862.0$         & $292{,}862.0$         & $1.0000\times$ & $292{,}862.0$        & $1.0000\times$ \\
-Signing Cost                      & $2{,}279{,}391.0$     & $1{,}791{,}978.0$     & $0.7862\times$ & $3{,}561{,}453.0$    & $1.5625\times$ \\
-Verification Cost                 & $2{,}387.0$           & $1{,}726.0$           & $0.7231\times$ & $1{,}719.0$          & $0.7202\times$ \\
-Compression per Byte ($\rho$)     & $0.303227$            & $0.297997$            & $0.9828\times$ & $0.300105$           & $0.9897\times$ \\
+Parameters $(h, d, k, a, w)$      & $(63, 7, 14, 12, 16)$ & $(45, 5, 10, 13, 16)$ & --             & $(45, 5, 8, 16, 16)$  & --             \\
+Signature Size (Bytes)            & $7{,}856$             & $5{,}776$             & $0.7352\times$ & $5{,}712$             & $0.7271\times$ \\
+Key Generation Cost               & $292{,}862$           & $292{,}862$           & $1.0000\times$ & $292{,}862$           & $1.0000\times$ \\
+Signing Cost                      & $2{,}279{,}391$       & $1{,}791{,}978$       & $0.7862\times$ & $3{,}561{,}453$       & $1.5625\times$ \\
+Verification Cost                 & $2{,}387$             & $1{,}726$             & $0.7231\times$ & $1{,}719$             & $0.7202\times$ \\
+Compression per Byte ($\rho$)     & $0.3038$            & $0.2988$            & $0.9835\times$ & $0.3009$            & $0.9905\times$ \\
 \bottomrule
 \end{tabular}
 }
@@ -444,14 +446,14 @@ The results of the search presented in the Figure~\ref{fig:ideal_distance_plot}.
 \centering
     \begin{subfigure}[b]{0.49\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{content/images/ideal_candidate_case_1.png}
+        \includegraphics[width=\textwidth]{content/images/ideal_candidate_balanced.png}
         \caption{Balanced Candidate}
         \label{fig:regular-weighted}
     \end{subfigure}
     \hfill
     \begin{subfigure}[b]{0.49\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{content/images/ideal_candidate_case_2_.png}
+        \includegraphics[width=\textwidth]{content/images/ideal_candidate_best.png}
         \caption{The Best Candidate}
         \label{fig:metric-normalised}
     \end{subfigure}

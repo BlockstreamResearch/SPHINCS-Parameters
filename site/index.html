@@ -639,6 +639,14 @@
       return len1 * (w - 1) + len2 * (w - 1) - ds;
     }
 
+    // Exact compression-call count for a tweakable hash over n hash-sized values.
+    // Input layout (bits): PKseed(128) + Tweak(96) + n*hashbytes(128n) + padding(65)
+    // SHA-256 block size = 512 bits.
+    // Matches costs.sage: compute_Th(n) = ceil((128 + 96 + 128*n + 65) / 512)
+    function computeTh(n) {
+      return Math.ceil((128 + 96 + 128 * n + 65) / 512);
+    }
+
     function metrics(p) {
       const n = STD.n; // 16 bytes (128-bit security)
       const hp = p.h / p.d;
@@ -651,9 +659,15 @@
       const C_Hmsg = 2; // Message hash
       const C_PRFmsg = 2; // Message PRF
 
-      // Thl/Thk approximations (Cost to compress L or K public values)
-      const Thl = len;
-      const Thk = p.k;
+      // Exact compression counts for leaf/root compressions (matches costs.sage).
+      // computeTh(n) = ceil((128 + 96 + 128*n + 65) / 512):
+      //   Thl = cost to compress len WOTS public values into one XMSS leaf
+      //   Thk = cost to compress k  FORS roots into one combined value
+      // Previously approximated as len and k respectively, which overstated both
+      // by ~25 and ~9 compressions for standard parameters, cascading into
+      // KeyGen (+12,800), SigGen (+89,609) and SigVer (+191) errors.
+      const Thl = computeTh(len);
+      const Thk = computeTh(p.k);
 
       // 1. Signature Size (Bytes)
       // Rand (1*n) + FORS (k*(a+1)*n) + Hypertree Auth (h*n) + WOTS (d*len*n)
@@ -684,7 +698,7 @@
       // 5a. Signature Verification — average case
       // Each WOTS digit is uniform in {0..w-1}, so the verifier walks (w-1)/2
       // remaining steps on average. Used for filter thresholds and distance scoring.
-      const c_wots_avg = Math.ceil(((p.w - 1) * len / 2 * C_Th1)) + Thl;
+      const c_wots_avg = Math.floor((p.w - 1) * len / 2) * C_Th1 + Thl;
       // FORS path verify: k leaves (C_Th1) + k*a internal nodes (C_Th2) + root (Thk)
       const c_fts = (p.k * C_Th1) + (p.k * p.a * C_Th2) + Thk;
       const sv = C_Hmsg + c_fts + (p.d * c_wots_avg) + (p.h * C_Th2);
@@ -1433,7 +1447,7 @@
       state.initialPool = state.candidates.filter(passesInitial);
 
       // Assign stable scatter positions
-      const rand = mulberry32(42);
+      const rand = mulberry32(69421);
       for (const c of state.initialPool) {
         c._sx = rand();
         c._sy = rand();

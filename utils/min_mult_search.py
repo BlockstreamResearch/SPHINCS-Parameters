@@ -10,7 +10,7 @@ import argparse
 import pandas as pd
 import os
 
-METRICS = ['keygen_C', 'sign_C', 'verify_C', 'c_per_byte']
+METRICS = ['size', 'keygen_C', 'sign_C', 'verify_C', 'c_per_byte']
 
 def find_global_x_thresholds(csv_path, output_csv):
     if not os.path.exists(csv_path):
@@ -55,6 +55,7 @@ def find_global_x_thresholds(csv_path, output_csv):
             'a': row['a'],
             'w': row['w'],
             'size_bytes': row['size'],
+            'size_X': round(row['size_ratio'], 4),
             'keygen_X': round(row['keygen_C_ratio'], 4),
             'sign_X': round(row['sign_C_ratio'], 4),
             'verify_X': round(row['verify_C_ratio'], 4),

@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 STD_SIZE = 7856
-STD_CPB = 0.303845
+STD_CPB = 0.32815
 
 # =============================================================================
 # Global Configuration Toggles

@@ -11,6 +11,7 @@ import pandas as pd
 
 STD_SIZE = 7856
 SAVE_LOCALLY = True 
+FILENAME = "all_unbound_candidates.csv"
 
 if SAVE_LOCALLY:
     OUTPUT_CSV_PATH = FILENAME
@@ -43,10 +44,12 @@ def run_sage_sweep(max_size="inf", save_path=None):
     
     # If a save_path is provided, export the dataframe
     if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        out_dir = os.path.dirname(save_path)
+        if out_dir:  # Only create directories if out_dir is not empty
+            os.makedirs(out_dir, exist_ok=True)
         df_unique.to_csv(save_path, index=False)
         print(f"      [v] Saved unconstrained candidate data to: {save_path}")
-        
+
     return len(df_unique)
 
 def evaluate_reduction():
