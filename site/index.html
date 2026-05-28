@@ -656,8 +656,8 @@
       const Thk = p.k;
 
       // 1. Signature Size (Bytes)
-      // Rand (2*n) + FORS (k*(a+1)*n) + Hypertree Auth (h*n) + WOTS (d*len*n)
-      const size = n * (2 + p.k * (p.a + 1) + p.h + p.d * len);
+      // Rand (1*n) + FORS (k*(a+1)*n) + Hypertree Auth (h*n) + WOTS (d*len*n)
+      const size = n * (1 + p.k * (p.a + 1) + p.h + p.d * len);
 
       // 2. Cost of ONE XMSS Tree Layer (c_merkle)
       const leavesPerTree = Math.pow(2, hp);

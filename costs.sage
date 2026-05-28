@@ -37,7 +37,7 @@ load(os.path.join(_dir, "security.sage"))
 
 hashbytes = 16  # 16 bytes = 128 bits
 counter_size = 4 # 4 bytes = 32 bits
-randomness_size = 32  # 32 bytes = 256 bits
+randomness_size = 16  # 16 bytes = 128 bits
 
 # Compression function calls per hash operation
 # SHA-256 block size = 512 bits, with 65 bits for padding/length
