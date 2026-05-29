@@ -531,7 +531,7 @@
     <h1>SHRINCS Parameter Explorer</h1>
     <p class="tagline">
       Interactive search over SLH-DSA-compatible parameter tuples.
-      Methodology from the <a href="report.pdf" download>SHRINCS Parameter
+      Methodology from the <a href="report.pdf" target="_blank">SHRINCS Parameter
         Search</a> tech report.
     </p>
   </header>
@@ -709,10 +709,13 @@
       const c_wots_worst = (wotsVerifyWorstSteps(n, p.w) * C_Th1) + Thl;
       const sv_worst = C_Hmsg + c_fts + (p.d * c_wots_worst) + (p.h * C_Th2);
 
-      // 6. Density (Compressions per byte) — based on average SV
+      // 6. Density (Compressions per byte)
+      // avg:   based on average-case SV (used for filter threshold and distance scoring)
+      // worst: based on worst-case SV — upper bound on verifier work per byte transferred
       const cb = sv / size;
+      const cb_worst = sv_worst / size;
 
-      return { size, kg, sg, sv, sv_worst, cb };
+      return { size, kg, sg, sv, sv_worst, cb, cb_worst };
     }
 
     const STD_M = metrics(STD);
@@ -1165,7 +1168,8 @@
         ['SigGen cost', winner.sg, STD_M.sg],
         ['SigVer cost (avg)', winner.sv, STD_M.sv],
         ['SigVer cost (worst)', winner.sv_worst, STD_M.sv_worst],
-        ['Comp/Byte (ρ)', winner.cb, STD_M.cb],
+        ['Comp/Byte ρ (avg)', winner.cb, STD_M.cb],
+        ['Comp/Byte ρ (worst)', winner.cb_worst, STD_M.cb_worst],
       ];
       const rowsHTML = rows.map(([name, target, std]) => {
         const ratio = target / std;
@@ -1254,7 +1258,8 @@
         ['SigGen cost', c.sg, STD_M.sg],
         ['SigVer cost (avg)', c.sv, STD_M.sv],
         ['SigVer cost (worst)', c.sv_worst, STD_M.sv_worst],
-        ['Comp/Byte (ρ)', c.cb, STD_M.cb],
+        ['Comp/Byte ρ (avg)', c.cb, STD_M.cb],
+        ['Comp/Byte ρ (worst)', c.cb_worst, STD_M.cb_worst],
       ];
       const tbody = rows.map(([name, target, std]) => {
         const r = target / std;
@@ -1375,7 +1380,8 @@
         ['SigGen cost', m.sg, STD_M.sg],
         ['SigVer cost (avg)', m.sv, STD_M.sv],
         ['SigVer cost (worst)', m.sv_worst, STD_M.sv_worst],
-        ['Comp/Byte (ρ)', m.cb, STD_M.cb],
+        ['Comp/Byte ρ (avg)', m.cb, STD_M.cb],
+        ['Comp/Byte ρ (worst)', m.cb_worst, STD_M.cb_worst],
       ];
       const rowsHTML = rows.map(([name, target, std]) => {
         const r = target / std;
