@@ -33,7 +33,7 @@ We introduce the following filters\footnote{The coefficient for each filter, exc
 \paragraph{Note:}
 All verification cost reported in this section are \emph{average-case}: they reflect the expected number of compressions for a uniformly random message.
 The \emph{worst-case} verification cost is approximately $1.94\times$ higher and depends solely on the message being signed — it cannot be influenced by the verifier.
-We also use an \emph{average-case} signing cost, while the \emph{worst-case} does not significantly increse the number of compressions after signature generation.
+We also use an \emph{average-case} signing cost, while the \emph{worst-case} does not significantly increse the number of compressions to generate a signature.
  
 
 These filters can be combined and parameterized in different ways to produce different result sets. Below, we consider several cases to illustrate how the choice of filter parameters affects the resulting candidate set.
@@ -96,7 +96,7 @@ Naturally, the smaller the multiplier $X$, the fewer candidates survive the filt
         Key Generation Cost & $292{,}862$ & $146{,}430$ & $0.5000\times$ \\
         Signing Cost & $2{,}279{,}391$ & $756{,}689$ & $0.3320\times$ \\
         Verification Cost & $2{,}387$ & $1{,}857$ & $0.7780\times$ \\
-        Compression per Byte ($\rho$) & $0.303844$ & $0.268663$ & $0.8842\times$ \\
+        Compression per Byte ($\rho$) & $0.3038$ & $0.2686$ & $0.8842\times$ \\
 \bottomrule
 \end{tabular}
 \end{table}
