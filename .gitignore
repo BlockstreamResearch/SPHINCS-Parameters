@@ -1,6 +1,6 @@
 .DS_Store
 
-slhdsa-2to40.sage.py
+*.sage.py
 
 ## Core latex/pdflatex auxiliary files:
 *.aux
