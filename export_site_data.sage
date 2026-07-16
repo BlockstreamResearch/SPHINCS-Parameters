@@ -204,7 +204,8 @@ def _commit():
             ['git', 'rev-parse', '--short', 'HEAD'],
             cwd=_dir, stderr=subprocess.DEVNULL).decode().strip()
     except Exception:
-        return 'unknown'
+        sha = os.environ.get('GITHUB_SHA', '')
+        return sha[:7] if sha else 'unknown'
 
 
 data = {

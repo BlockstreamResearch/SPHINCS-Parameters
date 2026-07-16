@@ -57,8 +57,6 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           apt-get update -qq && apt-get install -y -qq make
-          # running as root: mark the checkout safe so the data.json commit stamp works
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           sage -pip install --quiet --no-cache-dir pandas seaborn
           make sweeps derived data figures PYTHON="sage -python"
 
