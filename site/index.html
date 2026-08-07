@@ -664,6 +664,16 @@
     // SLH-DSA-128s baseline (matches the numbers in the tech report)
     const STD = { n: 16, h: 63, d: 7, k: 14, a: 12, w: 16 };
 
+    // ---------- Schnorr (BIP340) reference ----------
+    const SCHNORR_KAPPA_URL =
+      'https://raw.githubusercontent.com/mjthatch/bip340-vs-sha256/main/results/kappa.json';
+    const SCHNORR_FALLBACK = {
+      cb64: 1.98,
+      impl: 'libsecp256k1',
+      commit: null, run: null, machine: null, preliminary: false,
+      live: false,
+    };
+
     // ---------- Cost formulas ----------
     // WOTS+ chain components: { len1, len2, len }
     // len1 = message chains, len2 = checksum chains, len = len1 + len2
@@ -1016,6 +1026,7 @@
       candidates: [],
       initialPool: [],
       siteData: null,          // parsed data.json (null in fallback mode)
+      schnorr: { ...SCHNORR_FALLBACK },  // BIP340 ρ reference (live after loadSchnorrRef)
       pools: {},               // scheme -> candidate pool
       scheme: 'SPX',
       useWorst: false,         // filter/rank on worst-case SigVer & ρ
@@ -1281,6 +1292,8 @@
         ['SigVer cost (worst)', winner.sv_worst, STD_M.sv_worst],
         ['Comp/Byte ρ (avg)', winner.cb, STD_M.cb],
         ['Comp/Byte ρ (worst)', winner.cb_worst, STD_M.cb_worst],
+        ['ρ / Schnorr (avg)', winner.cb / state.schnorr.cb64, STD_M.cb / state.schnorr.cb64],
+        ['ρ / Schnorr (worst)', winner.cb_worst / state.schnorr.cb64, STD_M.cb_worst / state.schnorr.cb64],
       ];
       const rowsHTML = rows.map(([name, target, std]) => {
         const ratio = target / std;
@@ -1373,6 +1386,8 @@
         ['SigVer cost (worst)', c.sv_worst, STD_M.sv_worst],
         ['Comp/Byte ρ (avg)', c.cb, STD_M.cb],
         ['Comp/Byte ρ (worst)', c.cb_worst, STD_M.cb_worst],
+        ['ρ / Schnorr (avg)', c.cb / state.schnorr.cb64, STD_M.cb / state.schnorr.cb64],
+        ['ρ / Schnorr (worst)', c.cb_worst / state.schnorr.cb64, STD_M.cb_worst / state.schnorr.cb64],
       ];
       const tbody = rows.map(([name, target, std]) => {
         const r = target / std;
@@ -1507,6 +1522,8 @@
         ['SigVer cost (worst)', m.sv_worst, STD_M.sv_worst],
         ['Comp/Byte ρ (avg)', m.cb, STD_M.cb],
         ['Comp/Byte ρ (worst)', m.cb_worst, STD_M.cb_worst],
+        ['ρ / Schnorr (avg)', m.cb / state.schnorr.cb64, STD_M.cb / state.schnorr.cb64],
+        ['ρ / Schnorr (worst)', m.cb_worst / state.schnorr.cb64, STD_M.cb_worst / state.schnorr.cb64],
       ];
       const rowsHTML = rows.map(([name, target, std]) => {
         const r = target / std;
@@ -1585,6 +1602,31 @@
       }
     }
 
+    // Fetch the BIP340 Schnorr verification-density reference (C/B) from the bip340-vs-sha256 repo
+    async function loadSchnorrRef() {
+      try {
+        const resp = await fetch(SCHNORR_KAPPA_URL, { cache: 'no-cache' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const k = await resp.json();
+        const entry = k && k.cb && k.cb[SCHNORR_FALLBACK.impl];
+        const cb = entry && entry.cb_64;
+        if (!isFinite(cb) || cb <= 0) throw new Error('cb.' + SCHNORR_FALLBACK.impl + '.cb_64 missing');
+        return {
+          cb64: cb,
+          impl: SCHNORR_FALLBACK.impl,
+          commit: k.secp256k1_commit || null,
+          run: typeof k.run_utc === 'string' ? k.run_utc.slice(0, 10) : null,
+          machine: k.machine || null,
+          preliminary: !!k.preliminary,
+          live: true,
+        };
+      } catch (e) {
+        console.warn('Schnorr reference kappa.json unavailable (' + e.message +
+          ') — using the built-in ' + SCHNORR_FALLBACK.cb64.toFixed(2) + ' C/B.');
+        return { ...SCHNORR_FALLBACK };
+      }
+    }
+
     // Cross-check the loaded data against the local formulas: the baseline
     // plus a sample of pool rows. Any divergence is a bug in one of the two
     // implementations — log it loudly.
@@ -1632,6 +1674,22 @@
       }
     }
 
+    function schnorrNote() {
+      const s = state.schnorr;
+      const rAvg = (STD_M.cb / s.cb64).toFixed(3);
+      const rWorst = (STD_M.cb_worst / s.cb64).toFixed(3);
+      const src = s.live
+        ? `kappa.json${s.commit ? ` @ secp256k1 ${s.commit}` : ''}${s.run ? `, ${s.run}` : ''}` +
+          `${s.machine ? `, ${s.machine}` : ''}${s.preliminary ? ', preliminary' : ''}`
+        : `built-in 1.98 C/B — live kappa.json unreachable`;
+      return `<br><span style="opacity:0.65;font-size:11px;">` +
+        `ρ reference: BIP340 Schnorr verify ≈ <strong>${s.cb64.toFixed(2)} C/B</strong> ` +
+        `(${s.impl}, single verify over a 64 B wire signature; ` +
+        `<a href="https://github.com/mjthatch/bip340-vs-sha256" style="color:inherit;">bip340-vs-sha256</a>: ${src}). ` +
+        `SLH-DSA-128s baseline: ${STD_M.cb.toFixed(4)} C/B = ` +
+        `<strong>${rAvg}×</strong> Schnorr (avg), ${rWorst}× (worst).</span>`;
+    }
+
     function renderInfoStrip() {
       const d = state.siteData;
       const pool = state.initialPool;
@@ -1647,14 +1705,14 @@
           `Data: <code>data.json</code> (generated ${d.meta.generated}, commit ${d.meta.commit}); ` +
           `security via the FORS / PORS+FP subset-forgery analysis of the report's ` +
           `<a href="https://github.com/BlockstreamResearch/SPHINCS-Parameters/blob/main/security.sage" style="color:inherit;">security.sage</a>.` +
-          `</span>`;
+          `</span>` + schnorrNote();
       } else {
         html =
           `Scheme: <strong>SPX</strong> · ` +
           `<strong>${state.candidates.length.toLocaleString()}</strong> tuples · ` +
           `<strong>${pool.length.toLocaleString()}</strong> pass the initial bounds ${bounds}. ` +
           `<span style="opacity:0.65;font-size:11px;">Pool computed in-browser ` +
-          `(data.json unavailable — scheme variants disabled).</span>`;
+          `(data.json unavailable — scheme variants disabled).</span>` + schnorrNote();
       }
       document.getElementById('initial-info').innerHTML = html;
     }
@@ -1726,12 +1784,16 @@
     function exportSurvivorsCSV() {
       const header = ['scheme', 'h', 'd', 'k', 'a', 'w', 'swn', 'mmax', 'size',
         'keygen_C', 'sign_C', 'verify_C', 'verify_worst_C',
-        'c_per_byte', 'c_per_byte_worst', 'distance'];
+        'c_per_byte', 'c_per_byte_worst',
+        'cb_vs_schnorr', 'cb_worst_vs_schnorr', 'schnorr_cb64', 'distance'];
       const lines = [header.join(',')];
       for (const c of state.lastSurvivors) {
         lines.push([state.scheme, c.h, c.d, c.k, c.a, c.w, c.swn || 0, c.mmax || 0,
           c.size, c.kg, c.sg, c.sv, c.sv_worst,
           c.cb.toFixed(6), c.cb_worst.toFixed(6),
+          (c.cb / state.schnorr.cb64).toFixed(6),
+          (c.cb_worst / state.schnorr.cb64).toFixed(6),
+          state.schnorr.cb64.toFixed(6),
           weightedDistance(c, state.W).toFixed(6)].join(','));
       }
       const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv' });
@@ -1743,8 +1805,9 @@
     }
 
     async function setup() {
-      const data = await loadSiteData();
+      const [data, schnorr] = await Promise.all([loadSiteData(), loadSchnorrRef()]);
       state.siteData = data;
+      state.schnorr = schnorr;
       if (data) {
         data.meta.schemes.forEach((s, si) => {
           const pool = poolFromData(data, s);
