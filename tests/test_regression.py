@@ -197,7 +197,7 @@ def test_site_stateful():
 const out = { slh: null, uxmss: {}, xmssmt: {} };
 const s = buildSLH().metrics;
 out.slh = [s.size, s.keygen, s.siggen, s.sigver, s.sigverWorst];
-for (const ots of ['TW','WC']) for (const w of [16,32,256]) {
+for (const ots of ['TW','WC']) for (const w of [16,32,64,128,256]) {
   const c = buildUxmss(ots, w), m = c.metrics;
   out.uxmss[`${ots},${w}`] = [c.hsf, m.sizeQ1, m.size, m.keygen, m.siggen, m.sigver, m.sigverWorst];
 }
@@ -243,7 +243,7 @@ def test_data_json_meta():
     for s in d['meta']['schemes']:
         p = d['pools'][s]
         assert p['count'] == len(p['rows']), s
-    assert d['pools']['SPX']['considered'] == 25935
+    assert d['pools']['SPX']['considered'] == 43225
 
 
 def test_data_json_stateless():
@@ -355,7 +355,7 @@ def test_data_json_stateful():
         assert got == want, (r[:4], got, want)
         assert m['sg_cold'] >= m['sg']
     ui = {f: i for i, f in enumerate(d['uxmss']['fields'])}
-    assert len(d['uxmss']['rows']) == 6
+    assert len(d['uxmss']['rows']) == 10
     UKEYS = ('hsf', 'sz_q1', 'sz_max', 'kg', 'sg', 'sg_cold', 'state',
              'sv_max', 'sv_max_worst')
     for r in d['uxmss']['rows']:

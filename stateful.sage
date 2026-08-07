@@ -33,13 +33,16 @@ OTS variants:
   WOTS+C        Counter-based OTS; no checksum; l = l1 + grinding counter.
                 Verification cost fixed: (w-1)*l - S_wn steps (deterministic).
 
-w values: 16, 32, 256.
+w values: 16, 32, 64, 128, 256.
   w= 16: l1=32  WOTS-TW/classic l=35  WOTS+C S_wn=240
   w= 32: l1=26  WOTS-TW/classic l=28  WOTS+C S_wn=403
+  w= 64: l1=22  WOTS-TW/classic l=24  WOTS+C S_wn=693
+  w=128: l1=19  WOTS-TW/classic l=21  WOTS+C S_wn=1206
   w=256: l1=16  WOTS-TW/classic l=18  WOTS+C S_wn=2040
 
   Note: l1 = ceil(8n / log2(w)) per FIPS 205. For w=16 and w=256 the
-  division is exact; for w=32 we need 26 chains (not 25) to cover the
+  division is exact; the others need the round-up (w=32: 26 chains for
+  130 >= 128 bits, w=64: 22 for 132, w=128: 19 for 133) to cover the
   full 128-bit message digest.
 
 SHA-256 compression model: inherited from costs.sage, governed by the
@@ -125,9 +128,11 @@ OTS_WC      = "wc"
 # WOTS+C target digit sums S_wn = floor(l1*(w-1)/2), where l1 = ceil(8n/log2(w))
 # w=16:  l1=32, S_wn = 32*15/2 = 240
 # w=32:  l1=26, S_wn = 26*31/2 = 403
+# w=64:  l1=22, S_wn = 22*63/2 = 693
+# w=128: l1=19, S_wn = floor(19*127/2) = 1206  (odd product; ν(1206) = ν(1207))
 # w=256: l1=16, S_wn = 16*255/2 = 2040
-WOTS_C_PAIRS = [(16, 240), (32, 403), (256, 2040)]
-WOTS_W_VALS  = [16, 32, 256]
+WOTS_C_PAIRS = [(16, 240), (32, 403), (64, 693), (128, 1206), (256, 2040)]
+WOTS_W_VALS  = [16, 32, 64, 128, 256]
 
 PARAM_SETS = (
     [(OTS_WC,      w, swn) for w, swn in WOTS_C_PAIRS] +
@@ -522,7 +527,7 @@ def print_xmss_table(rows_by_h):
     print()
     print("="*W)
     print(" XMSS — Single-Layer Balanced Tree ".center(W, "="))
-    print(" OTS: WOTS-classic / WOTS-TW / WOTS+C  |  w ∈ {16,32,256} ".center(W, "="))
+    print(" OTS: WOTS-classic / WOTS-TW / WOTS+C  |  w ∈ {16,32,64,128,256} ".center(W, "="))
     print(" Auth path = h nodes (fixed per sig); Sign-BDS = amortised ".center(W, "="))
     print("="*W)
     print(_hdr(cols)); print(_sep_line(cols))
@@ -549,7 +554,7 @@ def print_xmssmt_table(rows_by_h):
     print()
     print("="*W)
     print(" XMSS-MT — Multi-Tree Hypertree (no FORS needed; stateful) ".center(W, "="))
-    print(" OTS: WOTS-classic / WOTS-TW / WOTS+C  |  w ∈ {16,32,256} ".center(W, "="))
+    print(" OTS: WOTS-classic / WOTS-TW / WOTS+C  |  w ∈ {16,32,64,128,256} ".center(W, "="))
     print(" Keygen builds top tree only (2^h' keys); Sign-BDS amortised ".center(W, "="))
     print("="*W)
     print(_hdr(cols)); print(_sep_line(cols))
@@ -581,7 +586,7 @@ def print_uxmss_table(rows_by_h, refs):
     print()
     print("="*W)
     print(" SHRINCS/UXMSS — Left-leaning Stateful Tree ".center(W, "="))
-    print(" OTS: WOTS-classic / WOTS-TW / WOTS+C  |  w ∈ {16,32,256} ".center(W, "="))
+    print(" OTS: WOTS-classic / WOTS-TW / WOTS+C  |  w ∈ {16,32,64,128,256} ".center(W, "="))
     print(" max stateful sig must be strictly < Ref ".center(W, "="))
     print("="*W)
     print(_hdr(cols)); print(_sep_line(cols))

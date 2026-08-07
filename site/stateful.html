@@ -349,6 +349,8 @@
         <select id="f-w">
           <option>16</option>
           <option>32</option>
+          <option>64</option>
+          <option>128</option>
           <option>256</option>
         </select>
       </label>
@@ -379,8 +381,8 @@
   <div class="panel" id="all-candidates-panel">
     <h2>All stateful candidates</h2>
     <p class="hint">
-      Pre-swept over h = [10, 40], d = [1, 10] (with d ⏐ h), OTS = {WOTS, WOTS+C}, w = {16, 32, 256},
-      plus the 6 UXMSS variants (2 OTS * 3 w). Every candidate has signature size strictly smaller than SLH-DSA-128s.
+      Pre-swept over h = [10, 40], d = [1, 10] (with d ⏐ h), OTS = {WOTS, WOTS+C}, w = {16, 32, 64, 128, 256},
+      plus the 10 UXMSS variants (2 OTS * 5 w). Every candidate has signature size strictly smaller than SLH-DSA-128s.
       UXMSS tree height is capped at hsf = 255.
       Tighten the bounds to narrow the pool; click a row's <strong>+</strong> to add it to the comparison above.
     </p>
@@ -428,7 +430,7 @@ const C_PRFmsg = 2;
 const C_PRF = 1;
 
 // WOTS+C target chain sums S_wn
-const WOTS_C_SWN = { 16: 240, 32: 403, 256: 2040 };
+const WOTS_C_SWN = { 16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040 };
 const UXMSS_TARGET_SIZE = 5712;     // Candidate 2 reference
 
 // SLH-DSA-128s baseline
@@ -982,7 +984,7 @@ function buildSweepPool() {
 
   // Fallback: compute the pool in-browser.
   const otsList = ['TW', 'WC'];
-  const wList = [16, 32, 256];
+  const wList = [16, 32, 64, 128, 256];
 
   // XMSS / XMSS-MT sweep
   for (const ots of otsList) {
@@ -1299,13 +1301,13 @@ function candidateFromKey(key) {
   const p = String(key).split('-');
   if (p[0] === 'uxmss' && p.length === 3) {
     const ots = p[1], w = parseInt(p[2], 10);
-    if (!['TW', 'WC'].includes(ots) || ![16, 32, 256].includes(w)) return null;
+    if (!['TW', 'WC'].includes(ots) || ![16, 32, 64, 128, 256].includes(w)) return null;
     return buildUxmss(ots, w);
   }
   if (p[0] === 'xmssmt' && p.length === 5) {
     const ots = p[1], w = parseInt(p[2], 10);
     const h = parseInt(p[3], 10), d = parseInt(p[4], 10);
-    if (!['TW', 'WC'].includes(ots) || ![16, 32, 256].includes(w)) return null;
+    if (!['TW', 'WC'].includes(ots) || ![16, 32, 64, 128, 256].includes(w)) return null;
     if (!Number.isInteger(h) || h < 2 || h > 60 ||
         !Number.isInteger(d) || d < 1 || h % d !== 0) return null;
     return buildXmssMt(ots, h, d, w);

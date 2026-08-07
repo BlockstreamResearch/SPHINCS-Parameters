@@ -797,7 +797,7 @@
 
     // ---------- Sweep ----------
     // Canonical grid — must match the report (Sec. 2) and slhdsa-2to40.sage defaults:
-    //   h in [40, 50], d in [2, 25] with d | h, k in [6, 24], a in [8, 20], w in {16, 32, 256}.
+    //   h in [40, 50], d in [2, 25] with d | h, k in [6, 24], a in [8, 20], w in {16, 32, 64, 128, 256}.
     // k >= 6 because with a <= 20 and h <= 50 any k <= 5 falls short of the
     // 128-bit security floor at q_s = 2^40, so smaller k never survives anyway.
     function sweep() {
@@ -807,7 +807,7 @@
           if (h % d !== 0) continue;
           for (let k = 6; k <= 24; k++) {
             for (let a = 8; a <= 20; a++) {
-              for (const w of [16, 32, 256]) {
+              for (const w of [16, 32, 64, 128, 256]) {
                 const p = { h, d, k, a, w };
                 const m = metrics(p);
                 // Skip pathological/infinite candidates
@@ -1292,8 +1292,8 @@
         ['SigVer cost (worst)', winner.sv_worst, STD_M.sv_worst],
         ['Comp/Byte ρ (avg)', winner.cb, STD_M.cb],
         ['Comp/Byte ρ (worst)', winner.cb_worst, STD_M.cb_worst],
-        ['ρ / Schnorr (avg)', winner.cb / state.schnorr.cb64, STD_M.cb / state.schnorr.cb64],
-        ['ρ / Schnorr (worst)', winner.cb_worst / state.schnorr.cb64, STD_M.cb_worst / state.schnorr.cb64],
+        ['ρ ÷ Schnorr (avg)', winner.cb / state.schnorr.cb64, STD_M.cb / state.schnorr.cb64],
+        ['ρ ÷ Schnorr (worst)', winner.cb_worst / state.schnorr.cb64, STD_M.cb_worst / state.schnorr.cb64],
       ];
       const rowsHTML = rows.map(([name, target, std]) => {
         const ratio = target / std;
@@ -1386,8 +1386,8 @@
         ['SigVer cost (worst)', c.sv_worst, STD_M.sv_worst],
         ['Comp/Byte ρ (avg)', c.cb, STD_M.cb],
         ['Comp/Byte ρ (worst)', c.cb_worst, STD_M.cb_worst],
-        ['ρ / Schnorr (avg)', c.cb / state.schnorr.cb64, STD_M.cb / state.schnorr.cb64],
-        ['ρ / Schnorr (worst)', c.cb_worst / state.schnorr.cb64, STD_M.cb_worst / state.schnorr.cb64],
+        ['ρ ÷ Schnorr (avg)', c.cb / state.schnorr.cb64, STD_M.cb / state.schnorr.cb64],
+        ['ρ ÷ Schnorr (worst)', c.cb_worst / state.schnorr.cb64, STD_M.cb_worst / state.schnorr.cb64],
       ];
       const tbody = rows.map(([name, target, std]) => {
         const r = target / std;
@@ -1452,9 +1452,9 @@
       }
       // w should be a power of 2 for the standard WOTS+ construction
       if ((p.w & (p.w - 1)) !== 0) {
-        warnings.push(`w = ${p.w} is not a power of 2. Standard WOTS+ uses w ∈ {16, 32, 256}; metrics are still computed but may not match a real implementation.`);
-      } else if (![16, 32, 256].includes(p.w)) {
-        warnings.push(`w = ${p.w} is a power of 2 but outside the standard set {16, 32, 256}. Metrics are computed but the tuple is non-standard.`);
+        warnings.push(`w = ${p.w} is not a power of 2. The sweep uses w ∈ {16, 32, 64, 128, 256}; metrics are still computed but may not match a real implementation.`);
+      } else if (![16, 32, 64, 128, 256].includes(p.w)) {
+        warnings.push(`w = ${p.w} is a power of 2 but outside the swept set {16, 32, 64, 128, 256}. Metrics are computed but the tuple is non-standard.`);
       }
 
       if (errors.length) return { valid: false, errors, warnings };
@@ -1522,8 +1522,8 @@
         ['SigVer cost (worst)', m.sv_worst, STD_M.sv_worst],
         ['Comp/Byte ρ (avg)', m.cb, STD_M.cb],
         ['Comp/Byte ρ (worst)', m.cb_worst, STD_M.cb_worst],
-        ['ρ / Schnorr (avg)', m.cb / state.schnorr.cb64, STD_M.cb / state.schnorr.cb64],
-        ['ρ / Schnorr (worst)', m.cb_worst / state.schnorr.cb64, STD_M.cb_worst / state.schnorr.cb64],
+        ['ρ ÷ Schnorr (avg)', m.cb / state.schnorr.cb64, STD_M.cb / state.schnorr.cb64],
+        ['ρ ÷ Schnorr (worst)', m.cb_worst / state.schnorr.cb64, STD_M.cb_worst / state.schnorr.cb64],
       ];
       const rowsHTML = rows.map(([name, target, std]) => {
         const r = target / std;

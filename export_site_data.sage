@@ -59,7 +59,7 @@ for s in schemes:
 # Canonical stateless grid (report Sec. 2; must match slhdsa-2to40.sage
 # defaults and the explorer's fallback sweep).
 GRID = {'h': [40, 50], 'd': [2, 25], 'k': [6, 24], 'a': [8, 20],
-        'w': [16, 32, 256], 'q_s_log2': 40, 'max_size': 7856}
+        'w': [16, 32, 64, 128, 256], 'q_s_log2': 40, 'max_size': 7856}
 WC_PAIRS = [(16, 240), (256, 2040)]   # (w, swn) for WOTS+C schemes
 POOL_FIELDS = ['h', 'd', 'k', 'a', 'w', 'swn', 'mmax',
                'size', 'kg', 'sg', 'sv', 'sv_worst']
@@ -158,12 +158,12 @@ for scheme in schemes:
 # ---------------------------------------------------------------------------
 # Stateful: XMSS/XMSS-MT grid + UXMSS variants (same functions as the CLI)
 # ---------------------------------------------------------------------------
-_SWN = {16: 240, 32: 403, 256: 2040}
+_SWN = {16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040}
 UXMSS_REF = 5712   # Report Candidate 2 — reference bound for max stateful size
 
 xmssmt_rows = []
 for ots_label, ots_type in (('TW', OTS_TW), ('WC', OTS_WC)):
-    for w in (16, 32, 256):
+    for w in (16, 32, 64, 128, 256):
         swn = _SWN[w] if ots_type == OTS_WC else 0
         for h in range(10, 41):
             for d in range(1, 11):
@@ -182,7 +182,7 @@ for ots_label, ots_type in (('TW', OTS_TW), ('WC', OTS_WC)):
 
 uxmss_rows = []
 for ots_label, ots_type in (('TW', OTS_TW), ('WC', OTS_WC)):
-    for w in (16, 32, 256):
+    for w in (16, 32, 64, 128, 256):
         swn = _SWN[w] if ots_type == OTS_WC else 0
         hsf = find_max_hsf(w, ots_type, UXMSS_REF)
         uxmss_rows.append([

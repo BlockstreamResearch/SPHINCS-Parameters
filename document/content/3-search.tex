@@ -22,7 +22,7 @@ Under this convention the SLH-DSA-128s baseline costs are: KeyGen $292{,}351$, S
 The methodology described here uses a set of SageMath scripts available at \url{https://github.com/BlockstreamResearch/SPHINCS-Parameters}.
 
 \subsection{Sweep Strategy} \label{sec:sweep-strategy}
-We start by enumerating all parameter tuples $(h, d, k, a, w)$. Applying the initial bounds (security level, size $\leq$ SLH-DSA, at least $2^{40}$ supported signatures) reduces the search space from \emph{25,935} candidates to \emph{9,182} - a $65\%$ cut. The remaining space is still too large to inspect by hand, so we need additional filters.
+We start by enumerating all parameter tuples $(h, d, k, a, w)$. Applying the initial bounds (security level, size $\leq$ SLH-DSA, at least $2^{40}$ supported signatures) reduces the search space from \emph{43,225} candidates to \emph{15,983} - a $63\%$ cut. The remaining space is still too large to inspect by hand, so we need additional filters.
 
 We introduce the following filters\footnote{The coefficient for each filter, except the signature size, may be greater than 1 (meaning we accept some regression on that metric in exchange for gains elsewhere).}:
 
@@ -194,7 +194,7 @@ The filtering process is shown in Figure~\ref{fig:full_filtering_process}.
     \label{fig:full_filtering_process}
 \end{figure}
 
-We start with \emph{19,437} candidates. The signature-size filter trims the pool to \emph{6,141}; the next filter (KeyGen) cuts it by more than $7\times$. Each subsequent filter prunes further, leaving \emph{61} final candidates for inspection.
+We start with \emph{32,395} candidates. The signature-size filter trims the pool to \emph{10,766}; the next filter (KeyGen) cuts it by more than $6\times$. Each subsequent filter prunes further, leaving \emph{61} final candidates for inspection: the verification-cost bound eliminates every $w \in \{64, 128\}$ candidate in this example, so the surviving set coincides with the one obtained on the original $w \in \{16, 32, 256\}$ grid.
 
 With the final 61 candidates in hand, we are ready to pick a winner.
 

@@ -3,16 +3,22 @@
  "wots_len": {
   "16": 35,
   "32": 28,
+  "64": 24,
+  "128": 21,
   "256": 18
  },
  "wots_len_wc": {
   "16": 32,
   "32": 26,
+  "64": 22,
+  "128": 19,
   "256": 16
  },
  "swn": {
   "16": 240,
   "32": 403,
+  "64": 693,
+  "128": 1206,
   "256": 2040
  },
  "baseline": {
@@ -24,8 +30,8 @@
   "sv_worst": 3891
  },
  "csv_rows": {
-  "all_size_capped_candidates.csv": 9183,
-  "all_unbound_candidates.csv": 19438
+  "all_size_capped_candidates.csv": 15984,
+  "all_unbound_candidates.csv": 32396
  },
  "stateless": {
   "63,7,14,12,16": {
@@ -131,6 +137,22 @@
    "sg": 1535479,
    "sv": 1555,
    "sv_worst": 2795
+  },
+  "45,5,10,13,64": {
+   "role": "w=64 spot (Candidate-1 analogue)",
+   "size": 4896,
+   "kg": 790527,
+   "sg": 4198392,
+   "sv": 4005,
+   "sv_worst": 7470
+  },
+  "45,5,10,13,128": {
+   "role": "w=128 spot (Candidate-1 analogue)",
+   "size": 4656,
+   "kg": 1379839,
+   "sg": 7144952,
+   "sv": 6885,
+   "sv_worst": 12920
   }
  },
  "stateful": {
@@ -155,6 +177,28 @@
     "sg_cold": 232145,
     "sv_max": 699,
     "sv_max_worst": 1102,
+    "state": 4096
+   },
+   "TW,64": {
+    "hsf": 255,
+    "sz_q1": 417,
+    "sz_max": 4481,
+    "kg": 395263,
+    "sg": 784,
+    "sg_cold": 396047,
+    "sv_max": 1020,
+    "sv_max_worst": 1713,
+    "state": 4096
+   },
+   "TW,128": {
+    "hsf": 255,
+    "sz_q1": 369,
+    "sz_max": 4433,
+    "kg": 689919,
+    "sg": 1358,
+    "sg_cold": 691277,
+    "sv_max": 1596,
+    "sv_max_worst": 2803,
     "state": 4096
    },
    "TW,256": {
@@ -188,6 +232,28 @@
     "sg_cold": 215598,
     "sv_max": 668,
     "sv_max_worst": 668,
+    "state": 4096
+   },
+   "WC,64": {
+    "hsf": 255,
+    "sz_q1": 389,
+    "sz_max": 4453,
+    "kg": 362239,
+    "sg": 944,
+    "sg_cold": 363183,
+    "sv_max": 957,
+    "sv_max_worst": 957,
+    "state": 4096
+   },
+   "WC,128": {
+    "hsf": 255,
+    "sz_q1": 341,
+    "sz_max": 4405,
+    "kg": 624383,
+    "sg": 1642,
+    "sg_cold": 626025,
+    "sv_max": 1471,
+    "sv_max_worst": 1471,
     "state": 4096
    },
    "WC,256": {
@@ -256,10 +322,28 @@
     "sv": 848,
     "sv_worst": 1592,
     "state": 2800
+   },
+   "TW,20,1,64": {
+    "size": 723,
+    "kg": 1619001343,
+    "sg": 31664,
+    "sg_cold": 1619002127,
+    "sv": 785,
+    "sv_worst": 1478,
+    "state": 1120
+   },
+   "WC,20,1,128": {
+    "size": 647,
+    "kg": 2557476863,
+    "sg": 50422,
+    "sg_cold": 2557478505,
+    "sv": 1236,
+    "sv_worst": 1236,
+    "state": 1120
    }
   }
  },
- "site_pool_count": 9182,
+ "site_pool_count": 15983,
  "variants": {
   "W+C|44,4,8,16,16,240": {
    "size": 4960,
@@ -357,5 +441,6 @@
    "sv_max": 784,
    "sv_max_worst": 1032
   }
- }
+ },
+ "_comment_w_grid": "2026-08-07: w grid extended with 64 (l1=22, S_wn=693) and 128 (l1=19, S_wn=floor(19*127/2)=1206). csv_rows/site_pool_count recomputed by two independent local implementations (site JS sweep under node + tests/model.py sizes over the JS security-pass set); FORS security depends only on (h,k,a), so the security-pass set is unchanged from the mpmath-verified generation. Per-w capped pool: 16:2420 32:2913 64:3259 128:3542 256:3849."
 }
