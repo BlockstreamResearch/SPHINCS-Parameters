@@ -370,6 +370,7 @@
       kept between signatures) and a state-minimized signer that rebuilds its trees per signature.
       <strong>State</strong> shows the cached signer's memory — UXMSS: all hsf+1 leaf hashes;
       XMSS/XMSS-MT: a BDS-style estimate; "—" for the stateless SLH-DSA baseline and in state-minimized mode.</p>
+    <p class="hint" id="schnorr-ref"></p>
     <div class="compare-wrap">
       <table class="compare" id="compare-table"></table>
     </div>
@@ -432,6 +433,17 @@ const UXMSS_TARGET_SIZE = 5712;     // Candidate 2 reference
 
 // SLH-DSA-128s baseline
 const SLH = { h: 63, d: 7, k: 14, a: 12, w: 16 };
+
+// Schnorr (BIP340) reference
+const SCHNORR_KAPPA_URL =
+  'https://raw.githubusercontent.com/mjthatch/bip340-vs-sha256/main/results/kappa.json';
+const SCHNORR_FALLBACK = {
+  cb64: 1.98,
+  impl: 'libsecp256k1',
+  commit: null, run: null, machine: null, preliminary: false,
+  live: false,
+};
+let SCHNORR = { ...SCHNORR_FALLBACK };
 
 //  Helpers 
 function idxBytes(h) { return Math.max(1, Math.ceil(h / 8)); }
@@ -858,6 +870,8 @@ const METRIC_COLS = [
   { label: 'SigVer (C)',  value: m => fmtCompressions(m.sigver),                   ratioField: 'sigver',  lowerIsBetter: true },
   { label: 'C/B (avg)',   value: m => fmtCpb(m.sigver / m.size),                   ratioFn: m => (m.sigver      / m.size),  lowerIsBetter: true },
   { label: 'C/B (worst)', value: m => fmtCpb(m.sigverWorst / m.size),              ratioFn: m => (m.sigverWorst / m.size),  lowerIsBetter: true },
+  { label: `<span title="Verify compressions per signature byte as a multiple of BIP340 Schnorr verification (libsecp256k1) — see the ρ reference note above">ρ ÷ Schnorr</span>`,
+                          value: m => fmtCpb((m.sigver / m.size) / SCHNORR.cb64) + '×' },
   { label: 'Max sigs',    value: (_, c) => fmtQs(c.metrics) },
 ];
 
@@ -1141,6 +1155,8 @@ const SWEEP_COLS = [
                                                                                                 sortFn: (m) => m.state || 0 },
   { field: 'sigver',   label: 'SigVer (C)', value: m => fmtCompressions(m.sigver),              sortFn: (m) => m.sigver,                                                ratioFn: m => m.sigver,           lowerIsBetter: true },
   { field: 'cb',       label: 'C/B (avg)',  value: m => fmtCpb(m.sigver / m.size),              sortFn: (m) => m.sigver / m.size,                                       ratioFn: m => m.sigver / m.size,  lowerIsBetter: true },
+  { field: 'cbSchnorr', label: `<span title="Verify compressions per signature byte as a multiple of BIP340 Schnorr verification (libsecp256k1) — see the ρ reference note in the comparison panel">ρ ÷ Schnorr</span>`,
+                                            value: m => fmtCpb((m.sigver / m.size) / SCHNORR.cb64) + '×', sortFn: (m) => m.sigver / m.size },
   { field: 'distance', label: 'Distance',   value: (m, c, std) => sweepDistance(m, std, sweepState.W).toFixed(4),
                                             sortFn: (m, c, std) => sweepDistance(m, std, sweepState.W) },
   { field: 'qs',       label: 'Max sigs',   value: (_, c) => fmtQs(c.metrics),                  sortFn: (m) => (m.qsLog2 !== null ? Math.pow(2, m.qsLog2) : m.qsExact) },
@@ -1361,6 +1377,7 @@ function exportSweepCSV() {
   const header = ['scheme', 'label', 'max_sigs', 'size_B', 'keygen_C',
     'siggen_bds_C', 'siggen_cold_C', 'state_B',
     'sigver_C', 'sigver_worst_C', 'c_per_byte', 'c_per_byte_worst',
+    'cb_vs_schnorr', 'cb_worst_vs_schnorr', 'schnorr_cb64',
     'signer_mode', 'distance'];
   const lines = [header.join(',')];
   for (const f of sweepState.lastSurvivors) {
@@ -1370,6 +1387,9 @@ function exportSweepCSV() {
       m.size, m.keygen, m.siggen, m.siggenCold, m.state !== undefined ? m.state : '',
       m.sigver, m.sigverWorst,
       (m.sigver / m.size).toFixed(6), (m.sigverWorst / m.size).toFixed(6),
+      (m.sigver / m.size / SCHNORR.cb64).toFixed(6),
+      (m.sigverWorst / m.size / SCHNORR.cb64).toFixed(6),
+      SCHNORR.cb64.toFixed(6),
       SIGNER_MODE,
       sweepDistance(m, std, sweepState.W).toFixed(6)].join(','));
   }
@@ -1487,8 +1507,49 @@ async function loadSiteData() {
   }
 }
 
+async function loadSchnorrRef() {
+  try {
+    const resp = await fetch(SCHNORR_KAPPA_URL, { cache: 'no-cache' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const k = await resp.json();
+    const entry = k && k.cb && k.cb[SCHNORR_FALLBACK.impl];
+    const cb = entry && entry.cb_64;
+    if (!isFinite(cb) || cb <= 0) throw new Error('cb.' + SCHNORR_FALLBACK.impl + '.cb_64 missing');
+    return {
+      cb64: cb,
+      impl: SCHNORR_FALLBACK.impl,
+      commit: k.secp256k1_commit || null,
+      run: typeof k.run_utc === 'string' ? k.run_utc.slice(0, 10) : null,
+      machine: k.machine || null,
+      preliminary: !!k.preliminary,
+      live: true,
+    };
+  } catch (e) {
+    console.warn('Schnorr reference kappa.json unavailable (' + e.message +
+      ') — using the built-in ' + SCHNORR_FALLBACK.cb64.toFixed(2) + ' C/B.');
+    return { ...SCHNORR_FALLBACK };
+  }
+}
+
+function renderSchnorrNote() {
+  const s = SCHNORR;
+  const m = state.candidates[0].metrics;
+  const cb = m.sigver / m.size;
+  const src = s.live
+    ? `kappa.json${s.commit ? ` @ secp256k1 ${s.commit}` : ''}${s.run ? `, ${s.run}` : ''}` +
+      `${s.machine ? `, ${s.machine}` : ''}${s.preliminary ? ', preliminary' : ''}`
+    : `built-in 1.98 C/B — live kappa.json unreachable`;
+  document.getElementById('schnorr-ref').innerHTML =
+    `The <strong>ρ ÷ Schnorr</strong> columns compare average-case C/B against BIP340 Schnorr ` +
+    `verification ≈ <strong>${s.cb64.toFixed(2)} C/B</strong> (${s.impl}, single verify over a ` +
+    `64 B wire signature; <a href="https://github.com/mjthatch/bip340-vs-sha256">bip340-vs-sha256</a>: ${src}). ` +
+    `SLH-DSA-128s baseline: ${fmtCpb(cb)} C/B = <strong>${fmtCpb(cb / s.cb64)}×</strong> Schnorr.`;
+}
+
 async function init() {
-  SITE_DATA = await loadSiteData();
+  const [siteData, schnorr] = await Promise.all([loadSiteData(), loadSchnorrRef()]);
+  SITE_DATA = siteData;
+  SCHNORR = schnorr;
   if (SITE_DATA) selfCheckStateful(SITE_DATA);
   state.candidates = defaultCandidates();
   applyStatefulHash();
@@ -1499,6 +1560,7 @@ async function init() {
   });
   setupAddForm();
   render();              // initial pass paints the comparison
+  renderSchnorrNote();
   buildSweepPool();      // sweep generation depends on the SLH baseline
   renderSweepFilters();
   renderSweepTable();    // first paint of the sweep table
