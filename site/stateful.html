@@ -365,9 +365,10 @@
     <p class="hint">All cost columns are SHA-256 compression-function calls with the PK.seed block midstate-cached
       (FIPS 205 SHA-2 layout; the original uncached convention remains available in the scripts via
       <code>HASH_CONVENTION=uncached</code>). Cost ratios under each value compare against SLH-DSA-128s.
-      UXMSS signatures grow with the signature index: the size column shows the first→largest range, and all
-      ratios, filters and verification costs use the worst case (hsf auth nodes, reached by the last two of
-      the hsf+1 signatures).
+      UXMSS signatures grow with the signature index: the size and C/B columns show the first→largest range
+      (C/B <em>falls</em> with the index — each extra auth node adds 16 B of signature but only one
+      compression of verify work), and all ratios, filters and verification costs use the worst case
+      (hsf auth nodes, reached by the last two of the hsf+1 signatures).
       The <strong>Signer</strong> selector switches SigGen between the cached signer (BDS-amortised, tree state
       kept between signatures) and a state-minimized signer that rebuilds its trees per signature.
       <strong>State</strong> shows the cached signer's memory — UXMSS: all hsf+1 leaf hashes;
@@ -384,6 +385,8 @@
       Pre-swept over h = [10, 40], d = [1, 10] (with d ⏐ h), OTS = {WOTS, WOTS+C}, w = {16, 32, 64, 128, 256},
       plus the 10 UXMSS variants (2 OTS * 5 w). Every candidate has signature size strictly smaller than SLH-DSA-128s.
       UXMSS tree height is capped at hsf = 255.
+      UXMSS C/B cells show the first→largest-signature range (density falls with the index);
+      bounds and sorting use the largest-signature value.
       Tighten the bounds to narrow the pool; click a row's <strong>+</strong> to add it to the comparison above.
     </p>
 
@@ -853,6 +856,15 @@ function fmtRatio(target, std) {
   return `${r.toFixed(2)}×`;
 }
 function fmtCpb(n) { return n.toFixed(3); }
+
+function fmtCpbCell(m, c, sv, scale, suffix) {
+  const cbMax = sv / m.size / scale;
+  if (c && c.hsf !== undefined && m.sizeQ1 !== undefined && m.sizeQ1 !== m.size) {
+    const cb1 = (sv - (c.hsf - 1) * C_Th2) / m.sizeQ1 / scale;
+    return fmtCpb(cb1) + '→' + fmtCpb(cbMax) + suffix;
+  }
+  return fmtCpb(cbMax) + suffix;
+}
 function fmtQs(c) {
   if (c.qsLog2 !== null) return `2^${c.qsLog2}`;
   return c.qsExact.toLocaleString();
@@ -870,10 +882,10 @@ const METRIC_COLS = [
                           value: m => fmtCompressions(sigGenOf(m)),                ratioFn: m => sigGenOf(m), lowerIsBetter: true },
   { label: 'State (B)',   value: m => (SIGNER_MODE === 'cold' || m.state === undefined) ? '—' : fmtBytes(m.state) },
   { label: 'SigVer (C)',  value: m => fmtCompressions(m.sigver),                   ratioField: 'sigver',  lowerIsBetter: true },
-  { label: 'C/B (avg)',   value: m => fmtCpb(m.sigver / m.size),                   ratioFn: m => (m.sigver      / m.size),  lowerIsBetter: true },
-  { label: 'C/B (worst)', value: m => fmtCpb(m.sigverWorst / m.size),              ratioFn: m => (m.sigverWorst / m.size),  lowerIsBetter: true },
+  { label: 'C/B (avg)',   value: (m, c) => fmtCpbCell(m, c, m.sigver, 1, ''),      ratioFn: m => (m.sigver      / m.size),  lowerIsBetter: true },
+  { label: 'C/B (worst)', value: (m, c) => fmtCpbCell(m, c, m.sigverWorst, 1, ''), ratioFn: m => (m.sigverWorst / m.size),  lowerIsBetter: true },
   { label: `<span title="Verify compressions per signature byte as a multiple of BIP340 Schnorr verification (libsecp256k1) — see the ρ reference note above">ρ ÷ Schnorr</span>`,
-                          value: m => fmtCpb((m.sigver / m.size) / SCHNORR.cb64) + '×' },
+                          value: (m, c) => fmtCpbCell(m, c, m.sigver, SCHNORR.cb64, '×') },
   { label: 'Max sigs',    value: (_, c) => fmtQs(c.metrics) },
 ];
 
@@ -1156,9 +1168,9 @@ const SWEEP_COLS = [
   { field: 'state',    label: 'State (B)',  value: m => (SIGNER_MODE === 'cold' || m.state === undefined) ? '—' : fmtBytes(m.state),
                                                                                                 sortFn: (m) => m.state || 0 },
   { field: 'sigver',   label: 'SigVer (C)', value: m => fmtCompressions(m.sigver),              sortFn: (m) => m.sigver,                                                ratioFn: m => m.sigver,           lowerIsBetter: true },
-  { field: 'cb',       label: 'C/B (avg)',  value: m => fmtCpb(m.sigver / m.size),              sortFn: (m) => m.sigver / m.size,                                       ratioFn: m => m.sigver / m.size,  lowerIsBetter: true },
+  { field: 'cb',       label: 'C/B (avg)',  value: (m, c) => fmtCpbCell(m, c, m.sigver, 1, ''), sortFn: (m) => m.sigver / m.size,                                       ratioFn: m => m.sigver / m.size,  lowerIsBetter: true },
   { field: 'cbSchnorr', label: `<span title="Verify compressions per signature byte as a multiple of BIP340 Schnorr verification (libsecp256k1) — see the ρ reference note in the comparison panel">ρ ÷ Schnorr</span>`,
-                                            value: m => fmtCpb((m.sigver / m.size) / SCHNORR.cb64) + '×', sortFn: (m) => m.sigver / m.size },
+                                            value: (m, c) => fmtCpbCell(m, c, m.sigver, SCHNORR.cb64, '×'), sortFn: (m) => m.sigver / m.size },
   { field: 'distance', label: 'Distance',   value: (m, c, std) => sweepDistance(m, std, sweepState.W).toFixed(4),
                                             sortFn: (m, c, std) => sweepDistance(m, std, sweepState.W) },
   { field: 'qs',       label: 'Max sigs',   value: (_, c) => fmtQs(c.metrics),                  sortFn: (m) => (m.qsLog2 !== null ? Math.pow(2, m.qsLog2) : m.qsExact) },
