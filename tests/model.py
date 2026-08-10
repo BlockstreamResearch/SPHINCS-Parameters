@@ -248,7 +248,7 @@ def wots_sign_c(w, ots):
         swn = SWN[w]
         nu = _nu(l, swn, w)
         search = -(-(w**l) // nu)          # ceil division, exact integers
-        return search * C_TH1C + l * C_PRF + swn * C_TH1 + compute_th(l)
+        return search * C_TH1C + l * C_PRF + swn * C_TH1
     return l * C_PRF + l * (w - 1) // 2 * C_TH1
 
 
@@ -275,7 +275,7 @@ def xmssmt_metrics(ots, h, d, w):
     pk = wots_pk_c(w, ots)
     kg = 2**hp * pk + (2**hp - 1) * C_TH2
     sg = C_HMSG + C_PRFMSG + wots_sign_c(w, ots) + d * (hp * pk + hp * C_TH2)
-    sg_cold = C_HMSG + C_PRFMSG + d * (kg + wots_sign_c(w, ots))
+    sg_cold = C_HMSG + C_PRFMSG + d * (kg + wots_sign_c(w, ots)) - pk
     sv = C_HMSG + d * (wots_verify_c(w, ots, False) + hp * C_TH2)
     sv_worst = C_HMSG + d * (wots_verify_c(w, ots, True) + hp * C_TH2)
     state = d * ceil(3.5 * hp) * N + (d - 1) * l * N
@@ -312,13 +312,14 @@ def uxmss_metrics(ots, w, target_size=5712):
 
     kg = (hsf + 1) * wots_pk_c(w, ots) + hsf * C_TH2
     sg = C_HMSG + C_PRFMSG + wots_sign_c(w, ots)
+    sg_cold = sg + hsf * wots_pk_c(w, ots) + hsf * C_TH2
     return {
         'hsf': hsf,
         'sz_q1': size(1),
         'sz_max': size(hsf),
         'kg': kg,
         'sg': sg,
-        'sg_cold': sg + kg,
+        'sg_cold': sg_cold,
         'sv_max': C_HMSG + wots_verify_c(w, ots, False) + hsf * C_TH2,
         'sv_max_worst': C_HMSG + wots_verify_c(w, ots, True) + hsf * C_TH2,
         'state': (hsf + 1) * N, 

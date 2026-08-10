@@ -178,12 +178,11 @@ def wots_pk_C(w, ots_type):
 
 
 def wots_sign_C(w, swn, ots_type):
-    l   = wots_l(w, ots_type)
+    l = wots_l(w, ots_type)
     if ots_type == OTS_WC:
-        Thl    = wots_Thl(l, ots_type)
         nu     = compute_nu(l, swn, w)
         search = int(ceil(F(w)**l / F(nu)))
-        return search * C_Th1c + l * C_PRF + swn * C_Th1 + Thl
+        return search * C_Th1c + l * C_PRF + swn * C_Th1
     return l * C_PRF + l * (w - 1) // 2 * C_Th1
 
 
@@ -286,7 +285,8 @@ def xmssmt_sign_cold_C_h(h, d, w, swn, ots_type):
     h_prime = h // d
     return float(C_Hmsg + C_PRFmsg +
                  d * (float(tree_keygen_C(h_prime, w, ots_type)) +
-                      wots_sign_C(w, swn, ots_type)))
+                      wots_sign_C(w, swn, ots_type))
+                 - wots_pk_C(w, ots_type))
 
 
 def xmssmt_sign_bds_C_h(h, d, w, swn, ots_type):
@@ -368,9 +368,10 @@ def uxmss_sign_C(q, hsf, w, swn, ots_type):
 
 
 def uxmss_sign_cold_C(hsf, w, swn, ots_type):
-    """State-minimal signer: rebuild all leaves to derive the auth path, then sign."""
+    """State-minimal signer: rebuild the hsf OTHER leaves (+ auth internals)
+    to derive the auth path, then sign."""
     return float(C_Hmsg + C_PRFmsg + wots_sign_C(w, swn, ots_type)
-                 + uxmss_keygen_C(hsf, w, ots_type))
+                 + hsf * wots_pk_C(w, ots_type) + hsf * C_Th2)
 
 
 def uxmss_state_bytes(hsf):

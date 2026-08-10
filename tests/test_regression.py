@@ -170,7 +170,7 @@ def _run_node(js):
 
 
 def test_site_index():
-    js = _extract_js('index.html', '// ---------- State ----------')
+    js = _extract_js('stateless.html', '// ---------- State ----------')
     tuples = [list(_tuple_of(k)) for k in FIX['stateless']]
     js += f"""
 const _tuples = {json.dumps(tuples)};
@@ -189,6 +189,43 @@ console.log(JSON.stringify(out));
         got = out['metrics'][key]
         want = [f['size'], f['kg'], f['sg'], f['sv'], f['sv_worst']]
         assert got == want, (key, got, want)
+
+
+def test_site_main():
+    """index.html (SHRINCS main): pinned cards must match the reference model."""
+    js = _extract_js('index.html', '// ---------- Render ----------')
+    js += """
+const out = {};
+out.pinned = (m => [m.size, m.kg, m.sg, m.sv, m.svWorst])(slhMetrics(PINNED));
+out.slh = (m => [m.size, m.kg, m.sg, m.sv, m.svWorst])(slhMetrics(SLH));
+const swn = WOTS_C_SWN[256];
+out.xmss = {};
+for (const h of [10, 20, 25, 40]) {
+  out.xmss[h] = [xmssMtSize(h,1,256,'WC'), xmssMtKeygenC(h,1,256,'WC'),
+    xmssMtSignBdsC(h,1,256,swn,'WC'), xmssMtSignColdC(h,1,256,swn,'WC'),
+    xmssMtStateBytes(h,1,256,'WC'), xmssMtVerifyC(h,1,256,swn,'WC')];
+}
+const hsf = findMaxHsf(256, 'WC', UXMSS_TARGET_SIZE);
+out.uxmss = [hsf, uxmssSize(1,hsf,256,'WC'), uxmssSize(hsf,hsf,256,'WC'),
+  uxmssKeygenC(hsf,256,'WC'), uxmssSignC(256,swn,'WC'),
+  uxmssVerifyC(hsf,hsf,256,swn,'WC')];
+console.log(JSON.stringify(out));
+"""
+    out = _run_node(js)
+    if out is None:
+        return
+    pm = M.spx_metrics(45, 5, 10, 13, 16)
+    assert out['pinned'] == [pm['size'], pm['kg'], pm['sg'], pm['sv'], pm['sv_worst']], out['pinned']
+    assert out['pinned'][0] == 5776   # the page's advertised 5,776 B
+    bm = M.spx_metrics(63, 7, 14, 12, 16)
+    assert out['slh'] == [bm['size'], bm['kg'], bm['sg'], bm['sv'], bm['sv_worst']], out['slh']
+    for h, got in out['xmss'].items():
+        m = M.xmssmt_metrics('WC', int(h), 1, 256)
+        want = [m['size'], m['kg'], m['sg'], m['sg_cold'], m['state'], m['sv']]
+        assert got == want, (h, got, want)
+    u = M.uxmss_metrics('WC', 256)
+    want = [u['hsf'], u['sz_q1'], u['sz_max'], u['kg'], u['sg'], u['sv_max']]
+    assert out['uxmss'] == want, (out['uxmss'], want)
 
 
 def test_site_stateful():
@@ -371,8 +408,8 @@ def test_site_data_integration():
     if _missing(DATA_JSON):
         return
     data_path = os.path.join(ROOT, 'site', 'data.json')
-    # index.html: poolFromData must reproduce the pool; STD_M must equal baseline
-    js = _extract_js('index.html', '// ---------- State ----------')
+    # stateless.html: poolFromData must reproduce the pool; STD_M must equal baseline
+    js = _extract_js('stateless.html', '// ---------- State ----------')
     js += f"""
 const data = JSON.parse(require('fs').readFileSync({json.dumps(data_path)}, 'utf8'));
 const pool = poolFromData(data, 'SPX');

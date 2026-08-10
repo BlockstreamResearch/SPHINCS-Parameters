@@ -163,7 +163,7 @@
     "sz_max": 4657,
     "kg": 146175,
     "sg": 301,
-    "sg_cold": 146476,
+    "sg_cold": 145906,
     "sv_max": 529,
     "sv_max_worst": 777,
     "state": 4096
@@ -174,7 +174,7 @@
     "sz_max": 4545,
     "kg": 231679,
     "sg": 466,
-    "sg_cold": 232145,
+    "sg_cold": 231241,
     "sv_max": 699,
     "sv_max_worst": 1102,
     "state": 4096
@@ -185,7 +185,7 @@
     "sz_max": 4481,
     "kg": 395263,
     "sg": 784,
-    "sg_cold": 396047,
+    "sg_cold": 394504,
     "sv_max": 1020,
     "sv_max_worst": 1713,
     "state": 4096
@@ -196,7 +196,7 @@
     "sz_max": 4433,
     "kg": 689919,
     "sg": 1358,
-    "sg_cold": 691277,
+    "sg_cold": 688583,
     "sv_max": 1596,
     "sv_max_worst": 2803,
     "state": 4096
@@ -207,7 +207,7 @@
     "sz_max": 4385,
     "kg": 1181183,
     "sg": 2317,
-    "sg_cold": 1183500,
+    "sg_cold": 1178887,
     "sv_max": 2557,
     "sv_max_worst": 4597,
     "state": 4096
@@ -217,8 +217,8 @@
     "sz_q1": 549,
     "sz_max": 4613,
     "kg": 133631,
-    "sg": 351,
-    "sg_cold": 133982,
+    "sg": 342,
+    "sg_cold": 133452,
     "sv_max": 507,
     "sv_max_worst": 507,
     "state": 4096
@@ -228,8 +228,8 @@
     "sz_q1": 453,
     "sz_max": 4517,
     "kg": 215039,
-    "sg": 559,
-    "sg_cold": 215598,
+    "sg": 552,
+    "sg_cold": 214752,
     "sv_max": 668,
     "sv_max_worst": 668,
     "state": 4096
@@ -239,8 +239,8 @@
     "sz_q1": 389,
     "sz_max": 4453,
     "kg": 362239,
-    "sg": 944,
-    "sg_cold": 363183,
+    "sg": 938,
+    "sg_cold": 361763,
     "sv_max": 957,
     "sv_max_worst": 957,
     "state": 4096
@@ -250,8 +250,8 @@
     "sz_q1": 341,
     "sz_max": 4405,
     "kg": 624383,
-    "sg": 1642,
-    "sg_cold": 626025,
+    "sg": 1636,
+    "sg_cold": 623581,
     "sv_max": 1471,
     "sv_max_worst": 1471,
     "state": 4096
@@ -261,8 +261,8 @@
     "sz_q1": 293,
     "sz_max": 4357,
     "kg": 1050111,
-    "sg": 2814,
-    "sg_cold": 1052925,
+    "sg": 2809,
+    "sg_cold": 1048819,
     "sv_max": 2303,
     "sv_max_worst": 2303,
     "state": 4096
@@ -273,7 +273,7 @@
     "size": 899,
     "kg": 598736895,
     "sg": 11721,
-    "sg_cold": 598737196,
+    "sg_cold": 598736626,
     "sv": 294,
     "sv_worst": 542,
     "state": 1120
@@ -281,8 +281,8 @@
    "WC,10,1,16": {
     "size": 694,
     "kg": 534527,
-    "sg": 5571,
-    "sg_cold": 534878,
+    "sg": 5562,
+    "sg_cold": 534348,
     "sv": 262,
     "sv_worst": 262,
     "state": 560
@@ -291,7 +291,7 @@
     "size": 1235,
     "kg": 926719,
     "sg": 18566,
-    "sg_cold": 1854366,
+    "sg_cold": 1853462,
     "sv": 906,
     "sv_worst": 1712,
     "state": 1568
@@ -299,8 +299,8 @@
    "WC,40,5,256": {
     "size": 1961,
     "kg": 1050111,
-    "sg": 166894,
-    "sg_cold": 5264609,
+    "sg": 166889,
+    "sg_cold": 5260483,
     "sv": 10272,
     "sv_worst": 10272,
     "state": 3264
@@ -309,7 +309,7 @@
     "size": 6261,
     "kg": 9135,
     "sg": 23141,
-    "sg_cold": 94324,
+    "sg_cold": 93754,
     "sv": 2762,
     "sv_worst": 5242,
     "state": 7280
@@ -318,7 +318,7 @@
     "size": 2180,
     "kg": 584703,
     "sg": 17431,
-    "sg_cold": 1755004,
+    "sg_cold": 1754434,
     "sv": 848,
     "sv_worst": 1592,
     "state": 2800
@@ -327,7 +327,7 @@
     "size": 723,
     "kg": 1619001343,
     "sg": 31664,
-    "sg_cold": 1619002127,
+    "sg_cold": 1619000584,
     "sv": 785,
     "sv_worst": 1478,
     "state": 1120
@@ -335,8 +335,8 @@
    "WC,20,1,128": {
     "size": 647,
     "kg": 2557476863,
-    "sg": 50422,
-    "sg_cold": 2557478505,
+    "sg": 50416,
+    "sg_cold": 2557476061,
     "sv": 1236,
     "sv_worst": 1236,
     "state": 1120
@@ -436,11 +436,12 @@
    "sz_max": 4657,
    "kg": 146430,
    "sg": 301,
-   "sg_cold": 146731,
+   "sg_cold": 146161,
    "state": 4096,
    "sv_max": 784,
    "sv_max_worst": 1032
   }
  },
- "_comment_w_grid": "2026-08-07: w grid extended with 64 (l1=22, S_wn=693) and 128 (l1=19, S_wn=floor(19*127/2)=1206). csv_rows/site_pool_count recomputed by two independent local implementations (site JS sweep under node + tests/model.py sizes over the JS security-pass set); FORS security depends only on (h,k,a), so the security-pass set is unchanged from the mpmath-verified generation. Per-w capped pool: 16:2420 32:2913 64:3259 128:3542 256:3849."
+ "_comment_w_grid": "2026-08-07: w grid extended with 64 (l1=22, S_wn=693) and 128 (l1=19, S_wn=floor(19*127/2)=1206). csv_rows/site_pool_count recomputed by two independent local implementations (site JS sweep under node + tests/model.py sizes over the JS security-pass set); FORS security depends only on (h,k,a), so the security-pass set is unchanged from the mpmath-verified generation. Per-w capped pool: 16:2420 32:2913 64:3259 128:3542 256:3849.",
+ "_comment_signing": "2026-08-09: WOTS signing counts signer-side work only \u2014 chains are walked to the signature positions and the leaf compress (Thl) belongs to the verifier. Cold signing rebuilds sibling leaves; the top-layer/UXMSS root is the public key, so the signer's own leaf pk is never recomputed (one wots_pk subtracted for XMSS-MT, hsf*pk + hsf*Th2 bound for UXMSS)."
 }

@@ -303,7 +303,7 @@
 <body>
 
 <header>
-  <div class="breadcrumb"><a href="index.html">← Parameter Explorer</a></div>
+  <div class="breadcrumb"><a href="index.html">← SHRINCS recommended parameters</a> &nbsp;·&nbsp; <a href="stateless.html">Parameter Explorer</a></div>
   <h1>Stateful Scheme Comparison</h1>
   <p class="tagline">
     Comparison of stateful signature candidates. You can add and compare your own by clicking <strong>+ Add candidate</strong>.
@@ -499,12 +499,11 @@ function computeNu(l, swn, w) {
 function wotsSignC(w, swn, ots) {
   const l = wotsL(w, ots);
   if (ots === 'WC') {
-    const Thl = wotsThl(l, ots);
     const nu = computeNu(l, swn, w);
     const wToL = BigInt(w) ** BigInt(l);
     const searchBig = wToL / nu + ((wToL % nu === 0n) ? 0n : 1n);
     const search = Number(searchBig);   // typically small, fits in double
-    return search * C_Th1c + l * C_PRF + swn * C_Th1 + Thl;
+    return search * C_Th1c + l * C_PRF + swn * C_Th1;
   }
   return l * C_PRF + Math.floor(l * (w - 1) / 2) * C_Th1;
 }
@@ -559,7 +558,8 @@ function xmssMtSignBdsC(h, d, w, swn, ots) {
 }
 function xmssMtSignColdC(h, d, w, swn, ots) {
   // State-minimized signer: rebuild d trees of height h' per signature.
-  return C_Hmsg + C_PRFmsg + d * (treeKeygenC(h / d, w, ots) + wotsSignC(w, swn, ots));
+  return C_Hmsg + C_PRFmsg + d * (treeKeygenC(h / d, w, ots) + wotsSignC(w, swn, ots))
+       - wotsPkC(w, ots);
 }
 function xmssMtStateBytes(h, d, w, ots) {
   // BDS-style cached-signer state estimate: ~3.5*h' nodes per layer.
@@ -609,7 +609,7 @@ function uxmssVerifyC(q, hsf, w, swn, ots, worstCase) {
 }
 
 //  SLH-DSA (stateless, FORS + WOTS-TW + hyper-tree)
-// Exact compression-call model — same formulas as index.html metrics() and
+// Exact compression-call model — same formulas as stateless.html metrics() and
 // costs.sage (cached convention). Baseline SLH-DSA-128s: size 7856 B,
 // KeyGen 292,351 C, SigGen 2,218,483 C, SigVer 2,155 C (avg) / 3,891 C (worst).
 function slhMetrics(p) {
@@ -719,7 +719,7 @@ function buildUxmss(ots, w) {
       sizeQ1: uxmssSize(1, hsf, w, ots),
       keygen: uxmssKeygenC(hsf, w, ots),
       siggen: uxmssSignC(w, swn, ots),
-      siggenCold: uxmssSignC(w, swn, ots) + uxmssKeygenC(hsf, w, ots),
+      siggenCold: uxmssSignC(w, swn, ots) + hsf * wotsPkC(w, ots) + hsf * C_Th2,
       state: uxmssStateBytes(hsf),
       sigver: uxmssVerifyC(hsf, hsf, w, swn, ots, false),
       sigverWorst: uxmssVerifyC(hsf, hsf, w, swn, ots, true),
