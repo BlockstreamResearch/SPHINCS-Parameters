@@ -276,11 +276,12 @@ def test_data_json_meta():
     assert d['meta']['cost_convention'].startswith('cached')
     assert d['meta']['grid']['h'] == [40, 50]
     assert d['meta']['grid']['k'] == [6, 24]
+    assert d['meta']['grid']['w'] == [2, 4, 16, 256]
     assert 'SPX' in d['meta']['schemes']
     for s in d['meta']['schemes']:
         p = d['pools'][s]
         assert p['count'] == len(p['rows']), s
-    assert d['pools']['SPX']['considered'] == 43225
+    assert d['pools']['SPX']['considered'] == 34580
 
 
 def test_data_json_stateless():

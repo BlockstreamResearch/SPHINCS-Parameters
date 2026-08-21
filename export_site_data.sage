@@ -59,7 +59,7 @@ for s in schemes:
 # Canonical stateless grid (report Sec. 2; must match slhdsa-2to40.sage
 # defaults and the explorer's fallback sweep).
 GRID = {'h': [40, 50], 'd': [2, 25], 'k': [6, 24], 'a': [8, 20],
-        'w': [16, 32, 64, 128, 256], 'q_s_log2': 40, 'max_size': 7856}
+        'w': [2, 4, 16, 256], 'q_s_log2': 40, 'max_size': 7856}
 WC_PAIRS = [(16, 240), (256, 2040)]   # (w, swn) for WOTS+C schemes
 POOL_FIELDS = ['h', 'd', 'k', 'a', 'w', 'swn', 'mmax',
                'size', 'kg', 'sg', 'sv', 'sv_worst']

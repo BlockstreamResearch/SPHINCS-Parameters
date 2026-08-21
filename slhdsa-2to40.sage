@@ -13,7 +13,7 @@ Supported (ots, fts) combinations:
   (wots+c, pors+fp)  -> W+C_P+FP
 
 Sweep behavior per OTS:
-  - wots-tw : w in {16, 32, 64, 128, 256}, swn = 0
+  - wots-tw : w in {2, 4, 16, 256}, swn = 0
   - wots+c  : (w, swn) in {(16, 240), (256, 2040)}
 
 Filters (defaults; override via CLI):
@@ -117,7 +117,7 @@ SCHEME = SCHEME_MAP[(OTS, FTS)]
 
 # (w, swn) sweep pairs depend on OTS
 if OTS == "wots-tw":
-    W_SWN_PAIRS = [(16, 0), (32, 0), (64, 0), (128, 0), (256, 0)]
+    W_SWN_PAIRS = [(2, 0), (4, 0), (16, 0), (256, 0)]
 else:  # wots+c
     W_SWN_PAIRS = [(16, 240), (256, 2040)]
 

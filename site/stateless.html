@@ -492,7 +492,8 @@
       color: var(--text-soft);
     }
 
-    .custom-inputs .field input {
+    .custom-inputs .field input,
+    .custom-inputs .field select {
       width: 72px;
       padding: 6px 8px;
       border: 1px solid var(--border);
@@ -500,9 +501,12 @@
       font-family: var(--mono);
       font-size: 14px;
       text-align: right;
+      background: var(--panel);
+      color: var(--text);
     }
 
-    .custom-inputs .field input:focus {
+    .custom-inputs .field input:focus,
+    .custom-inputs .field select:focus {
       outline: none;
       border-color: var(--accent);
     }
@@ -643,13 +647,19 @@
       <div class="panel">
         <h2>Compare your own candidate</h2>
         <p class="hint">Enter any (h, d, k, a, w) tuple to see how it stacks up against SLH-DSA-128s.
+          w is limited to the SLH-DSA-compatible choices {2, 4, 16, 256}.
           This panel always evaluates the plain SPX model (WOTS-TW + FORS), regardless of the scheme selected above.</p>
         <div class="custom-inputs" id="custom-inputs">
           <div class="field"><label>h</label><input type="number" id="cust-h" value="63" min="1" step="1"></div>
           <div class="field"><label>d</label><input type="number" id="cust-d" value="7" min="1" step="1"></div>
           <div class="field"><label>k</label><input type="number" id="cust-k" value="14" min="1" step="1"></div>
           <div class="field"><label>a</label><input type="number" id="cust-a" value="12" min="1" step="1"></div>
-          <div class="field"><label>w</label><input type="number" id="cust-w" value="16" min="2" step="1"></div>
+          <div class="field"><label>w</label><select id="cust-w">
+            <option value="2">2</option>
+            <option value="4">4</option>
+            <option value="16" selected>16</option>
+            <option value="256">256</option>
+          </select></div>
         </div>
         <div id="custom-status"></div>
         <div id="custom-result"></div>
@@ -664,6 +674,10 @@
     // ---------- Constants ----------
     // SLH-DSA-128s baseline (matches the numbers in the tech report)
     const STD = { n: 16, h: 63, d: 7, k: 14, a: 12, w: 16 };
+
+    // SLH-DSA-compatible Winternitz choices: lg_w = log2(w) must divide 8 so
+    // that base_2b message digits stay byte-aligned (lg_w in {1, 2, 4, 8}).
+    const ALLOWED_W = [2, 4, 16, 256];
 
     // ---------- Schnorr (BIP340) reference ----------
     const SCHNORR_KAPPA_URL =
@@ -798,7 +812,7 @@
 
     // ---------- Sweep ----------
     // Canonical grid — must match the report (Sec. 2) and slhdsa-2to40.sage defaults:
-    //   h in [40, 50], d in [2, 25] with d | h, k in [6, 24], a in [8, 20], w in {16, 32, 64, 128, 256}.
+    //   h in [40, 50], d in [2, 25] with d | h, k in [6, 24], a in [8, 20], w in ALLOWED_W = {2, 4, 16, 256}.
     // k >= 6 because with a <= 20 and h <= 50 any k <= 5 falls short of the
     // 128-bit security floor at q_s = 2^40, so smaller k never survives anyway.
     function sweep() {
@@ -808,7 +822,7 @@
           if (h % d !== 0) continue;
           for (let k = 6; k <= 24; k++) {
             for (let a = 8; a <= 20; a++) {
-              for (const w of [16, 32, 64, 128, 256]) {
+              for (const w of ALLOWED_W) {
                 const p = { h, d, k, a, w };
                 const m = metrics(p);
                 // Skip pathological/infinite candidates
@@ -925,7 +939,14 @@
     function poolFromData(data, scheme) {
       const p = data.pools[scheme];
       const idx = Object.fromEntries(p.fields.map((f, i) => [f, i]));
-      return p.rows.map(r => {
+      // Guard against a stale data.json generated on an older grid: only
+      // SLH-DSA-compatible w survive (a freshly exported dataset drops none).
+      const rows = p.rows.filter(r => ALLOWED_W.includes(r[idx.w]));
+      if (rows.length !== p.rows.length) {
+        console.warn(`pool ${scheme}: dropped ${p.rows.length - rows.length} rows with ` +
+          `w outside {${ALLOWED_W.join(', ')}} — regenerate data.json (stale grid).`);
+      }
+      return rows.map(r => {
         const c = {
           h: r[idx.h], d: r[idx.d], k: r[idx.k], a: r[idx.a], w: r[idx.w],
           swn: r[idx.swn], mmax: r[idx.mmax],
@@ -1451,11 +1472,9 @@
       if (p.h % p.d !== 0) {
         errors.push(`d must divide h evenly — h/d = ${(p.h / p.d).toFixed(3)} is not an integer.`);
       }
-      // w should be a power of 2 for the standard WOTS+ construction
-      if ((p.w & (p.w - 1)) !== 0) {
-        warnings.push(`w = ${p.w} is not a power of 2. The sweep uses w ∈ {16, 32, 64, 128, 256}; metrics are still computed but may not match a real implementation.`);
-      } else if (![16, 32, 64, 128, 256].includes(p.w)) {
-        warnings.push(`w = ${p.w} is a power of 2 but outside the swept set {16, 32, 64, 128, 256}. Metrics are computed but the tuple is non-standard.`);
+      if (!ALLOWED_W.includes(p.w)) {
+        errors.push(`w = ${p.w} is not SLH-DSA-compatible. Allowed: w ∈ {${ALLOWED_W.join(', ')}} ` +
+          `(lg_w = log₂ w must divide 8; FIPS 205 itself standardises w = 16).`);
       }
 
       if (errors.length) return { valid: false, errors, warnings };
@@ -1567,7 +1586,9 @@
 
     function attachCustomCandidate() {
       ['cust-h', 'cust-d', 'cust-k', 'cust-a', 'cust-w'].forEach(id => {
-        document.getElementById(id).addEventListener('input', renderCustom);
+        const el = document.getElementById(id);
+        el.addEventListener('input', renderCustom);
+        el.addEventListener('change', renderCustom);  // <select> (cust-w) safety
       });
       renderCustom();
     }
@@ -1694,7 +1715,7 @@
     function renderInfoStrip() {
       const d = state.siteData;
       const pool = state.initialPool;
-      const bounds = `(≥ 128-bit security at q<sub>s</sub> = 2⁴⁰, size &lt; 7,856 B)`;
+      const bounds = `(≥ 128-bit security at q<sub>s</sub> = 2⁴⁰, size &lt; 7,856 B, w = {2, 4, 16, 256})`;
       let html;
       if (d) {
         const pm = d.pools[state.scheme];
@@ -1776,6 +1797,7 @@
       if (params.c) {
         const vals = params.c.split(',').map(v => parseInt(v, 10));
         if (vals.length === 5 && vals.every(Number.isFinite)) {
+          if (!ALLOWED_W.includes(vals[4])) vals[4] = 16;
           CUSTOM_IDS.forEach((id, i) => document.getElementById(id).value = vals[i]);
         }
       }

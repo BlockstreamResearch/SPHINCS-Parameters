@@ -22,7 +22,7 @@ Under this convention the SLH-DSA-128s baseline costs are: KeyGen $292{,}351$, S
 The methodology described here uses a set of SageMath scripts available at \url{https://github.com/BlockstreamResearch/SPHINCS-Parameters}.
 
 \subsection{Sweep Strategy} \label{sec:sweep-strategy}
-We start by enumerating all parameter tuples $(h, d, k, a, w)$. Applying the initial bounds (security level, size $\leq$ SLH-DSA, at least $2^{40}$ supported signatures) reduces the search space from \emph{43,225} candidates to \emph{15,983} - a $63\%$ cut. The remaining space is still too large to inspect by hand, so we need additional filters.
+We start by enumerating all parameter tuples $(h, d, k, a, w)$. Applying the initial bounds (security level, size $\leq$ SLH-DSA, at least $2^{40}$ supported signatures) reduces the search space from \emph{34,580} candidates to \emph{7,570} - a $78\%$ cut. The remaining space is still too large to inspect by hand, so we need additional filters.
 
 We introduce the following filters\footnote{The coefficient for each filter, except the signature size, may be greater than 1 (meaning we accept some regression on that metric in exchange for gains elsewhere).}:
 
@@ -62,13 +62,13 @@ In this case, we find the most efficient signature for a single metric at a time
 %---
 Smallest Signature & $(50, 2, 6, 20, 256)$ & \textcolor{green}{$3408$} & \textcolor{green}{$-56.6\%$} & \textcolor{red}{$1.55 \times 10^{11}$} & \textcolor{red}{$5.30 \times 10^5$} & \textcolor{red}{$3.10 \times 10^{11}$} & \textcolor{red}{$1.40 \times 10^5$} & \textcolor{red}{$4780$} & \textcolor{red}{$2.22$} & \textcolor{red}{$1.40$} \\
 %---
-Fastest Keygen & $(40, 10, 7, 20, 32)$ & \textcolor{red}{$7488$} & \textcolor{red}{$-4.7\%$} & \textcolor{green}{$1.45 \times 10^4$} & \textcolor{green}{$0.05$} & \textcolor{red}{$2.22 \times 10^7$} & \textcolor{red}{$9.99$} & \textcolor{orange}{$4612$} & \textcolor{orange}{$2.14$} & \textcolor{orange}{$0.62$} \\
+Fastest Keygen & $(40, 8, 7, 20, 16)$ & \textcolor{red}{$7488$} & \textcolor{red}{$-4.7\%$} & \textcolor{green}{$1.83 \times 10^4$} & \textcolor{green}{$0.06$} & \textcolor{red}{$2.22 \times 10^7$} & \textcolor{red}{$9.99$} & \textcolor{orange}{$2368$} & \textcolor{orange}{$1.10$} & \textcolor{orange}{$0.32$} \\
 %---
-Fastest Signing & $(40, 8, 23, 8, 32)$ & \textcolor{red}{$7552$} & \textcolor{red}{$-3.9\%$} & \textcolor{green}{$2.90 \times 10^4$} & \textcolor{green}{$0.10$} & \textcolor{green}{$2.49 \times 10^5$} & \textcolor{green}{$0.11$} & \textcolor{orange}{$3792$} & \textcolor{orange}{$1.76$} & \textcolor{orange}{$0.50$} \\
+Fastest Signing & $(42, 7, 20, 8, 16)$ & \textcolor{red}{$7488$} & \textcolor{red}{$-4.7\%$} & \textcolor{green}{$3.65 \times 10^4$} & \textcolor{green}{$0.12$} & \textcolor{green}{$2.71 \times 10^5$} & \textcolor{green}{$0.12$} & \textcolor{orange}{$2134$} & \textcolor{orange}{$0.99$} & \textcolor{orange}{$0.29$} \\
 %---
-Fastest Verification & $(50, 2, 6, 20, 16)$ & \textcolor{green}{$3952$} & \textcolor{green}{$-49.7\%$} & \textcolor{red}{$1.92 \times 10^{10}$} & \textcolor{red}{$6.55 \times 10^4$} & \textcolor{red}{$3.83 \times 10^{10}$} & \textcolor{red}{$1.73 \times 10^4$} & \textcolor{green}{$724$} & \textcolor{green}{$0.34$} & \textcolor{green}{$0.18$} \\
+Fastest Verification & $(50, 2, 6, 20, 2)$ & \textcolor{red}{$7184$} & \textcolor{red}{$-8.6\%$} & \textcolor{red}{$1.03 \times 10^{10}$} & \textcolor{red}{$3.54 \times 10^4$} & \textcolor{red}{$2.07 \times 10^{10}$} & \textcolor{red}{$9.33 \times 10^3$} & \textcolor{green}{$386$} & \textcolor{green}{$0.18$} & \textcolor{green}{$0.05$} \\
 %---
-Best Density Ratio (\texorpdfstring{$\rho$}{rho}) & $(40, 2, 18, 20, 16)$ & \textcolor{red}{$7824$} & \textcolor{red}{$-0.4\%$} & \textcolor{red}{$5.99 \times 10^{8}$} & \textcolor{red}{$2.05 \times 10^3$} & \textcolor{red}{$1.25 \times 10^{9}$} & \textcolor{red}{$5.65 \times 10^2$} & \textcolor{green}{$969$} & \textcolor{green}{$0.45$} & \textcolor{green}{$0.12$} \\
+Best Density Ratio (\texorpdfstring{$\rho$}{rho}) & $(50, 2, 6, 20, 2)$ & \textcolor{red}{$7184$} & \textcolor{red}{$-8.6\%$} & \textcolor{red}{$1.03 \times 10^{10}$} & \textcolor{red}{$3.54 \times 10^4$} & \textcolor{red}{$2.07 \times 10^{10}$} & \textcolor{red}{$9.33 \times 10^3$} & \textcolor{green}{$386$} & \textcolor{green}{$0.18$} & \textcolor{green}{$0.05$} \\
 \bottomrule
 \end{tabular}%
 }
@@ -194,7 +194,7 @@ The filtering process is shown in Figure~\ref{fig:full_filtering_process}.
     \label{fig:full_filtering_process}
 \end{figure}
 
-We start with \emph{32,395} candidates. The signature-size filter trims the pool to \emph{10,766}; the next filter (KeyGen) cuts it by more than $6\times$. Each subsequent filter prunes further, leaving \emph{61} final candidates for inspection: the verification-cost bound eliminates every $w \in \{64, 128\}$ candidate in this example, so the surviving set coincides with the one obtained on the original $w \in \{16, 32, 256\}$ grid.
+We start with \emph{25,916} candidates. The signature-size filter trims the pool to \emph{4,814} and eliminates every $w = 2$ candidate; the next filter (KeyGen) cuts it by roughly $9\times$ and removes the last $w = 4$ candidates. Each subsequent filter prunes further, leaving \emph{61} final candidates for inspection: the verification-cost bound eliminates every $w = 256$ candidate in this example, so all survivors use $w = 16$ and the surviving set is identical to the one obtained on the previous $w \in \{16, 32, 64, 128, 256\}$ grid.
 
 With the final 61 candidates in hand, we are ready to pick a winner.
 

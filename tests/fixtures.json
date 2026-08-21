@@ -1,6 +1,8 @@
 {
  "_comment": "Golden values under the CACHED hash convention (default: PK.seed midstate cached, Th2=1, ADRS_c=22B \u2014 see costs.sage HASH_CONVENTION). uncached_spot holds frozen values from real prior sage runs under the original uncached convention.",
  "wots_len": {
+  "2": 136,
+  "4": 68,
   "16": 35,
   "32": 28,
   "64": 24,
@@ -30,8 +32,8 @@
   "sv_worst": 3891
  },
  "csv_rows": {
-  "all_size_capped_candidates.csv": 15984,
-  "all_unbound_candidates.csv": 32396
+  "all_size_capped_candidates.csv": 7571,
+  "all_unbound_candidates.csv": 25917
  },
  "stateless": {
   "63,7,14,12,16": {
@@ -153,6 +155,22 @@
    "sg": 7144952,
    "sv": 6885,
    "sv_worst": 12920
+  },
+  "45,5,10,13,4": {
+   "role": "w=4 spot (Candidate-1 analogue)",
+   "size": 8416,
+   "kg": 148991,
+   "sg": 990712,
+   "sv": 790,
+   "sv_worst": 1285
+  },
+  "45,5,10,13,2": {
+   "role": "w=2 spot (Candidate-1 analogue)",
+   "size": 13856,
+   "kg": 157695,
+   "sg": 1034232,
+   "sv": 705,
+   "sv_worst": 1040
   }
  },
  "stateful": {
@@ -343,7 +361,7 @@
    }
   }
  },
- "site_pool_count": 15983,
+ "site_pool_count": 7570,
  "variants": {
   "W+C|44,4,8,16,16,240": {
    "size": 4960,
@@ -443,5 +461,6 @@
   }
  },
  "_comment_w_grid": "2026-08-07: w grid extended with 64 (l1=22, S_wn=693) and 128 (l1=19, S_wn=floor(19*127/2)=1206). csv_rows/site_pool_count recomputed by two independent local implementations (site JS sweep under node + tests/model.py sizes over the JS security-pass set); FORS security depends only on (h,k,a), so the security-pass set is unchanged from the mpmath-verified generation. Per-w capped pool: 16:2420 32:2913 64:3259 128:3542 256:3849.",
+ "_comment_w_grid_2026_08_21": "2026-08-21: w grid restricted to the SLH-DSA-compatible byte-aligned choices {2, 4, 16, 256} (lg_w = log2(w) must divide 8; FIPS 205 standardises w = 16): 32/64/128 dropped, 2/4 added. FORS security depends only on (h,k,a), so the security-pass set (6,479 (h,d,k,a) combos) is unchanged from the mpmath-verified generation; csv_rows/site_pool_count recomputed by the site JS sweep under node and cross-checked against tests/model.py (w=16/256 per-w counts reproduce the frozen 2026-08-07 values exactly). Per-w capped pool: 2:165 4:1136 16:2420 256:3849.",
  "_comment_signing": "2026-08-09: WOTS signing counts signer-side work only \u2014 chains are walked to the signature positions and the leaf compress (Thl) belongs to the verifier. Cold signing rebuilds sibling leaves; the top-layer/UXMSS root is the public key, so the signer's own leaf pk is never recomputed (one wots_pk subtracted for XMSS-MT, hsf*pk + hsf*Th2 bound for UXMSS)."
 }
