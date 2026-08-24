@@ -277,6 +277,7 @@ def test_data_json_meta():
     assert d['meta']['grid']['h'] == [40, 50]
     assert d['meta']['grid']['k'] == [6, 24]
     assert d['meta']['grid']['w'] == [2, 4, 16, 256]
+    assert d['meta']['w_optional'] == [32, 64]
     assert 'SPX' in d['meta']['schemes']
     for s in d['meta']['schemes']:
         p = d['pools'][s]
@@ -285,7 +286,7 @@ def test_data_json_meta():
 
 
 def test_data_json_stateless():
-    if _missing(DATA_JSON, CSVS[0]):
+    if _missing(DATA_JSON, *CSVS):
         return
     d = _site_data()
     b = FIX['baseline']
@@ -295,19 +296,38 @@ def test_data_json_stateless():
     idx = {f: i for i, f in enumerate(p['fields'])}
     rows = p['rows']
     assert len(rows) == FIX['site_pool_count']
+    core_w = set(d['meta']['grid']['w'])
+    extra_w = set(d['meta']['w_optional'])
     csv_tuples = {tuple(int(r[x]) for x in 'hdkaw')
                   for r in _csv_rows('all_size_capped_candidates.csv')
                   if r['label'] != 'STANDARD'}
-    json_tuples = set()
+    core_tuples, extra_tuples = set(), {}
     for r in rows:
         t = (r[idx['h']], r[idx['d']], r[idx['k']], r[idx['a']], r[idx['w']])
-        json_tuples.add(t)
+        if t[4] in core_w:
+            core_tuples.add(t)
+        else:
+            assert t[4] in extra_w, t
+            extra_tuples.setdefault(t[4], set()).add(t[:4])
         m = M.spx_metrics(*t)
         got = tuple(r[idx[k]] for k in ('size', 'kg', 'sg', 'sv', 'sv_worst'))
         want = (m['size'], m['kg'], m['sg'], m['sv'], m['sv_worst'])
         assert got == want, (t, got, want)
         assert r[idx['swn']] == 0 and r[idx['mmax']] == 0
-    assert json_tuples == csv_tuples
+    assert core_tuples == csv_tuples
+    # Optional-w rows must be exactly the security-pass set (recovered from
+    # the unbound sweep CSV — FORS security is w-independent) capped by the
+    # same size bound; their per-w counts are pinned in the fixtures.
+    sec_pass = {tuple(int(r[x]) for x in 'hdka')
+                for r in _csv_rows('all_unbound_candidates.csv')
+                if r['label'] != 'STANDARD'}
+    max_size = d['meta']['grid']['max_size']
+    for w_str, cnt in FIX['optional_pool_counts'].items():
+        w = int(w_str)
+        expected = {t for t in sec_pass
+                    if M.spx_metrics(*t, w)['size'] < max_size}
+        assert len(expected) == cnt, (w, len(expected), cnt)
+        assert extra_tuples.get(w, set()) == expected, w
 
 
 def test_sage_preparser_hazards():

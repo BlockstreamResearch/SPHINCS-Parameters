@@ -361,7 +361,7 @@
    }
   }
  },
- "site_pool_count": 7570,
+ "site_pool_count": 13742,
  "variants": {
   "W+C|44,4,8,16,16,240": {
    "size": 4960,
@@ -462,5 +462,10 @@
  },
  "_comment_w_grid": "2026-08-07: w grid extended with 64 (l1=22, S_wn=693) and 128 (l1=19, S_wn=floor(19*127/2)=1206). csv_rows/site_pool_count recomputed by two independent local implementations (site JS sweep under node + tests/model.py sizes over the JS security-pass set); FORS security depends only on (h,k,a), so the security-pass set is unchanged from the mpmath-verified generation. Per-w capped pool: 16:2420 32:2913 64:3259 128:3542 256:3849.",
  "_comment_w_grid_2026_08_21": "2026-08-21: w grid restricted to the SLH-DSA-compatible byte-aligned choices {2, 4, 16, 256} (lg_w = log2(w) must divide 8; FIPS 205 standardises w = 16): 32/64/128 dropped, 2/4 added. FORS security depends only on (h,k,a), so the security-pass set (6,479 (h,d,k,a) combos) is unchanged from the mpmath-verified generation; csv_rows/site_pool_count recomputed by the site JS sweep under node and cross-checked against tests/model.py (w=16/256 per-w counts reproduce the frozen 2026-08-07 values exactly). Per-w capped pool: 2:165 4:1136 16:2420 256:3849.",
- "_comment_signing": "2026-08-09: WOTS signing counts signer-side work only \u2014 chains are walked to the signature positions and the leaf compress (Thl) belongs to the verifier. Cold signing rebuilds sibling leaves; the top-layer/UXMSS root is the public key, so the signer's own leaf pk is never recomputed (one wots_pk subtracted for XMSS-MT, hsf*pk + hsf*Th2 bound for UXMSS)."
+ "_comment_w_optional": "2026-08-21 (later): optional Winternitz extras added to the SPX pool behind an explorer checkbox \u2014 w in {32, 64} (non-byte-aligned, exploratory). Exported by export_site_data.sage sweep_spx_extra; the sweep CSVs, report and figures keep the core {2, 4, 16, 256} grid, so csv_rows are unchanged. site_pool_count covers core + extras; optional_pool_counts pins the per-w extras (both reproduce the frozen 2026-08-07 mpmath-verified counts exactly). A w = 65536 extreme mode existed briefly the same day and was removed as not meaningful.",
+ "_comment_signing": "2026-08-09: WOTS signing counts signer-side work only \u2014 chains are walked to the signature positions and the leaf compress (Thl) belongs to the verifier. Cold signing rebuilds sibling leaves; the top-layer/UXMSS root is the public key, so the signer's own leaf pk is never recomputed (one wots_pk subtracted for XMSS-MT, hsf*pk + hsf*Th2 bound for UXMSS).",
+ "optional_pool_counts": {
+  "32": 2913,
+  "64": 3259
+ }
 }

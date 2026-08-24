@@ -3,10 +3,11 @@
 Export the canonical dataset consumed by both interactive pages: site/data.json.
 
 Single source of truth:
-  - SPX pool        : read from utils/all_size_capped_candidates.csv
+  - SPX pool        : core rows read from utils/all_size_capped_candidates.csv
                       (regenerate first if needed:
                        sage slhdsa-2to40.sage --max-size 7856 &&
-                       mv candidates.csv utils/all_size_capped_candidates.csv)
+                       mv candidates.csv utils/all_size_capped_candidates.csv),
+                      plus optional-w rows (W_OPTIONAL)
   - variant pools   : W+C, W+C_F+C, W+C_P+FP swept over the same canonical
                       grid with (w, swn) in {(16, 240), (256, 2040)}, using
                       costs.sage / security.sage directly
@@ -60,6 +61,8 @@ for s in schemes:
 # defaults and the explorer's fallback sweep).
 GRID = {'h': [40, 50], 'd': [2, 25], 'k': [6, 24], 'a': [8, 20],
         'w': [2, 4, 16, 256], 'q_s_log2': 40, 'max_size': 7856}
+# Optional Winternitz extras for the SPX pool
+W_OPTIONAL = [32, 64]
 WC_PAIRS = [(16, 240), (256, 2040)]   # (w, swn) for WOTS+C schemes
 POOL_FIELDS = ['h', 'd', 'k', 'a', 'w', 'swn', 'mmax',
                'size', 'kg', 'sg', 'sv', 'sv_worst']
@@ -105,6 +108,37 @@ def _security_ok(model, h, k, a):
     return _sec_cache[key]
 
 
+def sweep_spx_extra(w_values):
+    """SPX rows for the optional w values (same initial bounds as the CSV)."""
+    rows = []
+    pairs = _hd_pairs()
+    for w in w_values:
+        for pi, (h, d) in enumerate(pairs):
+            print("  SPX extras: w={} {}/{}".format(w, pi + 1, len(pairs)),
+                  file=sys.stderr, end='\r')
+            for k in range(GRID['k'][0], GRID['k'][1] + 1):
+                for a in range(GRID['a'][0], GRID['a'][1] + 1):
+                    if not _security_ok("FORS", h, k, a):
+                        continue
+                    try:
+                        sign = compute_signing_time(h, d, a, k, w, 0, 'SPX')
+                        mmax = sign['mmax']
+                        verify = compute_verification_time(h, d, a, k, w, 0, 'SPX', mmax)
+                        size = compute_size(h, d, a, k, w, 'SPX', mmax)
+                    except Exception:
+                        continue
+                    if size >= GRID['max_size']:
+                        continue
+                    kg = compute_keygen_time(h, d, w, 'SPX')
+                    rows.append([int(h), int(d), int(k), int(a), int(w),
+                                 0, 0, int(size), int(kg),
+                                 int(sign['compressions']),
+                                 int(verify['compressions']),
+                                 int(verify['compressions_worst'])])
+    print(file=sys.stderr)
+    return rows
+
+
 def sweep_scheme(scheme):
     model = "PORS+FP" if scheme == "W+C_P+FP" else "FORS"
     rows, considered = [], 0
@@ -140,12 +174,17 @@ def sweep_scheme(scheme):
 pools = {}
 if 'SPX' in schemes:
     pairs = _hd_pairs()
+    # 'considered' counts the core grid only; the page derives the count for
+    # whichever w set is active from meta.grid.
     spx_considered = (len(pairs) * len(GRID['w'])
                       * (GRID['k'][1] - GRID['k'][0] + 1)
                       * (GRID['a'][1] - GRID['a'][0] + 1))
+    spx_extra = sweep_spx_extra(W_OPTIONAL)
+    all_spx = spx_rows + spx_extra
     pools['SPX'] = {'fields': POOL_FIELDS, 'considered': spx_considered,
-                    'count': len(spx_rows), 'rows': spx_rows}
-    print("SPX: {} rows (from CSV)".format(len(spx_rows)), file=sys.stderr)
+                    'count': len(all_spx), 'rows': all_spx}
+    print("SPX: {} rows ({} core from CSV + {} optional-w)".format(
+        len(all_spx), len(spx_rows), len(spx_extra)), file=sys.stderr)
 for scheme in schemes:
     if scheme == 'SPX':
         continue
@@ -215,6 +254,7 @@ data = {
         'generated': datetime.date.today().isoformat(),
         'commit': _commit(),
         'grid': GRID,
+        'w_optional': W_OPTIONAL,
         'wc_pairs': WC_PAIRS,
         'schemes': [s for s in ALL_SCHEMES if s in pools],
         'uxmss_ref_size': UXMSS_REF,

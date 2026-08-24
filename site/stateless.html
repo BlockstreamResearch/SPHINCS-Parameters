@@ -136,7 +136,7 @@
     }
 
     .control input.val-input {
-      width: 64px;
+      width: 92px;
       text-align: right;
       border: 1px solid transparent;
       background: transparent;
@@ -597,6 +597,12 @@
       <p class="hint" id="scheme-hint">FTS/OTS variant from the report. All ratios compare against the SLH-DSA-128s (SPX) baseline.</p>
       <div class="seg" id="scheme-controls"></div>
 
+      <h2 class="section-title">Winternitz set</h2>
+      <p class="hint">w = {2, 4, 16, 256} is always on (lg<sub>w</sub> | 8). Extras extend the SPX pool only.</p>
+      <label class="mode-toggle" title="lg_w = 5, 6 — base_2b digits straddle byte boundaries; outside strict SLH-DSA byte alignment. Exploratory.">
+        <input type="checkbox" id="optw-toggle"> include w = 32, 64 (non-aligned)
+      </label>
+
       <h2 class="section-title">Filter coefficients</h2>
       <p class="hint">Bound each metric as a coefficient of SLH-DSA-128s. Survivors must satisfy every bound.</p>
       <div id="filter-controls"></div>
@@ -647,7 +653,7 @@
       <div class="panel">
         <h2>Compare your own candidate</h2>
         <p class="hint">Enter any (h, d, k, a, w) tuple to see how it stacks up against SLH-DSA-128s.
-          w is limited to the SLH-DSA-compatible choices {2, 4, 16, 256}.
+          w covers the SLH-DSA-compatible choices {2, 4, 16, 256}, plus the optional extras 32 and 64.
           This panel always evaluates the plain SPX model (WOTS-TW + FORS), regardless of the scheme selected above.</p>
         <div class="custom-inputs" id="custom-inputs">
           <div class="field"><label>h</label><input type="number" id="cust-h" value="63" min="1" step="1"></div>
@@ -655,10 +661,16 @@
           <div class="field"><label>k</label><input type="number" id="cust-k" value="14" min="1" step="1"></div>
           <div class="field"><label>a</label><input type="number" id="cust-a" value="12" min="1" step="1"></div>
           <div class="field"><label>w</label><select id="cust-w">
-            <option value="2">2</option>
-            <option value="4">4</option>
-            <option value="16" selected>16</option>
-            <option value="256">256</option>
+            <optgroup label="SLH-DSA-compatible">
+              <option value="2">2</option>
+              <option value="4">4</option>
+              <option value="16" selected>16</option>
+              <option value="256">256</option>
+            </optgroup>
+            <optgroup label="exploratory">
+              <option value="32">32</option>
+              <option value="64">64</option>
+            </optgroup>
           </select></div>
         </div>
         <div id="custom-status"></div>
@@ -678,6 +690,10 @@
     // SLH-DSA-compatible Winternitz choices: lg_w = log2(w) must divide 8 so
     // that base_2b message digits stay byte-aligned (lg_w in {1, 2, 4, 8}).
     const ALLOWED_W = [2, 4, 16, 256];
+
+    // Optional Winternitz extras, gated by a sidebar checkbox 
+    const OPTIONAL_W = [32, 64];
+    const UNIVERSE_W = [...ALLOWED_W, ...OPTIONAL_W];
 
     // ---------- Schnorr (BIP340) reference ----------
     const SCHNORR_KAPPA_URL =
@@ -822,7 +838,7 @@
           if (h % d !== 0) continue;
           for (let k = 6; k <= 24; k++) {
             for (let a = 8; a <= 20; a++) {
-              for (const w of ALLOWED_W) {
+              for (const w of UNIVERSE_W) {
                 const p = { h, d, k, a, w };
                 const m = metrics(p);
                 // Skip pathological/infinite candidates
@@ -939,12 +955,12 @@
     function poolFromData(data, scheme) {
       const p = data.pools[scheme];
       const idx = Object.fromEntries(p.fields.map((f, i) => [f, i]));
-      // Guard against a stale data.json generated on an older grid: only
-      // SLH-DSA-compatible w survive (a freshly exported dataset drops none).
-      const rows = p.rows.filter(r => ALLOWED_W.includes(r[idx.w]));
+      // Guard against a stale data.json generated on an older grid: only the
+      // swept w universe survives (a freshly exported dataset drops none).
+      const rows = p.rows.filter(r => UNIVERSE_W.includes(r[idx.w]));
       if (rows.length !== p.rows.length) {
         console.warn(`pool ${scheme}: dropped ${p.rows.length - rows.length} rows with ` +
-          `w outside {${ALLOWED_W.join(', ')}} — regenerate data.json (stale grid).`);
+          `w outside {${UNIVERSE_W.join(', ')}} — regenerate data.json (stale grid).`);
       }
       return rows.map(r => {
         const c = {
@@ -995,7 +1011,7 @@
         cur = next;
         const worstTag = (mk !== step.metric) ? ' (worst)' : '';
         stepCounts.push({
-          name: `${step.label}${worstTag} ≤ ${X[step.key].toFixed(2)}·std`,
+          name: `${step.label}${worstTag} ≤ ${fmtX(X[step.key])}·std`,
           count: cur.length
         });
       });
@@ -1052,6 +1068,8 @@
       pools: {},               // scheme -> candidate pool
       scheme: 'SPX',
       useWorst: false,         // filter/rank on worst-case SigVer & ρ
+      showOptW: false,         // include w = 32, 64 (non-byte-aligned extras)
+      xMax: { kg: 20, sg: 20, sv: 20, cb: 20 },
       X: { ...DEFAULTS_X },
       W: { ...DEFAULTS_W },
       // Live filter results (refreshed every update)
@@ -1063,6 +1081,59 @@
       // Per-metric ratio ranges across current survivors (for normalisation)
       lastRanges: Object.fromEntries(['size', 'kg', 'sg', 'sv', 'cb'].map(k => [k, { min: 0, max: 1 }])),
     };
+
+    // Active Winternitz set: the SLH-DSA-compatible core plus any enabled optional extras (the extras exist in the SPX pool only).
+    function activeWSet() {
+      const act = [...ALLOWED_W];
+      if (state.showOptW) act.push(...OPTIONAL_W);
+      return act.sort((a, b) => a - b);
+    }
+
+    function rebuildInitialPool() {
+      const act = activeWSet();
+      state.initialPool = (state.pools[state.scheme] || []).filter(c => act.includes(c.w));
+    }
+
+    // Round a ratio up to a 1-2-5 decade; 20x is the floor so the classic slider range never shrinks.
+    function niceCap(m) {
+      if (!isFinite(m) || m <= 20) return 20;
+      const e = Math.pow(10, Math.floor(Math.log10(m)));
+      for (const f of [1, 2, 5, 10]) if (f * e >= m) return f * e;
+      return 10 * e;
+    }
+
+    // X-slider caps: the largest per-metric ratio present in ANY loaded pool
+    // (average and worst-case variants), so even the extreme candidates —
+    // e.g. the tiny-signature d = 2 family with keygen ratios in the tens of
+    // thousands — stay reachable. Never below 20.
+    function computeXMax() {
+      const maxes = { kg: 0, sg: 0, sv: 0, cb: 0 };
+      for (const scheme of Object.keys(state.pools)) {
+        for (const c of state.pools[scheme]) {
+          if (c.kg / STD_M.kg > maxes.kg) maxes.kg = c.kg / STD_M.kg;
+          if (c.sg / STD_M.sg > maxes.sg) maxes.sg = c.sg / STD_M.sg;
+          maxes.sv = Math.max(maxes.sv, c.sv / STD_M.sv, c.sv_worst / STD_M.sv_worst);
+          maxes.cb = Math.max(maxes.cb, c.cb / STD_M.cb, c.cb_worst / STD_M.cb_worst);
+        }
+      }
+      state.xMax = { kg: niceCap(maxes.kg), sg: niceCap(maxes.sg),
+                     sv: niceCap(maxes.sv), cb: niceCap(maxes.cb) };
+    }
+
+    function clampXToMax() {
+      for (const k of ['kg', 'sg', 'sv', 'cb']) {
+        if (state.X[k] > state.xMax[k]) state.X[k] = state.xMax[k];
+      }
+    }
+
+    // Tuples swept per w value: (h, d) pairs with d | h times the k and a ranges.
+    function consideredPerW(grid) {
+      const g = grid || { h: [40, 50], d: [2, 25], k: [6, 24], a: [8, 20] };
+      let hd = 0;
+      for (let h = g.h[0]; h <= g.h[1]; h++)
+        for (let d = g.d[0]; d <= g.d[1]; d++) if (h % d === 0) hd++;
+      return hd * (g.k[1] - g.k[0] + 1) * (g.a[1] - g.a[0] + 1);
+    }
 
     // Stable seeded RNG for scatter positions
     function mulberry32(seed) {
@@ -1083,16 +1154,37 @@
       return n.toFixed(0);
     }
     function fmtRatio(r) {
+      if (r >= 1000) return r.toExponential(2) + '×';
       return r.toFixed(3) + '×';
+    }
+
+    // Log-position mapping for the cost-coefficient sliders: integer track
+    // positions 0..SLIDER_STEPS <-> X in [min, max], geometrically spaced.
+    // (~2% per tick — finer than the old 0.1 linear step near X = 1, and it
+    // reaches the pool's extreme ratios that a linear 0.1..20 track cannot.)
+    const SLIDER_STEPS = 1000;
+    function posToX(pos, min, max) {
+      return min * Math.pow(max / min, pos / SLIDER_STEPS);
+    }
+    function xToPos(x, min, max) {
+      const t = Math.log(x / min) / Math.log(max / min);
+      return Math.round(SLIDER_STEPS * Math.max(0, Math.min(1, t)));
+    }
+    function fmtX(v) {
+      // Keep the string short enough for the 92px value inputs: plain
+      // integers up to 6 digits, compact exponential beyond.
+      if (v < 100) return v.toFixed(2);
+      if (v < 1e6) return String(Math.round(v));
+      return v.toExponential(1);
     }
 
     function renderControls() {
       const filterDefs = [
         { key: 'size', label: 'X<sub>size</sub>', min: 0.30, max: 1.00, step: 0.01, dp: 2 },
-        { key: 'kg', label: 'X<sub>kg</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 2 },
-        { key: 'sg', label: 'X<sub>sg</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 2 },
-        { key: 'sv', label: 'X<sub>sv</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 2 },
-        { key: 'cb', label: 'X<sub>cb</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 2 },
+        { key: 'kg', label: 'X<sub>kg</sub>', min: 0.10, max: state.xMax.kg, log: true },
+        { key: 'sg', label: 'X<sub>sg</sub>', min: 0.10, max: state.xMax.sg, log: true },
+        { key: 'sv', label: 'X<sub>sv</sub>', min: 0.10, max: state.xMax.sv, log: true },
+        { key: 'cb', label: 'X<sub>cb</sub>', min: 0.10, max: state.xMax.cb, log: true },
       ];
       document.getElementById('filter-controls').innerHTML = filterDefs.map(d => `
     <div class="control">
@@ -1100,12 +1192,14 @@
         <span class="name">${d.label}</span>
         <input type="number" class="val-input"
                id="X_${d.key}_val"
-               min="${d.min}" max="${d.max}" step="${d.step}"
-               value="${state.X[d.key].toFixed(d.dp)}"
-               data-coef-input="${d.key}" data-dp="${d.dp}">
+               min="${d.min}" max="${d.max}" step="${d.log ? 'any' : d.step}"
+               value="${d.log ? fmtX(state.X[d.key]) : state.X[d.key].toFixed(d.dp)}"
+               data-coef-input="${d.key}"${d.log ? '' : ` data-dp="${d.dp}"`}>
       </label>
-      <input type="range" min="${d.min}" max="${d.max}" step="${d.step}"
-             value="${state.X[d.key]}" data-coef="${d.key}">
+      <input type="range" min="${d.log ? 0 : d.min}" max="${d.log ? SLIDER_STEPS : d.max}"
+             step="${d.log ? 1 : d.step}"
+             value="${d.log ? xToPos(state.X[d.key], d.min, d.max) : state.X[d.key]}"
+             data-coef="${d.key}"${d.log ? ' data-log="1"' : ''}>
     </div>
   `).join('');
 
@@ -1132,16 +1226,24 @@
   `).join('');
 
       // --- Wire bidirectional input <-> slider for both X and W ---
+      // Sliders flagged data-log store a 0..SLIDER_STEPS track position; the
+      // real range lives on the paired number input's min/max attributes.
       function bindPair(group, store) {
         // Slider -> store + number-input
         document.querySelectorAll(`input[data-${group}]`).forEach(slider => {
           slider.addEventListener('input', e => {
             const key = e.target.dataset[group];
-            const v = parseFloat(e.target.value);
-            store[key] = v;
             const numInp = document.querySelector(`input[data-${group}-input="${key}"]`);
-            const dp = parseInt(numInp.dataset.dp, 10);
-            numInp.value = v.toFixed(dp);
+            let v;
+            if (e.target.dataset.log) {
+              v = posToX(parseFloat(e.target.value),
+                         parseFloat(numInp.min), parseFloat(numInp.max));
+              numInp.value = fmtX(v);
+            } else {
+              v = parseFloat(e.target.value);
+              numInp.value = v.toFixed(parseInt(numInp.dataset.dp, 10));
+            }
+            store[key] = v;
             update();
           });
         });
@@ -1155,14 +1257,16 @@
             const max = parseFloat(e.target.max);
             const clamped = Math.max(min, Math.min(max, v));
             store[key] = clamped;
-            document.querySelector(`input[data-${group}="${key}"]`).value = clamped;
+            const slider = document.querySelector(`input[data-${group}="${key}"]`);
+            slider.value = slider.dataset.log ? xToPos(clamped, min, max) : clamped;
             update();
           });
           // On blur, reformat to canonical precision and re-clamp the displayed value
           inp.addEventListener('blur', e => {
             const key = e.target.dataset[`${group}Input`];
-            const dp = parseInt(e.target.dataset.dp, 10);
-            e.target.value = store[key].toFixed(dp);
+            e.target.value = e.target.dataset.dp
+              ? store[key].toFixed(parseInt(e.target.dataset.dp, 10))
+              : fmtX(store[key]);
           });
         });
       }
@@ -1472,9 +1576,12 @@
       if (p.h % p.d !== 0) {
         errors.push(`d must divide h evenly — h/d = ${(p.h / p.d).toFixed(3)} is not an integer.`);
       }
-      if (!ALLOWED_W.includes(p.w)) {
-        errors.push(`w = ${p.w} is not SLH-DSA-compatible. Allowed: w ∈ {${ALLOWED_W.join(', ')}} ` +
-          `(lg_w = log₂ w must divide 8; FIPS 205 itself standardises w = 16).`);
+      if (!UNIVERSE_W.includes(p.w)) {
+        errors.push(`w = ${p.w} is not supported. Choose w ∈ {${UNIVERSE_W.join(', ')}} ` +
+          `({2, 4, 16, 256} are SLH-DSA-compatible; FIPS 205 itself standardises w = 16).`);
+      } else if (OPTIONAL_W.includes(p.w)) {
+        warnings.push(`w = ${p.w}: lg_w = ${Math.log2(p.w)} does not divide 8, so base_2b digits ` +
+          `straddle byte boundaries — exploratory, outside strict SLH-DSA compatibility.`);
       }
 
       if (errors.length) return { valid: false, errors, warnings };
@@ -1715,13 +1822,20 @@
     function renderInfoStrip() {
       const d = state.siteData;
       const pool = state.initialPool;
-      const bounds = `(≥ 128-bit security at q<sub>s</sub> = 2⁴⁰, size &lt; 7,856 B, w = {2, 4, 16, 256})`;
+      const act = activeWSet();
+      const wtxt = state.scheme === 'SPX'
+        ? `w = {${act.join(', ')}}`
+        : `(w, S<sub>wn</sub>) ∈ {(16, 240), (256, 2040)}`;
+      const bounds = `(≥ 128-bit security at q<sub>s</sub> = 2⁴⁰, size &lt; 7,856 B, ${wtxt})`;
       let html;
       if (d) {
         const pm = d.pools[state.scheme];
+        const swept = state.scheme === 'SPX'
+          ? consideredPerW(d.meta.grid) * act.length
+          : pm.considered;
         html =
           `Scheme: <strong>${SCHEME_LABELS[state.scheme]}</strong> · ` +
-          `<strong>${pm.considered.toLocaleString()}</strong> tuples swept · ` +
+          `<strong>${swept.toLocaleString()}</strong> tuples swept · ` +
           `<strong>${pool.length.toLocaleString()}</strong> pass the initial bounds ${bounds}. ` +
           `<span style="opacity:0.65;font-size:11px;">` +
           `Data: <code>data.json</code> (generated ${d.meta.generated}, commit ${d.meta.commit}); ` +
@@ -1731,7 +1845,7 @@
       } else {
         html =
           `Scheme: <strong>SPX</strong> · ` +
-          `<strong>${state.candidates.length.toLocaleString()}</strong> tuples · ` +
+          `<strong>${(consideredPerW(null) * act.length).toLocaleString()}</strong> tuples · ` +
           `<strong>${pool.length.toLocaleString()}</strong> pass the initial bounds ${bounds}. ` +
           `<span style="opacity:0.65;font-size:11px;">Pool computed in-browser ` +
           `(data.json unavailable — scheme variants disabled).</span>` + schnorrNote();
@@ -1742,7 +1856,7 @@
     function activateScheme(scheme) {
       if (!state.pools[scheme] || scheme === state.scheme) return;
       state.scheme = scheme;
-      state.initialPool = state.pools[scheme];
+      rebuildInitialPool();
       renderSchemeButtons();
       renderInfoStrip();
       update();
@@ -1761,6 +1875,7 @@
       if (HASH_KEYS.some(k => state.W[k] !== DEFAULTS_W[k]))
         parts.push('w=' + HASH_KEYS.map(k => state.W[k]).join(','));
       if (state.useWorst) parts.push('wc=1');
+      if (state.showOptW) parts.push('ow=1');
       const cust = CUSTOM_IDS.map(id => document.getElementById(id).value).join(',');
       if (cust !== CUSTOM_DEFAULTS) parts.push('c=' + cust);
       const url = parts.length
@@ -1778,26 +1893,28 @@
         if (eq > 0) params[part.slice(0, eq)] = decodeURIComponent(part.slice(eq + 1));
       }
       const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-      const setVec = (str, store, loSize) => {
+      const setVec = (str, store, isX) => {
         const vals = (str || '').split(',').map(parseFloat);
         if (vals.length !== 5 || !vals.every(isFinite)) return;
+        // X cost coefficients accept the full pool range (clampXToMax pulls
+        // them down to the computed slider caps right after); weights keep 20.
         HASH_KEYS.forEach((k, i) => {
-          store[k] = (k === 'size' && loSize)
+          store[k] = (k === 'size' && isX)
             ? clamp(vals[i], 0.30, 1.00)
-            : clamp(vals[i], 0.10, 20.00);
+            : clamp(vals[i], 0.10, isX ? 1e9 : 20.00);
         });
       };
       if (params.s && SCHEME_FROM_ID[params.s] && state.pools[SCHEME_FROM_ID[params.s]]) {
         state.scheme = SCHEME_FROM_ID[params.s];
-        state.initialPool = state.pools[state.scheme];
       }
       if (params.x) setVec(params.x, state.X, true);
       if (params.w) setVec(params.w, state.W, false);
       if (params.wc === '1') state.useWorst = true;
+      if (params.ow === '1') state.showOptW = true;
       if (params.c) {
         const vals = params.c.split(',').map(v => parseInt(v, 10));
         if (vals.length === 5 && vals.every(Number.isFinite)) {
-          if (!ALLOWED_W.includes(vals[4])) vals[4] = 16;
+          if (!UNIVERSE_W.includes(vals[4])) vals[4] = 16;
           CUSTOM_IDS.forEach((id, i) => document.getElementById(id).value = vals[i]);
         }
       }
@@ -1846,11 +1963,13 @@
         for (const c of pool) { c._sx = rand(); c._sy = rand(); }
         state.pools['SPX'] = pool;
       }
-      state.initialPool = state.pools[state.scheme];
-
-      applyHash();               // may switch scheme, X/W, worst mode, custom tuple
+      computeXMax();             // slider caps from the loaded pools
+      applyHash();               // may switch scheme, X/W, worst mode, w extras, custom tuple
+      clampXToMax();
+      rebuildInitialPool();
       renderControls();
       document.getElementById('worst-toggle').checked = state.useWorst;
+      document.getElementById('optw-toggle').checked = state.showOptW;
       renderSchemeButtons();
       renderInfoStrip();
       update();
@@ -1859,6 +1978,12 @@
 
       document.getElementById('worst-toggle').addEventListener('change', e => {
         state.useWorst = e.target.checked;
+        update();
+      });
+      document.getElementById('optw-toggle').addEventListener('change', e => {
+        state.showOptW = e.target.checked;
+        rebuildInitialPool();
+        renderInfoStrip();
         update();
       });
       document.getElementById('share-btn').addEventListener('click', async e => {
