@@ -243,7 +243,7 @@ def xmss_size_h(h, w, ots_type):
 
 
 def xmss_keygen_C_h(h, w, ots_type):
-    return float(tree_keygen_C(h, w, ots_type))
+    return int(tree_keygen_C(h, w, ots_type))
 
 
 def xmss_sign_C_h(h, w, swn, ots_type):
@@ -281,15 +281,15 @@ def xmssmt_size_h(h, d, w, ots_type):
 
 def xmssmt_keygen_C_h(h, d, w, ots_type):
     h_prime = h // d
-    return float(tree_keygen_C(h_prime, w, ots_type))
+    return int(tree_keygen_C(h_prime, w, ots_type))
 
 
 def xmssmt_sign_cold_C_h(h, d, w, swn, ots_type):
     h_prime = h // d
-    return float(C_Hmsg + C_PRFmsg +
-                 d * (float(tree_keygen_C(h_prime, w, ots_type)) +
-                      wots_sign_C(w, swn, ots_type))
-                 - wots_pk_C(w, ots_type))
+    return int(C_Hmsg + C_PRFmsg +
+               d * (int(tree_keygen_C(h_prime, w, ots_type)) +
+                    wots_sign_C(w, swn, ots_type))
+               - wots_pk_C(w, ots_type))
 
 
 def xmssmt_sign_bds_C_h(h, d, w, swn, ots_type):
