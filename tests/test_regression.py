@@ -331,14 +331,29 @@ def test_data_json_stateless():
 
 
 def test_sage_preparser_hazards():
-    """No backslash line-continuations in .sage files"""
+    import ast
     import glob
+    import io
+    import tokenize
     offenders = []
-    for path in glob.glob(os.path.join(ROOT, '*.sage')):
-        for lineno, line in enumerate(open(path), 1):
-            if line.rstrip('\n').endswith('\\'):
-                offenders.append(f'{os.path.basename(path)}:{lineno}')
-    assert not offenders, f'backslash continuations in sage files: {offenders}'
+    for path in sorted(glob.glob(os.path.join(ROOT, '*.sage'))):
+        name = os.path.basename(path)
+        src = open(path, encoding='utf-8').read()
+        for lineno, line in enumerate(src.splitlines(), 1):
+            if line.endswith('\\'):
+                offenders.append(f'{name}:{lineno} backslash continuation')
+        try:
+            ast.parse(src)
+        except SyntaxError as e:
+            offenders.append(f'{name}:{e.lineno} {e.msg}')
+        try:
+            for tok in tokenize.generate_tokens(io.StringIO(src).readline):
+                if tok.type == tokenize.NAME and not tok.string.isascii():
+                    offenders.append(
+                        f'{name}:{tok.start[0]} non-ASCII identifier {tok.string!r}')
+        except tokenize.TokenError:
+            pass  # unterminated construct — already reported via ast.parse
+    assert not offenders, f'sage-file hazards: {offenders}'
 
 
 def test_uncached_convention():

@@ -195,7 +195,7 @@ def wots_verify_worst_steps(w, ots_type):
     C = l1 * (w - 1)
     ds = 0
     rem = C
-    while rem > 0:ƒ
+    while rem > 0:
         ds += rem % w
         rem = rem // w
     return l1 * (w - 1) + l2 * (w - 1) - ds
