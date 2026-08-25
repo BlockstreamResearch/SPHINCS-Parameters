@@ -184,7 +184,7 @@ def wots_sign_C(w, swn, ots_type):
     l = wots_l(w, ots_type)
     if ots_type == OTS_WC:
         nu     = compute_nu(l, swn, w)
-        search = int(ceil(F(w)**l / F(nu)))
+        search = int((w**l + nu - 1) // nu)
         return search * C_Th1c + l * C_PRF + swn * C_Th1
     return l * C_PRF + l * (w - 1) // 2 * C_Th1
 
@@ -222,7 +222,7 @@ def tree_size_per_layer(h_prime, w, ots_type):
 
 def tree_keygen_C(h_prime, w, ots_type):
     pk = wots_pk_C(w, ots_type)
-    sz = F(2)**h_prime
+    sz = 2**h_prime
     return sz * pk + (sz - 1) * C_Th2
 
 

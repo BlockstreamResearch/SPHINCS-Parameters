@@ -1543,7 +1543,7 @@ function setupAddForm() {
 
     try {
       let cand;
-      if (scheme === 'xmssmt') {ƒ
+      if (scheme === 'xmssmt') {
         const h = parseInt(document.getElementById('f-h').value, 10);
         const d = parseInt(document.getElementById('f-d').value, 10);
         if (!Number.isInteger(h) || h < 2 || h > 60) throw new Error(`h must be an integer in [2, 60] (got ${h}).`);
