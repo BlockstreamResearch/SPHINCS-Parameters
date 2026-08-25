@@ -34,7 +34,8 @@ def set_convention(mode):
     C_TH2 = 1 if mode == 'cached' else 2
 
 
-SWN = {16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040}   # WOTS+C target chain sums S_{w,n} = floor(l1*(w-1)/2)
+SWN = {16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040,
+       65536: 262140}   # WOTS+C target chain sums S_{w,n} = floor(l1*(w-1)/2)
 
 HSF_MAX = 255                # FXMSS encodes the node height as a single byte
 

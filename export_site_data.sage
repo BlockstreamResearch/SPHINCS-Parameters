@@ -197,12 +197,13 @@ for scheme in schemes:
 # ---------------------------------------------------------------------------
 # Stateful: XMSS/XMSS-MT grid + UXMSS variants (same functions as the CLI)
 # ---------------------------------------------------------------------------
-_SWN = {16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040}
+_SWN = {16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040, 65536: 262140}
+STATEFUL_W = (16, 32, 64, 128, 256, 65536)
 UXMSS_REF = 5712   # Report Candidate 2 — reference bound for max stateful size
 
 xmssmt_rows = []
 for ots_label, ots_type in (('TW', OTS_TW), ('WC', OTS_WC)):
-    for w in (16, 32, 64, 128, 256):
+    for w in STATEFUL_W:
         swn = _SWN[w] if ots_type == OTS_WC else 0
         for h in range(10, 41):
             for d in range(1, 11):
@@ -221,7 +222,7 @@ for ots_label, ots_type in (('TW', OTS_TW), ('WC', OTS_WC)):
 
 uxmss_rows = []
 for ots_label, ots_type in (('TW', OTS_TW), ('WC', OTS_WC)):
-    for w in (16, 32, 64, 128, 256):
+    for w in STATEFUL_W:
         swn = _SWN[w] if ots_type == OTS_WC else 0
         hsf = find_max_hsf(w, ots_type, UXMSS_REF)
         uxmss_rows.append([

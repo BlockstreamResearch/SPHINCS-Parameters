@@ -7,21 +7,24 @@
   "32": 28,
   "64": 24,
   "128": 21,
-  "256": 18
+  "256": 18,
+  "65536": 10
  },
  "wots_len_wc": {
   "16": 32,
   "32": 26,
   "64": 22,
   "128": 19,
-  "256": 16
+  "256": 16,
+  "65536": 8
  },
  "swn": {
   "16": 240,
   "32": 403,
   "64": 693,
   "128": 1206,
-  "256": 2040
+  "256": 2040,
+  "65536": 262140
  },
  "baseline": {
   "role": "STANDARD baseline",
@@ -284,6 +287,28 @@
     "sv_max": 2303,
     "sv_max_worst": 2303,
     "state": 4096
+   },
+   "TW,65536": {
+    "hsf": 255,
+    "sz_q1": 193,
+    "sz_max": 4257,
+    "kg": 167773183,
+    "sg": 327689,
+    "sg_cold": 167445509,
+    "sv_max": 327935,
+    "sv_max_worst": 590075,
+    "state": 4096
+   },
+   "WC,65536": {
+    "hsf": 255,
+    "sz_q1": 165,
+    "sz_max": 4229,
+    "kg": 134218751,
+    "sg": 398867,
+    "sg_cold": 134093327,
+    "sv_max": 262401,
+    "sv_max_worst": 262401,
+    "state": 4096
    }
   },
   "xmssmt": {
@@ -357,6 +382,24 @@
     "sg_cold": 2557476061,
     "sv": 1236,
     "sv_worst": 1236,
+    "state": 1120
+   },
+   "TW,20,1,65536": {
+    "size": 499,
+    "kg": 687198961663,
+    "sg": 13434969,
+    "sg_cold": 687198633989,
+    "sv": 327700,
+    "sv_worst": 589840,
+    "state": 1120
+   },
+   "WC,20,1,65536": {
+    "size": 471,
+    "kg": 549760008191,
+    "sg": 10884707,
+    "sg_cold": 549759882767,
+    "sv": 262166,
+    "sv_worst": 262166,
     "state": 1120
    }
   }
@@ -467,5 +510,6 @@
  "optional_pool_counts": {
   "32": 2913,
   "64": 3259
- }
+ },
+ "_comment_w_stateful": "2026-08-24: stateful grid extended with w = 65536 (lg_w = 16, two-byte digits): l1 = 8, WOTS-TW l = 10, WOTS+C S_wn = floor(8*65535/2) = 262140 (grinding search = 136,715 attempts, exact under BigInt/int). XMSS-MT and UXMSS sweeps now cover 2 OTS x 6 w; uxmss rows 10 -> 12. Fixture spots chosen with all values < 2^53 so the site-JS comparison stays exact. The stateless grid is unaffected."
 }

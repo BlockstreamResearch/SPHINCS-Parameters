@@ -352,6 +352,7 @@
           <option>64</option>
           <option>128</option>
           <option>256</option>
+          <option>65536</option>
         </select>
       </label>
       <div class="form-error" id="f-error" hidden></div>
@@ -382,8 +383,8 @@
   <div class="panel" id="all-candidates-panel">
     <h2>All stateful candidates</h2>
     <p class="hint">
-      Pre-swept over h = [10, 40], d = [1, 10] (with d ⏐ h), OTS = {WOTS, WOTS+C}, w = {16, 32, 64, 128, 256},
-      plus the 10 UXMSS variants (2 OTS * 5 w). Every candidate has signature size strictly smaller than SLH-DSA-128s.
+      Pre-swept over h = [10, 40], d = [1, 10] (with d ⏐ h), OTS = {WOTS, WOTS+C}, w = {16, 32, 64, 128, 256, 65536},
+      plus the 12 UXMSS variants (2 OTS * 6 w). Every candidate has signature size strictly smaller than SLH-DSA-128s.
       UXMSS tree height is capped at hsf = 255.
       UXMSS C/B cells show the first→largest-signature range (density falls with the index);
       bounds and sorting use the largest-signature value.
@@ -433,7 +434,7 @@ const C_PRFmsg = 2;
 const C_PRF = 1;
 
 // WOTS+C target chain sums S_wn
-const WOTS_C_SWN = { 16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040 };
+const WOTS_C_SWN = { 16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040, 65536: 262140 };
 const UXMSS_TARGET_SIZE = 5712;     // Candidate 2 reference
 
 // SLH-DSA-128s baseline
@@ -996,7 +997,7 @@ function buildSweepPool() {
 
   // Fallback: compute the pool in-browser.
   const otsList = ['TW', 'WC'];
-  const wList = [16, 32, 64, 128, 256];
+  const wList = [16, 32, 64, 128, 256, 65536];
 
   // XMSS / XMSS-MT sweep
   for (const ots of otsList) {
@@ -1036,6 +1037,8 @@ const SWEEP_DEFAULTS_W = { size: 1.0,  kg: 1.0,   sg: 1.0,   sv: 1.0,   cb: 1.0 
 const sweepState = {
   X: { ...SWEEP_DEFAULTS_X },
   W: { ...SWEEP_DEFAULTS_W },
+  // Caps for the log-scaled cost bounds (recomputed from the pool)
+  xMax: { kg: 20, sg: 20, sv: 20, cb: 20 },
   sort: { col: 'distance', dir: 'asc' },
   // Per-metric ratio ranges across current survivors (for distance normalisation)
   lastRanges: Object.fromEntries(['size', 'kg', 'sg', 'sv', 'cb'].map(k => [k, { min: 0, max: 1 }])),
@@ -1045,10 +1048,10 @@ const sweepState = {
 // Bound coefficient descriptors
 const SWEEP_BOUND_FILTERS = [
   { key: 'size',  label: 'X_size',         min: 0.10, max: 1.00,  step: 0.01, dp: 2 },
-  { key: 'kg',    label: 'X_kg',           min: 0.10, max: 20.00, step: 0.10, dp: 2 },
-  { key: 'sg',    label: 'X_sg',           min: 0.10, max: 20.00, step: 0.10, dp: 2 },
-  { key: 'sv',    label: 'X_sv',           min: 0.10, max: 20.00, step: 0.10, dp: 2 },
-  { key: 'cb',    label: 'X_cb',           min: 0.10, max: 20.00, step: 0.10, dp: 2 },
+  { key: 'kg',    label: 'X_kg',           min: 0.10, log: true },
+  { key: 'sg',    label: 'X_sg',           min: 0.10, log: true },
+  { key: 'sv',    label: 'X_sv',           min: 0.10, log: true },
+  { key: 'cb',    label: 'X_cb',           min: 0.10, log: true },
   { key: 'minQs', label: 'Min sigs (2^h)', min: 0,    max: 40,    step: 1,    dp: 0 },
 ];
 // Importance-weight descriptors (W)
@@ -1105,33 +1108,95 @@ function sweepDistance(m, std, W) {
   return Math.sqrt(d2);
 }
 
-// Shared slider/number-input renderer
+// Shared slider/number-input renderer.
+// Filters flagged `log: true` get a geometric slider: the range element
+// stores an integer track position 0..SLIDER_STEPS while the real bound
+// range lives on the paired number input's min/max (max = sweepState.xMax).
+const SLIDER_STEPS = 1000;
+function posToX(pos, min, max) {
+  return min * Math.pow(max / min, pos / SLIDER_STEPS);
+}
+function xToPos(x, min, max) {
+  const t = Math.log(x / min) / Math.log(max / min);
+  return Math.round(SLIDER_STEPS * Math.max(0, Math.min(1, t)));
+}
+function fmtX(v) {
+  if (v < 100) return v.toFixed(2);
+  if (v < 1e6) return String(Math.round(v));
+  return v.toExponential(1);
+}
+
+// Round a ratio up to a 1-2-5 decade; 20x is the floor.
+function niceCap(m) {
+  if (!isFinite(m) || m <= 20) return 20;
+  const e = Math.pow(10, Math.floor(Math.log10(m)));
+  for (const f of [1, 2, 5, 10]) if (f * e >= m) return f * e;
+  return 10 * e;
+}
+
+// Largest per-metric ratio across the sweep pool (both signer modes and both
+// verify variants), so every candidate — w = 65536 included — is reachable.
+function computeSweepXMax() {
+  const std = state.candidates[0].metrics;
+  const maxes = { kg: 0, sg: 0, sv: 0, cb: 0 };
+  for (const f of SWEEP_FACTORIES) {
+    const m = f.cached.metrics;
+    maxes.kg = Math.max(maxes.kg, m.keygen / std.keygen);
+    maxes.sg = Math.max(maxes.sg, m.siggen / std.siggen, m.siggenCold / std.siggenCold);
+    maxes.sv = Math.max(maxes.sv, m.sigver / std.sigver, m.sigverWorst / std.sigverWorst);
+    maxes.cb = Math.max(maxes.cb, (m.sigver / m.size) / (std.sigver / std.size),
+                        (m.sigverWorst / m.size) / (std.sigverWorst / std.size));
+  }
+  sweepState.xMax = { kg: niceCap(maxes.kg), sg: niceCap(maxes.sg),
+                      sv: niceCap(maxes.sv), cb: niceCap(maxes.cb) };
+}
+
+function clampSweepXToMax() {
+  for (const k of ['kg', 'sg', 'sv', 'cb']) {
+    if (sweepState.X[k] > sweepState.xMax[k]) sweepState.X[k] = sweepState.xMax[k];
+  }
+}
+
 function renderSweepFilterGroup(hostId, group, filters) {
   const host = document.getElementById(hostId);
   const store = sweepState[group];
-  host.innerHTML = filters.map(f => `
+  host.innerHTML = filters.map(f => {
+    const max = f.log ? sweepState.xMax[f.key] : f.max;
+    const numVal = f.log ? fmtX(store[f.key]) : store[f.key].toFixed(f.dp);
+    const sliderAttrs = f.log
+      ? `min="0" max="${SLIDER_STEPS}" step="1"
+             value="${xToPos(store[f.key], f.min, max)}" data-sw="${f.key}" data-log="1"`
+      : `min="${f.min}" max="${f.max}" step="${f.step}"
+             value="${store[f.key]}" data-sw="${f.key}"`;
+    return `
     <div class="ctrl">
       <label>
         <span class="name">${f.label}</span>
         <input type="number" class="val"
                id="sw-${group}-${f.key}-val"
-               min="${f.min}" max="${f.max}" step="${f.step}"
-               value="${store[f.key].toFixed(f.dp)}"
-               data-sw-input="${f.key}" data-dp="${f.dp}">
+               min="${f.min}" max="${max}" step="${f.log ? 'any' : f.step}"
+               value="${numVal}"
+               data-sw-input="${f.key}"${f.log ? '' : ` data-dp="${f.dp}"`}>
       </label>
-      <input type="range"
-             min="${f.min}" max="${f.max}" step="${f.step}"
-             value="${store[f.key]}" data-sw="${f.key}">
+      <input type="range" ${sliderAttrs}>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   host.querySelectorAll('input[data-sw]').forEach(slider => {
     slider.addEventListener('input', e => {
       const key = e.target.dataset.sw;
-      const v = parseFloat(e.target.value);
-      store[key] = v;
       const inp = host.querySelector(`input[data-sw-input="${key}"]`);
-      inp.value = v.toFixed(parseInt(inp.dataset.dp, 10));
+      let v;
+      if (e.target.dataset.log) {
+        v = posToX(parseFloat(e.target.value),
+                   parseFloat(inp.min), parseFloat(inp.max));
+        inp.value = fmtX(v);
+      } else {
+        v = parseFloat(e.target.value);
+        inp.value = v.toFixed(parseInt(inp.dataset.dp, 10));
+      }
+      store[key] = v;
       renderSweepTable();
     });
   });
@@ -1143,13 +1208,15 @@ function renderSweepFilterGroup(hostId, group, filters) {
       const min = parseFloat(e.target.min), max = parseFloat(e.target.max);
       const v = Math.max(min, Math.min(max, raw));
       store[key] = v;
-      host.querySelector(`input[data-sw="${key}"]`).value = v;
+      const slider = host.querySelector(`input[data-sw="${key}"]`);
+      slider.value = slider.dataset.log ? xToPos(v, min, max) : v;
       renderSweepTable();
     });
     inp.addEventListener('blur', e => {
       const key = e.target.dataset.swInput;
-      const dp = parseInt(e.target.dataset.dp, 10);
-      e.target.value = store[key].toFixed(dp);
+      e.target.value = e.target.dataset.dp
+        ? store[key].toFixed(parseInt(e.target.dataset.dp, 10))
+        : fmtX(store[key]);
     });
   });
 }
@@ -1313,13 +1380,13 @@ function candidateFromKey(key) {
   const p = String(key).split('-');
   if (p[0] === 'uxmss' && p.length === 3) {
     const ots = p[1], w = parseInt(p[2], 10);
-    if (!['TW', 'WC'].includes(ots) || ![16, 32, 64, 128, 256].includes(w)) return null;
+    if (!['TW', 'WC'].includes(ots) || ![16, 32, 64, 128, 256, 65536].includes(w)) return null;
     return buildUxmss(ots, w);
   }
   if (p[0] === 'xmssmt' && p.length === 5) {
     const ots = p[1], w = parseInt(p[2], 10);
     const h = parseInt(p[3], 10), d = parseInt(p[4], 10);
-    if (!['TW', 'WC'].includes(ots) || ![16, 32, 64, 128, 256].includes(w)) return null;
+    if (!['TW', 'WC'].includes(ots) || ![16, 32, 64, 128, 256, 65536].includes(w)) return null;
     if (!Number.isInteger(h) || h < 2 || h > 60 ||
         !Number.isInteger(d) || d < 1 || h % d !== 0) return null;
     return buildXmssMt(ots, h, d, w);
@@ -1354,11 +1421,13 @@ function applyStatefulHash() {
   if (params.b) {
     const v = params.b.split(',').map(parseFloat);
     if (v.length === 6 && v.every(isFinite)) {
+      // Cost bounds accept the full pool range; clampSweepXToMax() pulls
+      // them down to the computed caps once the pool is built.
       sweepState.X.size = clamp(v[0], 0.10, 1.00);
-      sweepState.X.kg = clamp(v[1], 0.10, 20.00);
-      sweepState.X.sg = clamp(v[2], 0.10, 20.00);
-      sweepState.X.sv = clamp(v[3], 0.10, 20.00);
-      sweepState.X.cb = clamp(v[4], 0.10, 20.00);
+      sweepState.X.kg = clamp(v[1], 0.10, 1e15);
+      sweepState.X.sg = clamp(v[2], 0.10, 1e15);
+      sweepState.X.sv = clamp(v[3], 0.10, 1e15);
+      sweepState.X.cb = clamp(v[4], 0.10, 1e15);
       sweepState.X.minQs = clamp(Math.round(v[5]), 0, 40);
     }
   }
@@ -1474,7 +1543,7 @@ function setupAddForm() {
 
     try {
       let cand;
-      if (scheme === 'xmssmt') {
+      if (scheme === 'xmssmt') {ƒ
         const h = parseInt(document.getElementById('f-h').value, 10);
         const d = parseInt(document.getElementById('f-d').value, 10);
         if (!Number.isInteger(h) || h < 2 || h > 60) throw new Error(`h must be an integer in [2, 60] (got ${h}).`);
@@ -1576,6 +1645,8 @@ async function init() {
   render();              // initial pass paints the comparison
   renderSchnorrNote();
   buildSweepPool();      // sweep generation depends on the SLH baseline
+  computeSweepXMax();    // bound caps from the pool (w = 65536 needs big ones)
+  clampSweepXToMax();
   renderSweepFilters();
   renderSweepTable();    // first paint of the sweep table
 

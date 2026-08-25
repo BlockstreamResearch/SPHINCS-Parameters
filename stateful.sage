@@ -33,12 +33,13 @@ OTS variants:
   WOTS+C        Counter-based OTS; no checksum; l = l1 + grinding counter.
                 Verification cost fixed: (w-1)*l - S_wn steps (deterministic).
 
-w values: 16, 32, 64, 128, 256.
-  w= 16: l1=32  WOTS-TW/classic l=35  WOTS+C S_wn=240
-  w= 32: l1=26  WOTS-TW/classic l=28  WOTS+C S_wn=403
-  w= 64: l1=22  WOTS-TW/classic l=24  WOTS+C S_wn=693
-  w=128: l1=19  WOTS-TW/classic l=21  WOTS+C S_wn=1206
-  w=256: l1=16  WOTS-TW/classic l=18  WOTS+C S_wn=2040
+w values: 16, 32, 64, 128, 256, 65536.
+  w= 16:    l1=32  WOTS-TW/classic l=35  WOTS+C S_wn=240
+  w= 32:    l1=26  WOTS-TW/classic l=28  WOTS+C S_wn=403
+  w= 64:    l1=22  WOTS-TW/classic l=24  WOTS+C S_wn=693
+  w=128:    l1=19  WOTS-TW/classic l=21  WOTS+C S_wn=1206
+  w=256:    l1=16  WOTS-TW/classic l=18  WOTS+C S_wn=2040
+  w=65536:  l1=8  WOTS-TW/classic l=10  WOTS+C S_wn=262140
 
   Note: l1 = ceil(8n / log2(w)) per FIPS 205. For w=16 and w=256 the
   division is exact; the others need the round-up (w=32: 26 chains for
@@ -131,8 +132,10 @@ OTS_WC      = "wc"
 # w=64:  l1=22, S_wn = 22*63/2 = 693
 # w=128: l1=19, S_wn = floor(19*127/2) = 1206  (odd product; ν(1206) = ν(1207))
 # w=256: l1=16, S_wn = 16*255/2 = 2040
-WOTS_C_PAIRS = [(16, 240), (32, 403), (64, 693), (128, 1206), (256, 2040)]
-WOTS_W_VALS  = [16, 32, 64, 128, 256]
+# w=65536: l1=8, S_wn = 8*65535/2 = 262140
+WOTS_C_PAIRS = [(16, 240), (32, 403), (64, 693), (128, 1206), (256, 2040),
+                (65536, 262140)]
+WOTS_W_VALS  = [16, 32, 64, 128, 256, 65536]
 
 PARAM_SETS = (
     [(OTS_WC,      w, swn) for w, swn in WOTS_C_PAIRS] +
@@ -192,7 +195,7 @@ def wots_verify_worst_steps(w, ots_type):
     C = l1 * (w - 1)
     ds = 0
     rem = C
-    while rem > 0:
+    while rem > 0:ƒ
         ds += rem % w
         rem = rem // w
     return l1 * (w - 1) + l2 * (w - 1) - ds
