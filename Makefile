@@ -6,6 +6,7 @@
 #   make data       — site/data.json for both site pages             (sage)
 #   make figures    — report figures from the generated data         (python)
 #   make test       — regression suite (validates artifacts <-> model)
+#   make check-local — pre-push validation w/o sage
 #   make clean-generated
 
 SAGE   ?= sage
@@ -17,7 +18,7 @@ IMAGES := document/content/images
 CSV_CAPPED  := $(UTILS)/all_size_capped_candidates.csv
 CSV_UNBOUND := $(UTILS)/all_unbound_candidates.csv
 
-.PHONY: generate sweeps derived data figures test clean-generated
+.PHONY: generate sweeps derived data figures test check-local clean-generated
 
 generate: sweeps derived data figures test
 
@@ -65,6 +66,10 @@ figures:
 
 test:
 	$(PYTHON) tests/test_regression.py
+
+check-local:
+	$(PYTHON) tests/synth_generated.py
+	GENERATED_REQUIRED=1 $(PYTHON) tests/test_regression.py
 
 clean-generated:
 	rm -f $(CSV_CAPPED) $(CSV_UNBOUND)

@@ -16,5 +16,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Synthesize generated artifacts from the reference model
+        run: python3 tests/synth_generated.py
       - name: Run regression suite
-        run: python3 tests/test_regression.py
+        run: GENERATED_REQUIRED=1 python3 tests/test_regression.py
