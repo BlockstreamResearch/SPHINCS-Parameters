@@ -75,7 +75,7 @@ Total Security:
 # High precision arithmetic
 F = RealField(100)
 
-def pow(p, e):
+def powF(p, e):
     """Power function with high precision"""
     return F(p)**e
 
@@ -85,13 +85,13 @@ def qhitprob(q_s, r, leaves):
     Follows binomial distribution with q_s trials and success probability p = 1/leaves
     """
     p = F(1/leaves)
-    return binomial(q_s, r) * pow(p, r) * pow(1-p, q_s-r)
+    return binomial(q_s, r) * powF(p, r) * powF(1-p, q_s-r)
 
 def p_forge_fors(r, k, t):
     """
     P(FORS forgery | r signatures hit instance) = (1 - (1 - 1/t)^r)^k
     """
-    return pow(1 - pow(1 - F(1)/F(t), r), k)
+    return powF(1 - powF(1 - F(1)/F(t), r), k)
 
 def p_forge_pors_fp(r, k, t):
     """

@@ -156,7 +156,10 @@ def _extract_js(page, end_marker):
     html = open(os.path.join(ROOT, 'site', page)).read()
     m = re.search(r"'use strict';(.*?)" + re.escape(end_marker), html, re.S)
     assert m, f'extraction markers not found in {page} — update the test'
-    return m.group(1)
+    js = m.group(1)
+    if '<script src="formulas.js">' in html:
+        js = open(os.path.join(ROOT, 'site', 'formulas.js')).read() + '\n' + js
+    return js
 
 
 def _run_node(js):
@@ -354,6 +357,75 @@ def test_sage_preparser_hazards():
         except tokenize.TokenError:
             pass  # unterminated construct — already reported via ast.parse
     assert not offenders, f'sage-file hazards: {offenders}'
+
+
+def _js_code_chars(src):
+    NORMAL, SQ, DQ, TPL, LINE_C, BLOCK_C = range(6)
+    state, tpl_depth, line = NORMAL, [], 1
+    i, n = 0, len(src)
+    while i < n:
+        c = src[i]
+        nxt = src[i + 1] if i + 1 < n else ''
+        if c == '\n':
+            line += 1
+            if state == LINE_C:
+                state = NORMAL
+            i += 1
+            continue
+        if state == NORMAL:
+            if c == "'":
+                state = SQ
+            elif c == '"':
+                state = DQ
+            elif c == '`':
+                state = TPL
+            elif c == '/' and nxt == '/':
+                state = LINE_C; i += 1
+            elif c == '/' and nxt == '*':
+                state = BLOCK_C; i += 1
+            elif c == '}' and tpl_depth and tpl_depth[-1] == 0:
+                tpl_depth.pop(); state = TPL
+            else:
+                if c == '{' and tpl_depth:
+                    tpl_depth[-1] += 1
+                elif c == '}' and tpl_depth:
+                    tpl_depth[-1] -= 1
+                yield line, c
+        elif state in (SQ, DQ):
+            if c == '\\':
+                i += 1
+            elif c == ("'" if state == SQ else '"'):
+                state = NORMAL
+        elif state == TPL:
+            if c == '\\':
+                i += 1
+            elif c == '`':
+                state = NORMAL
+            elif c == '$' and nxt == '{':
+                tpl_depth.append(0); state = NORMAL; i += 1
+        elif state == BLOCK_C:
+            if c == '*' and nxt == '/':
+                state = NORMAL; i += 1
+        i += 1
+
+
+def test_site_js_hazards():
+    import glob
+    offenders = []
+
+    def scan(name, js, base_line):
+        for lineno, ch in _js_code_chars(js):
+            if not ch.isascii():
+                offenders.append(
+                    f'{name}:{base_line + lineno - 1} non-ASCII code char {ch!r} (U+{ord(ch):04X})')
+
+    for path in sorted(glob.glob(os.path.join(ROOT, 'site', '*.html'))):
+        html = open(path, encoding='utf-8').read()
+        for m in re.finditer(r'<script>(.*?)</script>', html, re.S):
+            scan(os.path.basename(path), m.group(1), html[:m.start(1)].count('\n') + 1)
+    for path in sorted(glob.glob(os.path.join(ROOT, 'site', '*.js'))):
+        scan(os.path.basename(path), open(path, encoding='utf-8').read(), 1)
+    assert not offenders, f'site-JS hazards: {offenders}'
 
 
 def test_uncached_convention():

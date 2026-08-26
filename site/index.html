@@ -214,7 +214,8 @@
     All costs are SHA-256 compression calls with the PK.seed block midstate-cached. Ranges on UXMSS rows are first-last signature.
   </footer>
 
-  <script>
+  <script src="formulas.js"></script>
+<script>
 'use strict';
 
 // Legacy shareable links: the Parameter Explorer used to live at this URL.
@@ -225,194 +226,14 @@ if (typeof location !== 'undefined' && location.hash &&
   location.replace('stateless.html' + location.hash);
 }
 
-// ---------- Cost model ----------
-// Verbatim subset of stateful.html's formula block (itself matching
-// costs.sage / stateful.sage, cached convention). The regression suite
-// diffs this page's pinned outputs against tests/model.py.
-const N = 16;                 // hashbytes
-const C_SIZE = 4;             // counter_size (WOTS+C grinding counter)
-const R_SIZE = 16;            // randomness_size = n
-const C_Th1 = 1;
-const C_Th1c = 1;
-const C_Th2 = 1;
-const C_Hmsg = 2;
-const C_PRFmsg = 2;
-const C_PRF = 1;
+// ---------- Page constants  ----------
 
-const WOTS_C_SWN = { 16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040 };
-const UXMSS_TARGET_SIZE = 5712;
-const SLH = { h: 63, d: 7, k: 14, a: 12, w: 16 };
 const PINNED = { h: 45, d: 5, k: 10, a: 13, w: 16 };   // Report Candidate 1 — 5,776 B
 const XMSS_W = 64;      // stateful cards: WOTS+C at w = 64
 const XMSS_H_MAX = 20;
 
-const SCHNORR_KAPPA_URL =
-  'https://raw.githubusercontent.com/mjthatch/bip340-vs-sha256/main/results/kappa.json';
-const SCHNORR_FALLBACK = {
-  cb64: 1.98,
-  impl: 'libsecp256k1',
-  commit: null, run: null, machine: null, preliminary: false,
-  live: false,
-};
-let SCHNORR = { ...SCHNORR_FALLBACK };
-
-function idxBytes(h) { return Math.max(1, Math.ceil(h / 8)); }
-function computeTh(n) { return Math.ceil((176 + 128 * n + 65) / 512); }
-
-function wotsL(w, ots) {
-  const l1 = Math.ceil(8 * N / Math.log2(w));
-  if (ots === 'WC') return l1;
-  const l2 = Math.floor(Math.log2(l1 * (w - 1)) / Math.log2(w)) + 1;
-  return l1 + l2;
-}
-function wotsThl(l, ots) { return computeTh(l); }
-function wotsPkC(w, ots) {
-  const l = wotsL(w, ots);
-  return l * C_PRF + l * (w - 1) * C_Th1 + wotsThl(l, ots);
-}
-function binomBig(n, k) {
-  if (k < 0n || k > n) return 0n;
-  if (k === 0n || k === n) return 1n;
-  if (k > n - k) k = n - k;
-  let num = 1n, den = 1n;
-  for (let i = 0n; i < k; i++) { num *= (n - i); den *= (i + 1n); }
-  return num / den;
-}
-function computeNu(l, swn, w) {
-  const lB = BigInt(l), swnB = BigInt(swn), wB = BigInt(w);
-  let nu = 0n;
-  for (let j = 0n; j <= lB; j++) {
-    const sign = (j % 2n === 0n) ? 1n : -1n;
-    const b1 = binomBig(lB, j);
-    const nVal = (swnB + lB) - j * wB - 1n;
-    let b2 = 0n;
-    if (nVal >= lB - 1n && lB > 0n) b2 = binomBig(nVal, lB - 1n);
-    nu += sign * b1 * b2;
-  }
-  return nu > 0n ? nu : 1n;
-}
-function wotsSignC(w, swn, ots) {
-  const l = wotsL(w, ots);
-  if (ots === 'WC') {
-    const nu = computeNu(l, swn, w);
-    const wToL = BigInt(w) ** BigInt(l);
-    const searchBig = wToL / nu + ((wToL % nu === 0n) ? 0n : 1n);
-    const search = Number(searchBig);
-    return search * C_Th1c + l * C_PRF + swn * C_Th1;
-  }
-  return l * C_PRF + Math.floor(l * (w - 1) / 2) * C_Th1;
-}
-function wotsVerifyWorstSteps(w) {
-  const l1 = Math.ceil(8 * N / Math.log2(w));
-  const l2 = Math.floor(Math.log2(l1 * (w - 1)) / Math.log2(w)) + 1;
-  const C = l1 * (w - 1);
-  let ds = 0, rem = C;
-  while (rem > 0) { ds += rem % w; rem = Math.floor(rem / w); }
-  return l1 * (w - 1) + l2 * (w - 1) - ds;
-}
-function wotsVerifyC(w, swn, ots, worstCase) {
-  const l = wotsL(w, ots);
-  const Thl = wotsThl(l, ots);
-  if (ots === 'WC') return ((w - 1) * l - swn) * C_Th1 + C_Th1c + Thl;
-  if (worstCase) return wotsVerifyWorstSteps(w) * C_Th1 + Thl;
-  return Math.floor(l * (w - 1) / 2) * C_Th1 + Thl;
-}
-function treeSizePerLayer(hPrime, w, ots) {
-  const l = wotsL(w, ots);
-  const ctr = (ots === 'WC') ? C_SIZE : 0;
-  return hPrime * N + l * N + ctr;
-}
-function treeKeygenC(hPrime, w, ots) {
-  const pk = wotsPkC(w, ots);
-  const sz = Math.pow(2, hPrime);
-  return sz * pk + (sz - 1) * C_Th2;
-}
-function xmssMtSize(h, d, w, ots) {
-  return R_SIZE + d * treeSizePerLayer(h / d, w, ots) + idxBytes(h);
-}
-function xmssMtKeygenC(h, d, w, ots) { return treeKeygenC(h / d, w, ots); }
-function xmssMtSignBdsC(h, d, w, swn, ots) {
-  const hPrime = h / d;
-  const pk = wotsPkC(w, ots);
-  return C_Hmsg + C_PRFmsg + wotsSignC(w, swn, ots) + d * (hPrime * pk + hPrime * C_Th2);
-}
-function xmssMtSignColdC(h, d, w, swn, ots) {
-  return C_Hmsg + C_PRFmsg + d * (treeKeygenC(h / d, w, ots) + wotsSignC(w, swn, ots))
-       - wotsPkC(w, ots);
-}
-function xmssMtStateBytes(h, d, w, ots) {
-  const hPrime = h / d;
-  return d * Math.ceil(3.5 * hPrime) * N + (d - 1) * wotsL(w, ots) * N;
-}
-function xmssMtVerifyC(h, d, w, swn, ots) {
-  return C_Hmsg + d * (wotsVerifyC(w, swn, ots, false) + (h / d) * C_Th2);
-}
-
-const HSF_MAX = 255;
-function uxmssIdxBytes(hsf) {
-  if (hsf <= 0) return 1;
-  return Math.max(1, Math.ceil(Math.log2(hsf + 1) / 8));
-}
-function findMaxHsf(w, ots, targetSize) {
-  const l = wotsL(w, ots);
-  const ctr = (ots === 'WC') ? C_SIZE : 0;
-  let hsf = 0;
-  for (let i = 0; i < 64; i++) {
-    const idx = uxmssIdxBytes(hsf);
-    const avail = targetSize - 1 - R_SIZE - ctr - l * N - idx;
-    const newHsf = Math.max(0, Math.min(Math.floor(avail / N), HSF_MAX));
-    if (newHsf === hsf) return hsf;
-    hsf = newHsf;
-  }
-  return hsf;
-}
-function uxmssSize(q, hsf, w, ots) {
-  const l = wotsL(w, ots);
-  const ctr = (ots === 'WC') ? C_SIZE : 0;
-  return R_SIZE + ctr + l * N + Math.min(q, hsf) * N + uxmssIdxBytes(hsf);
-}
-function uxmssKeygenC(hsf, w, ots) { return (hsf + 1) * wotsPkC(w, ots) + hsf * C_Th2; }
-function uxmssSignC(w, swn, ots) { return C_Hmsg + C_PRFmsg + wotsSignC(w, swn, ots); }
-function uxmssVerifyC(q, hsf, w, swn, ots) {
-  return C_Hmsg + wotsVerifyC(w, swn, ots, false) + Math.min(q, hsf) * C_Th2;
-}
-
-function slhMetrics(p) {
-  const hp = p.h / p.d;
-  const l1 = Math.ceil(8 * N / Math.log2(p.w));
-  const l2 = Math.floor(Math.log2(l1 * (p.w - 1)) / Math.log2(p.w)) + 1;
-  const len = l1 + l2;
-  const Thl = computeTh(len);
-  const Thk = computeTh(p.k);
-  const size = N * (1 + p.k * (p.a + 1) + p.h + p.d * len);
-  const leaves = Math.pow(2, hp);
-  const wotsCost = len * C_PRF + len * (p.w - 1) * C_Th1 + Thl;
-  const cMerkle = leaves * wotsCost + (leaves - 1) * C_Th2;
-  const kg = cMerkle;
-  const forsLeaves = Math.pow(2, p.a);
-  const cFors = p.k * forsLeaves * C_PRF + p.k * forsLeaves * C_Th1
-              + p.k * (forsLeaves - 1) * C_Th2 + Thk;
-  const sg = cFors + C_Hmsg + C_PRFmsg + p.d * cMerkle;
-  const cFts = p.k * C_Th1 + p.k * p.a * C_Th2 + Thk;
-  const cWotsAvg = Math.floor((p.w - 1) * len / 2) * C_Th1 + Thl;
-  const sv = C_Hmsg + cFts + p.d * cWotsAvg + p.h * C_Th2;
-  const cWotsWorst = wotsVerifyWorstSteps(p.w) * C_Th1 + Thl;
-  const svWorst = C_Hmsg + cFts + p.d * cWotsWorst + p.h * C_Th2;
-  return { size, kg, sg, sv, svWorst };
-}
-
 // ---------- Render ----------
-function fmtBytes(n) { return n.toLocaleString() + ' B'; }
-function fmtCompressions(n) {
-  if (!isFinite(n)) return '—';
-  if (n >= 1e15) return n.toExponential(2);
-  if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
-  if (n >= 1e9)  return (n / 1e9).toFixed(2) + 'G';
-  if (n >= 1e6)  return (n / 1e6).toFixed(2) + 'M';
-  if (n >= 1e3)  return (n / 1e3).toFixed(1) + 'K';
-  return Math.round(n).toLocaleString();
-}
-function fmtCpb(n) { return n.toFixed(3); }
+
 function row(name, value) {
   return `<tr><td>${name}</td><td>${value}</td></tr>`;
 }
@@ -465,8 +286,6 @@ function renderUxmss() {
   const szMax = uxmssSize(hsf, hsf, XMSS_W, 'WC');
   const kg = uxmssKeygenC(hsf, XMSS_W, 'WC');
   const sg = uxmssSignC(XMSS_W, swn, 'WC');
-  // Cold: rebuild the hsf OTHER leaves + internal-node bound (root = pk,
-  // own leaf is the verifier's work).
   const sgCold = sg + hsf * wotsPkC(XMSS_W, 'WC') + hsf * C_Th2;
   const sv1 = uxmssVerifyC(1, hsf, XMSS_W, swn, 'WC');
   const svMax = uxmssVerifyC(hsf, hsf, XMSS_W, swn, 'WC');
@@ -482,32 +301,6 @@ function renderUxmss() {
     row('C/B Comparing to BIP-340 Verification', `${fmtCpb(cb1 / SCHNORR.cb64)} - ${fmtCpb(cbMax / SCHNORR.cb64)}×`),
   ].join('');
 }
-
-// ---------- Schnorr reference ----------
-async function loadSchnorrRef() {
-  try {
-    const resp = await fetch(SCHNORR_KAPPA_URL, { cache: 'no-cache' });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const k = await resp.json();
-    const entry = k && k.cb && k.cb[SCHNORR_FALLBACK.impl];
-    const cb = entry && entry.cb_64;
-    if (!isFinite(cb) || cb <= 0) throw new Error('cb.' + SCHNORR_FALLBACK.impl + '.cb_64 missing');
-    return {
-      cb64: cb,
-      impl: SCHNORR_FALLBACK.impl,
-      commit: k.secp256k1_commit || null,
-      run: typeof k.run_utc === 'string' ? k.run_utc.slice(0, 10) : null,
-      machine: k.machine || null,
-      preliminary: !!k.preliminary,
-      live: true,
-    };
-  } catch (e) {
-    console.warn('Schnorr reference kappa.json unavailable (' + e.message +
-      ') — using the built-in ' + SCHNORR_FALLBACK.cb64.toFixed(2) + ' C/B.');
-    return { ...SCHNORR_FALLBACK };
-  }
-}
-
 
 // ---------- Setup ----------
 const state = { xmssH: 20 };
