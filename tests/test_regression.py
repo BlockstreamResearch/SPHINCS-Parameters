@@ -82,8 +82,8 @@ def test_baseline_metrics():
     m = M.spx_metrics(63, 7, 14, 12, 16)
     for k in ('size', 'kg', 'sg', 'sv', 'sv_worst'):
         assert m[k] == b[k], (k, m[k], b[k])
-    assert abs(m['cpb'] - 0.2743126272912423) < 1e-12
-    assert abs(m['cpb_worst'] - 0.4952902240325865) < 1e-12
+    assert abs(m['cpb'] - 2193 / 7856) < 1e-12
+    assert abs(m['cpb_worst'] - 3893 / 7856) < 1e-12
 
 
 def test_stateless_fixtures():
@@ -200,6 +200,7 @@ def test_site_main():
     js += """
 const out = {};
 out.pinned = (m => [m.size, m.kg, m.sg, m.sv, m.svWorst])(slhMetrics(PINNED));
+out.shrincs_size = shrincsStatelessSize(PINNED);
 out.slh = (m => [m.size, m.kg, m.sg, m.sv, m.svWorst])(slhMetrics(SLH));
 const swn = WOTS_C_SWN[256];
 out.xmss = {};
@@ -210,8 +211,17 @@ for (const h of [10, 20, 25, 40]) {
 }
 const hsf = findMaxHsf(256, 'WC', UXMSS_TARGET_SIZE);
 out.uxmss = [hsf, uxmssSize(1,hsf,256,'WC'), uxmssSize(hsf,hsf,256,'WC'),
-  uxmssKeygenC(hsf,256,'WC'), uxmssSignC(256,swn,'WC'),
+  uxmssKeygenC(hsf,256,'WC'), uxmssSignC(1,hsf,256,swn,'WC'),
   uxmssVerifyC(hsf,hsf,256,swn,'WC')];
+// the pinned UXMSS card (first..last signature) and its cold signer
+const pw = XMSS_W, pswn = WOTS_C_SWN[pw], phsf = findMaxHsf(pw, 'WC', UXMSS_TARGET_SIZE);
+out.pinned_uxmss = {
+  w: pw, hsf: phsf,
+  size: [uxmssSize(1,phsf,pw,'WC'), uxmssSize(phsf,phsf,pw,'WC')],
+  sign: [uxmssSignC(1,phsf,pw,pswn,'WC'), uxmssSignC(phsf+1,phsf,pw,pswn,'WC')],
+  cold: uxmssSignColdC(phsf,pw,pswn,'WC'),
+  verify: [uxmssVerifyC(1,phsf,pw,pswn,'WC'), uxmssVerifyC(phsf,phsf,pw,pswn,'WC')],
+};
 console.log(JSON.stringify(out));
 """
     out = _run_node(js)
@@ -219,7 +229,9 @@ console.log(JSON.stringify(out));
         return
     pm = M.spx_metrics(45, 5, 10, 13, 16)
     assert out['pinned'] == [pm['size'], pm['kg'], pm['sg'], pm['sv'], pm['sv_worst']], out['pinned']
-    assert out['pinned'][0] == 5776   # the page's advertised 5,776 B
+    assert out['pinned'][0] == 5776   # the SLH-DSA signature
+    # the page advertises the SHRINCS signature: indicator byte + SLH-DSA signature
+    assert out['shrincs_size'] == pm['size'] + M.IND_SIZE == 5777, out['shrincs_size']
     bm = M.spx_metrics(63, 7, 14, 12, 16)
     assert out['slh'] == [bm['size'], bm['kg'], bm['sg'], bm['sv'], bm['sv_worst']], out['slh']
     for h, got in out['xmss'].items():
@@ -229,6 +241,16 @@ console.log(JSON.stringify(out));
     u = M.uxmss_metrics('WC', 256)
     want = [u['hsf'], u['sz_q1'], u['sz_max'], u['kg'], u['sg'], u['sv_max']]
     assert out['uxmss'] == want, (out['uxmss'], want)
+    p = out['pinned_uxmss']
+    pw, phsf = p['w'], p['hsf']
+    pu = M.uxmss_metrics('WC', pw)
+    assert phsf == pu['hsf']
+    assert p['size'] == [pu['sz_q1'], pu['sz_max']], p['size']
+    assert p['sign'] == [M.uxmss_sign_c(1, phsf, pw, 'WC'),
+                         M.uxmss_sign_c(phsf + 1, phsf, pw, 'WC')], p['sign']
+    assert p['sign'][0] == pu['sg'] and p['sign'][0] - p['sign'][1] == phsf - 1
+    assert p['cold'] == pu['sg_cold'], p['cold']
+    assert p['verify'] == [M.uxmss_verify_c(1, phsf, pw, 'WC'), pu['sv_max']], p['verify']
 
 
 def test_site_stateful():
@@ -569,7 +591,7 @@ def test_sage_costs():
     b = FIX['baseline']
     assert f"Size:       {b['size']} bytes" in p.stdout, p.stdout
     assert 'Security:   128.0 bits' in p.stdout, p.stdout
-    assert 'C/byte:     0.27  (worst: 0.50)' in p.stdout, p.stdout
+    assert 'C/byte:     0.28  (worst: 0.50)' in p.stdout, p.stdout
     # Original convention via the env flag
     env = dict(os.environ, HASH_CONVENTION='uncached')
     p2 = subprocess.run(args, capture_output=True, text=True, cwd=ROOT,

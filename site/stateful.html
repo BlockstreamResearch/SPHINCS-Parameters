@@ -317,7 +317,7 @@
       <button class="btn" id="show-add">+ Add candidate</button>
       <button class="btn btn-ghost" id="reset-defaults">Reset to defaults</button>
       <button class="btn btn-ghost" id="share-btn" title="Copy a link that reproduces the current comparison list, signer mode, bounds, weights and sort">Copy shareable link</button>
-      <label class="signer-mode" title="cached (BDS): the signer keeps tree state — amortised treehash updates per signature. stateless-recompute: no cached tree material, trees are rebuilt per signature. SLH-DSA is stateless by design, so its SigGen is identical in both modes.">
+      <label class="signer-mode" title="cached: the signer keeps tree state — a BDS update per signature for XMSS/XMSS-MT (its per-signature bound is shown), a leaf cache for UXMSS. stateless-recompute: no cached tree material, trees are rebuilt per signature. SLH-DSA is stateless by design, so its SigGen is identical in both modes.">
         Signer:
         <select id="signer-mode">
           <option value="cached">cached (BDS state)</option>
@@ -370,10 +370,14 @@
       (C/B <em>falls</em> with the index — each extra auth node adds 16 B of signature but only one
       compression of verify work), and all ratios, filters and verification costs use the worst case
       (hsf auth nodes, reached by the last two of the hsf+1 signatures).
-      The <strong>Signer</strong> selector switches SigGen between the cached signer (BDS-amortised, tree state
-      kept between signatures) and a state-minimized signer that rebuilds its trees per signature.
+      The <strong>Signer</strong> selector switches SigGen between the cached signer (tree state kept between
+      signatures) and a state-minimized signer that rebuilds its trees per signature. The cached cost is an
+      upper bound per signature: one BDS update per layer for XMSS/XMSS-MT (at most (h'−K)/2+1 leaf
+      computations), and for UXMSS the first signature, which recombines the most spine nodes from the cached leaves.
       <strong>State</strong> shows the cached signer's memory — UXMSS: all hsf+1 leaf hashes;
-      XMSS/XMSS-MT: a BDS-style estimate; "—" for the stateless SLH-DSA baseline and in state-minimized mode.</p>
+      XMSS/XMSS-MT: the BDS state bound; "—" for the stateless SLH-DSA baseline and in state-minimized mode.
+      Sizes use the SHRINCS stateful layout: indicator byte, 16 B randomizer, leaf index, then per layer the
+      WOTS+C counter (2 B), chains and auth path.</p>
     <p class="hint" id="schnorr-ref"></p>
     <div class="compare-wrap">
       <table class="compare" id="compare-table"></table>
@@ -489,8 +493,8 @@ function buildUxmss(ots, w) {
       size: uxmssSize(hsf, hsf, w, ots),
       sizeQ1: uxmssSize(1, hsf, w, ots),
       keygen: uxmssKeygenC(hsf, w, ots),
-      siggen: uxmssSignC(w, swn, ots),
-      siggenCold: uxmssSignC(w, swn, ots) + hsf * wotsPkC(w, ots) + hsf * C_Th2,
+      siggen: uxmssSignC(1, hsf, w, swn, ots),
+      siggenCold: uxmssSignColdC(hsf, w, swn, ots),
       state: uxmssStateBytes(hsf),
       sigver: uxmssVerifyC(hsf, hsf, w, swn, ots, false),
       sigverWorst: uxmssVerifyC(hsf, hsf, w, swn, ots, true),

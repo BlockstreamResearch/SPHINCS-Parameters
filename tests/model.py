@@ -10,28 +10,38 @@ independent implementation that the real code is diffed against.
 """
 import os
 import sys
+from fractions import Fraction
+from functools import lru_cache
 from math import ceil, floor, log2, comb
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from octopus_pmf import interleave_cost_table  # noqa: E402  (pure python, MIT)
 
 N = 16                       # hashbytes (128-bit security level)
-C_SIZE = 4                   # WOTS+C grinding counter (bytes)
+C_SIZE = 4                   # WOTS+C grinding counter of the stateless variants (bytes)
 R_SIZE = 16                  # message randomness = n bytes
+IND_SIZE = 1                 # SHRINCS indicator byte (first byte of every signature)
 
 # Hash-cost convention, mirroring costs.sage
 CONVENTION = os.environ.get('HASH_CONVENTION', 'cached').lower()
 
-C_TH1 = 1; C_TH1C = 1; C_HMSG = 2; C_PRFMSG = 2; C_PRF = 1
+C_TH1 = 1; C_TH1C = 1; C_PRF = 1
 C_TH2 = 1 if CONVENTION == 'cached' else 2
+# 32-byte message, empty context. cached: H_msg is two nested SHA-256 calls
+# (2 + 2 compressions), PRF_msg is HMAC with its key-pad blocks cached (2 + 1).
+# uncached: the original single 2-block hashes.
+C_HMSG = 4 if CONVENTION == 'cached' else 2
+C_PRFMSG = 3 if CONVENTION == 'cached' else 2
 
 
 def set_convention(mode):
     """Switch the active convention at runtime (used by the tests)."""
-    global CONVENTION, C_TH2
+    global CONVENTION, C_TH2, C_HMSG, C_PRFMSG
     assert mode in ('cached', 'uncached'), mode
     CONVENTION = mode
     C_TH2 = 1 if mode == 'cached' else 2
+    C_HMSG = 4 if mode == 'cached' else 2
+    C_PRFMSG = 3 if mode == 'cached' else 2
 
 
 SWN = {16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040,
@@ -72,6 +82,58 @@ def wots_worst_steps(w):
     return l1 * (w - 1) + l2 * (w - 1) - ds
 
 
+def _digit_sum(x, w):
+    ds = 0
+    while x:
+        ds += x % w
+        x //= w
+    return ds
+
+
+@lru_cache(maxsize=None)
+def _checksum_digit_sum_total(l1, w):
+    """Sum, over all w^l1 message digit strings, of the base-w digit sum of the
+    WOTS-TW checksum.
+
+    The checksum l1*(w-1) - S has the same distribution as the digit sum S
+    itself (map every digit m to w-1-m). The number of strings with sum
+    exactly s is counted by inclusion-exclusion and weighted by the digit sum
+    of s. costs.sage and the site never form a digit sum: they use
+    digit_sum(x) = x - (w-1) * sum_j floor(x / w^j) and tail counts
+    P(S >= m*w^j), so the two computations are independent.
+    """
+    top = l1 * (w - 1)
+    binom_l = [comb(l1, j) for j in range(l1 + 1)]
+
+    def count(s):
+        return sum((-1)**j * binom_l[j] * comb(s - j * w + l1 - 1, l1 - 1)
+                   for j in range(min(l1, s // w) + 1))
+
+    total = 0
+    for s in range(top // 2 + 1):        # count(s) == count(top - s)
+        c = count(s)
+        total += c * _digit_sum(s, w)
+        if top - s != s:
+            total += c * _digit_sum(top - s, w)
+    return total
+
+
+def wots_tw_mean_steps(w, count=1):
+    """Mean chain steps to verify `count` WOTS-TW signatures on random digests,
+    rounded to the nearest integer (ties up).
+
+    cached:   exact expectation  l1*(w-1)/2 + l2*(w-1) - E[checksum digit sum]
+    uncached: the original (w-1)*l/2 approximation, kept verbatim
+    """
+    l1 = wots_len1(w)
+    l2 = wots_len(w) - l1
+    if CONVENTION != 'cached':
+        return count * ((w - 1) * (l1 + l2) // 2)
+    mean = (Fraction(l1 * (w - 1), 2) + l2 * (w - 1)
+            - Fraction(_checksum_digit_sum_total(l1, w), w**l1))
+    return floor(count * mean + Fraction(1, 2))
+
+
 # ---------------------------------------------------------------------------
 # Stateless: SLH-DSA / SPX (plain WOTS-TW + FORS), matches costs.sage
 # ---------------------------------------------------------------------------
@@ -93,9 +155,9 @@ def spx_metrics(h, d, k, a, w):
     sg = c_fors + (C_HMSG + C_PRFMSG) + d * c_merkle
 
     c_fts = k * C_TH1 + k * a * C_TH2 + thk
-    c_wots_avg = (w - 1) * l // 2 * C_TH1 + thl
-    c_wots_worst = wots_worst_steps(w) * C_TH1 + thl
-    sv = C_HMSG + c_fts + d * c_wots_avg + h * C_TH2
+    c_wots_avg = wots_tw_mean_steps(w, d) * C_TH1 + d * thl     # all d layers
+    c_wots_worst = wots_worst_steps(w) * C_TH1 + thl            # one layer
+    sv = C_HMSG + c_fts + c_wots_avg + h * C_TH2
     sv_worst = C_HMSG + c_fts + d * c_wots_worst + h * C_TH2
 
     return {
@@ -223,9 +285,19 @@ def scheme_metrics(scheme, h, d, k, a, w, swn=0):
 # ---------------------------------------------------------------------------
 # Stateful: XMSS / XMSS-MT / UXMSS, matches stateful.sage (R = n = 16 B)
 # ---------------------------------------------------------------------------
+#
+# Signature layout (SHRINCS stateful path), used for every scheme here:
+#   indicator (1 B) | R (16 B) | leaf index | WOTS signature | auth path
+# A WOTS+C signature starts with its grinding counter.
 
 def _wc(ots):
     return ots == 'WC'
+
+
+def counter_bytes(w):
+    """WOTS+C grinding counter: 2 bytes as in SHRINCS; w = 65536 needs more
+    attempts than 2 bytes can count and keeps 4."""
+    return 2 if w <= 256 else 4
 
 
 def wots_pk_c(w, ots):
@@ -250,78 +322,113 @@ def wots_sign_c(w, ots):
         nu = _nu(l, swn, w)
         search = -(-(w**l) // nu)          # ceil division, exact integers
         return search * C_TH1C + l * C_PRF + swn * C_TH1
-    return l * C_PRF + l * (w - 1) // 2 * C_TH1
+    # WOTS-TW: the signer walks what the verifier does not
+    if CONVENTION != 'cached':
+        return l * C_PRF + l * (w - 1) // 2 * C_TH1
+    return l * C_PRF + (l * (w - 1) - wots_tw_mean_steps(w)) * C_TH1
 
 
-def wots_verify_c(w, ots, worst=False):
+def wots_verify_c(w, ots, worst=False, count=1):
+    """Compressions to verify `count` WOTS signatures."""
     l = wots_len(w, _wc(ots))
     thl = compute_th(l)
     if _wc(ots):
-        return ((w - 1) * l - SWN[w]) * C_TH1 + C_TH1C + thl
+        return count * (((w - 1) * l - SWN[w]) * C_TH1 + C_TH1C + thl)
     if worst:
-        return wots_worst_steps(w) * C_TH1 + thl
-    return l * (w - 1) // 2 * C_TH1 + thl
+        return count * (wots_worst_steps(w) * C_TH1 + thl)
+    return wots_tw_mean_steps(w, count) * C_TH1 + count * thl
 
 
 def idx_bytes(h):
     return max(1, ceil(h / 8))
 
 
+# BDS traversal bounds (Buchmann-Dahmen-Schneider 2008) for a tree of height hp
+
+def bds_k(hp):
+    if hp < 2:
+        return hp
+    return 2 if hp % 2 == 0 else 3
+
+
+def bds_leaves(hp):
+    return (hp - bds_k(hp)) // 2 + 1
+
+
+def bds_hashes(hp):
+    return 3 * max(0, hp - bds_k(hp) - 1) // 2 + 1
+
+
+def bds_state_nodes(hp):
+    k = bds_k(hp)
+    auth, keep, retain = hp, hp // 2, 2**k - k - 1
+    treehash = max(0, hp - k) + max(0, hp - k - 1)
+    return auth + keep + retain + treehash
+
+
 def xmssmt_metrics(ots, h, d, w):
     assert h % d == 0
     hp = h // d
     l = wots_len(w, _wc(ots))
-    ctr = C_SIZE if _wc(ots) else 0
-    size = R_SIZE + d * (hp * N + l * N + ctr) + idx_bytes(h)
+    ctr = counter_bytes(w) if _wc(ots) else 0
+    size = IND_SIZE + R_SIZE + idx_bytes(h) + d * (ctr + l * N + hp * N)
     pk = wots_pk_c(w, ots)
     kg = 2**hp * pk + (2**hp - 1) * C_TH2
-    sg = C_HMSG + C_PRFMSG + wots_sign_c(w, ots) + d * (hp * pk + hp * C_TH2)
-    sg_cold = C_HMSG + C_PRFMSG + d * (kg + wots_sign_c(w, ots)) - pk
-    sv = C_HMSG + d * (wots_verify_c(w, ots, False) + hp * C_TH2)
-    sv_worst = C_HMSG + d * (wots_verify_c(w, ots, True) + hp * C_TH2)
-    state = d * ceil(3.5 * hp) * N + (d - 1) * l * N
+    msg = C_HMSG + C_PRFMSG
+    # cached signer: one BDS update per layer and signature (upper bound)
+    sg = msg + wots_sign_c(w, ots) + d * (bds_leaves(hp) * pk + bds_hashes(hp) * C_TH2)
+    # cold signer: rebuild every tree; the top one only needs its auth path
+    sg_cold = msg + d * (kg + wots_sign_c(w, ots)) - pk - hp * C_TH2
+    sv = C_HMSG + wots_verify_c(w, ots, False, d) + d * hp * C_TH2
+    sv_worst = C_HMSG + wots_verify_c(w, ots, True, d) + d * hp * C_TH2
+    state = d * bds_state_nodes(hp) * N + (d - 1) * l * N
     return {'size': size, 'kg': kg, 'sg': sg, 'sg_cold': sg_cold,
             'sv': sv, 'sv_worst': sv_worst, 'state': state}
 
 
-def uxmss_idx_bytes(hsf):
-    if hsf <= 0:
-        return 1
-    return max(1, ceil(log2(hsf + 1) / 8))
+def uxmss_idx_bytes(depth):
+    """Leaf-index width for a leaf at this depth: ceil(min(depth, 64) / 8)."""
+    return max(1, -(-min(depth, 64) // 8))
+
+
+def uxmss_size(q, hsf, w, ots):
+    """Size of the q-th UXMSS signature (q = 1 is the first)."""
+    l = wots_len(w, _wc(ots))
+    ctr = counter_bytes(w) if _wc(ots) else 0
+    depth = min(q, hsf)
+    return IND_SIZE + R_SIZE + uxmss_idx_bytes(depth) + ctr + l * N + depth * N
 
 
 def uxmss_find_hsf(w, ots, target_size):
-    l = wots_len(w, _wc(ots))
-    ctr = C_SIZE if _wc(ots) else 0
-    hsf = 0
-    for _ in range(64):
-        avail = target_size - 1 - R_SIZE - ctr - l * N - uxmss_idx_bytes(hsf)
-        new = max(0, min(avail // N, HSF_MAX))
-        if new == hsf:
-            return hsf
-        hsf = new
+    """Largest hsf <= HSF_MAX whose largest signature is below target_size."""
+    hsf = HSF_MAX
+    while hsf > 0 and uxmss_size(hsf, hsf, w, ots) >= target_size:
+        hsf -= 1
     return hsf
+
+
+def uxmss_sign_c(q, hsf, w, ots):
+    """Cached signer (hsf + 1 leaf public keys kept), q-th signature: the spine
+    sibling of the signing leaf is recombined with hsf - q node hashes."""
+    return (C_HMSG + C_PRFMSG + wots_sign_c(w, ots)
+            + (hsf - min(q, hsf)) * C_TH2)
+
+
+def uxmss_verify_c(q, hsf, w, ots, worst=False):
+    return C_HMSG + wots_verify_c(w, ots, worst) + min(q, hsf) * C_TH2
 
 
 def uxmss_metrics(ots, w, target_size=5712):
     hsf = uxmss_find_hsf(w, ots, target_size)
-    l = wots_len(w, _wc(ots))
-    ctr = C_SIZE if _wc(ots) else 0
-
-    def size(q):
-        return R_SIZE + ctr + l * N + min(q, hsf) * N + uxmss_idx_bytes(hsf)
-
-    kg = (hsf + 1) * wots_pk_c(w, ots) + hsf * C_TH2
-    sg = C_HMSG + C_PRFMSG + wots_sign_c(w, ots)
-    sg_cold = sg + hsf * wots_pk_c(w, ots) + hsf * C_TH2
+    sg = uxmss_sign_c(1, hsf, w, ots)                 # first signature: the worst
     return {
         'hsf': hsf,
-        'sz_q1': size(1),
-        'sz_max': size(hsf),
-        'kg': kg,
+        'sz_q1': uxmss_size(1, hsf, w, ots),
+        'sz_max': uxmss_size(hsf, hsf, w, ots),
+        'kg': (hsf + 1) * wots_pk_c(w, ots) + hsf * C_TH2,
         'sg': sg,
-        'sg_cold': sg_cold,
-        'sv_max': C_HMSG + wots_verify_c(w, ots, False) + hsf * C_TH2,
-        'sv_max_worst': C_HMSG + wots_verify_c(w, ots, True) + hsf * C_TH2,
-        'state': (hsf + 1) * N, 
+        'sg_cold': sg + hsf * wots_pk_c(w, ots),      # rebuild the other hsf leaves
+        'sv_max': uxmss_verify_c(hsf, hsf, w, ots, False),
+        'sv_max_worst': uxmss_verify_c(hsf, hsf, w, ots, True),
+        'state': (hsf + 1) * N,
     }

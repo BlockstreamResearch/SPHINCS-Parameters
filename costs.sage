@@ -45,9 +45,15 @@ randomness_size = 16  # 16 bytes = 128 bits
 # Two SHA-256 compression-counting conventions are supported, selected via the
 # HASH_CONVENTION environment variable ('cached' or 'uncached'):
 #
-#   cached (default): FIPS 205 SHA-2 layout with the PK.seed midstate cached
+#   cached (default): FIPS 205 SHA-2 layout with the PK.seed midstate cached.
+#     This is the instantiation implemented by SHRINCS (github.com/SHRINCS/shrincs-bip),
+#     and the counts below are the ones its reference implementation executes.
 #
-#   uncached: the original convention of this script: every call pays for its full input (2 compressions)
+#   uncached: the original convention of this script, kept verbatim so that
+#     earlier numbers stay reproducible: every call pays for its full input
+#     (a node hash costs 2 compressions), the message hashes are single
+#     2-block hashes, and WOTS-TW verification is averaged as (w-1)/2 steps
+#     per chain.
 #
 #     Usage: HASH_CONVENTION=uncached sage costs.sage --params ...
 #
@@ -58,9 +64,23 @@ assert HASH_CONVENTION in ('cached', 'uncached'), (
 C_Th1 = 1     # Tweakable hash, 1-block: PKseed (128) + Tweak (96) + m1 (128)
 C_Th1c = 1    # Tweakable hash, 1-block + counter: PKseed + Tweak + m1 + counter (32)
 C_Th2 = 1 if HASH_CONVENTION == 'cached' else 2 # Tweakable hash with hash convention
-C_Hmsg = 2    # Message hash: PKseed + PKroot (128) + R (256) + m (256)
-C_PRFmsg = 2  # Message PRF: SKprf (128) + Opt + m (256) + counter
 C_PRF = 1     # PRF: PKseed + SKseed + Tweak
+
+# Message hash and message PRF, for a 32-byte message and an empty context.
+#
+#   cached:
+#     H_msg = MGF1-SHA-256(R || PK.seed || SHA-256(R || PK.seed || PK.root || M), m)
+#       is two nested SHA-256 calls (98- and 68-byte inputs in SHRINCS), 2
+#       compressions each. Its input starts with the randomizer R, so nothing
+#       can be cached.                                                     -> 4
+#     PRF_msg = HMAC-SHA-256(SK.prf, opt_rand || M) is two SHA-256 calls of
+#       3 and 2 compressions. Their first blocks are the fixed HMAC key pads,
+#       cached like the PK.seed block (it would be 5 otherwise).           -> 3
+#   uncached (original model): one 2-block hash each
+#     H_msg:   PKseed + PKroot (128) + R (256) + m (256)                   -> 2
+#     PRF_msg: SKprf (128) + Opt + m (256) + counter                       -> 2
+C_Hmsg = 4 if HASH_CONVENTION == 'cached' else 2
+C_PRFmsg = 3 if HASH_CONVENTION == 'cached' else 2
 
 def compute_Th(n):
     """
@@ -180,6 +200,74 @@ def compute_wots_tw_worst_steps(l1, l2, w):
         ds += rem % int(w)
         rem //= int(w)
     return int(l1) * (int(w) - 1) + int(l2) * (int(w) - 1) - ds
+
+def _round_div(num, den):
+    """Nearest integer to num/den for non-negative integers (ties round up)."""
+    return (2*num + den) // (2*den)
+
+_wots_tw_floor_cache = {}
+
+def _wots_tw_floor_sum(l1, l2, w):
+    """
+    w^l1 * sum_{j=1}^{l2-1} E[floor(S / w^j)], as an exact integer, where S is
+    the sum of l1 independent uniform base-w digits.
+
+    E[floor(S / w^j)] = sum_{m>=1} P(S >= m*w^j), and the number of digit
+    strings with sum <= t is, by inclusion-exclusion,
+
+        sum_i (-1)^i * C(l1, i) * C(t - i*w + l1, l1).
+    """
+    l1, l2, w = int(l1), int(l2), int(w)
+    key = (l1, l2, w)
+    if key in _wots_tw_floor_cache:
+        return _wots_tw_floor_cache[key]
+    top = l1 * (w - 1)
+    W = w**l1
+
+    def count_le(t):
+        total = 0
+        for i in range(min(l1, t // w) + 1):
+            total += (-1)**i * binomial(l1, i) * binomial(t - i*w + l1, l1)
+        return total
+
+    acc = 0
+    for j in range(1, l2):
+        step = w**j
+        for m in range(1, top // step + 1):
+            acc += W - count_le(m*step - 1)
+    _wots_tw_floor_cache[key] = acc
+    return acc
+
+def compute_wots_tw_mean_steps(l1, l2, w, count=1):
+    """
+    Mean number of chain steps to verify `count` WOTS-TW signatures on
+    uniformly random digests, rounded to the nearest integer.
+
+    A message digit m costs w-1-m steps, so the l1 message chains average
+    (w-1)/2 steps each. The l2 checksum chains do not: the checksum
+    C = l1*(w-1) - S (S = sum of the message digits) is concentrated around
+    l1*(w-1)/2, so its base-w digits are far from uniform (the leading one
+    is almost always 0 or 1) and the verifier walks more of those chains
+    than (w-1)/2. Exactly:
+
+        E[steps] = l1*(w-1)/2 + l2*(w-1) - E[digit_sum(C)]
+                 = (w-1) * (l2 + sum_{j=1}^{l2-1} E[floor(S / w^j)]),
+
+    using that C is distributed like S (map every digit m to w-1-m) and
+    digit_sum(x) = x - (w-1) * sum_{j>=1} floor(x / w^j).
+
+    For w = 16 this is 267.12 steps rather than the 262 that (w-1)*l/2
+    gives, and the gap grows with w (2415.03 against 2295 for w = 256).
+
+    Under the original convention (HASH_CONVENTION=uncached) the (w-1)*l/2
+    approximation is kept.
+    """
+    if HASH_CONVENTION != 'cached':
+        return count * ((w - 1) * (l1 + l2) // 2)
+    W = int(w)**int(l1)
+    T = _wots_tw_floor_sum(l1, l2, w)
+    # count * (w-1) * (l2 + T/W), rounded to the nearest integer
+    return _round_div(count * (w - 1) * (l2*W + T), W)
 
 def compute_nu(l: int, paramsum: int, w: int) -> int:
     """
@@ -504,22 +592,25 @@ def compute_verification_time(h, d, a, k, w, swn, scheme, mmax=0):
     Thl = compute_Th(l)
     Thk = compute_Th(k)
 
-    # WOTS verification: complete each chain from signature value to public key
+    # WOTS verification: complete each chain from signature value to public key.
+    # h_wots / c_wots are totals over all d hypertree layers.
     if has_wc:
         # WOTS+C: chain positions sum to S_{w,n}, so remaining steps = (w-1)*l - S_{w,n}
         # Plus: verify counter hash (Th1c) and compress public key (Thl)
         # Deterministic: worst case == average case.
-        h_wots = (w-1)*l - swn + 2
-        c_wots = ((w-1)*l - swn)*C_Th1 + C_Th1c + Thl
+        h_wots = d*((w-1)*l - swn + 2)
+        c_wots = d*(((w-1)*l - swn)*C_Th1 + C_Th1c + Thl)
         c_wots_worst = c_wots
     else:  # Plain WOTS
-        # Expected chain position is (w-1)/2, so expected remaining steps = (w-1)*l/2
-        h_wots = (w-1)*l//2 + 1
-        c_wots = (w-1)*l//2*C_Th1 + Thl
-        # Worst case (all message digits 0): see compute_wots_tw_worst_steps.
         l1 = ceil(hashbytes*8/log(w,2))
         l2 = floor(log(l1*(w-1), 2)/log(w, 2)) + 1
-        c_wots_worst = compute_wots_tw_worst_steps(l1, l2, w)*C_Th1 + Thl
+        # Average case: expected chain steps for a uniformly random digest,
+        # see compute_wots_tw_mean_steps.
+        avg_steps = compute_wots_tw_mean_steps(l1, l2, w, d)
+        h_wots = avg_steps + d
+        c_wots = avg_steps*C_Th1 + d*Thl
+        # Worst case (all message digits 0): see compute_wots_tw_worst_steps.
+        c_wots_worst = d*(compute_wots_tw_worst_steps(l1, l2, w)*C_Th1 + Thl)
 
     # FTS verification
     if scheme == "W+C_F+C":
@@ -540,9 +631,9 @@ def compute_verification_time(h, d, a, k, w, swn, scheme, mmax=0):
     # The FTS and auth-path costs are message-independent, so the worst case
     # differs from the average only in the WOTS-TW chain walks.
     return {
-        'hashes': 1 + h_fts + d*h_wots + h,
-        'compressions': C_Hmsg + c_fts + d*c_wots + h*C_Th2,
-        'compressions_worst': C_Hmsg + c_fts + d*c_wots_worst + h*C_Th2,
+        'hashes': 1 + h_fts + h_wots + h,
+        'compressions': C_Hmsg + c_fts + c_wots + h*C_Th2,
+        'compressions_worst': C_Hmsg + c_fts + c_wots_worst + h*C_Th2,
     }
 
 # =============================================================================

@@ -721,7 +721,7 @@
     // Worst-case WOTS-TW verification steps per hypertree layer.
     //
     // WOTS-TW has no constant-sum constraint (unlike WOTS+C), so the
-    // average formula (w-1)*len/2 is WRONG for worst-case analysis.
+    // average is WRONG for worst-case analysis.
     //
     // Worst case: all len1 message digits = 0 → verifier walks w-1 steps
     // on each message chain.  The checksum C = len1*(w-1) is then fixed,
@@ -737,6 +737,59 @@
       let ds = 0, rem = C;
       while (rem > 0) { ds += rem % w; rem = Math.floor(rem / w); }
       return len1 * (w - 1) + len2 * (w - 1) - ds;
+    }
+
+    // Average WOTS-TW verification steps over `count` hypertree layers,
+    // rounded to the nearest integer (same as wotsTwMeanSteps in formulas.js
+    // and compute_wots_tw_mean_steps in costs.sage).
+    //
+    // The len1 message chains average (w-1)/2 steps each, but the len2
+    // checksum chains do not: the checksum is concentrated around
+    // len1*(w-1)/2, so its leading digit is almost always 0 or 1 and the
+    // verifier walks most of that chain. Exactly, with S the sum of the len1
+    // message digits,
+    //   E[steps] = (w-1) * (len2 + sum_{j=1}^{len2-1} E[floor(S / w^j)])
+    // (267.12 for w = 16, where (w-1)*len/2 would give 262). The expectations
+    // are E[floor(S / w^j)] = sum_{m>=1} P(S >= m*w^j), with the number of
+    // digit strings of sum <= t counted by inclusion-exclusion:
+    //   sum_i (-1)^i * C(len1, i) * C(t - i*w + len1, len1).
+    function binomBig(n, k) {
+      if (k < 0n || k > n) return 0n;
+      if (k === 0n || k === n) return 1n;
+      if (k > n - k) k = n - k;
+      let num = 1n, den = 1n;
+      for (let i = 0n; i < k; i++) { num *= (n - i); den *= (i + 1n); }
+      return num / den;
+    }
+
+    // Per (n, w): the mean steps of one signature as the exact fraction num / W.
+    const _meanStepsCache = new Map();
+    function wotsVerifyMeanSteps(n, w, count) {
+      const key = n + ',' + w;
+      let mean = _meanStepsCache.get(key);
+      if (!mean) {
+        const { len1, len2 } = wotsComponents(n, w);
+        const L1 = BigInt(len1), wB = BigInt(w);
+        const top = L1 * (wB - 1n);
+        const W = wB ** L1;
+        const countLe = (t) => {
+          let total = 0n;
+          for (let i = 0n; i <= L1 && i * wB <= t; i++) {
+            const term = binomBig(L1, i) * binomBig(t - i * wB + L1, L1);
+            total += (i % 2n === 0n) ? term : -term;
+          }
+          return total;
+        };
+        let acc = 0n;
+        for (let j = 1; j < len2; j++) {
+          const step = wB ** BigInt(j);
+          for (let m = 1n; m * step <= top; m++) acc += W - countLe(m * step - 1n);
+        }
+        mean = { num: BigInt(w - 1) * (BigInt(len2) * W + acc), W };
+        _meanStepsCache.set(key, mean);
+      }
+      // count * num / W, rounded to the nearest integer
+      return Number((2n * BigInt(count) * mean.num + mean.W) / (2n * mean.W));
     }
 
     // Marginal compression-call count for a tweakable hash over n hash-sized
@@ -757,12 +810,16 @@
       // Compression costs: cached convention, matching costs.sage defaults:
       // PK.seed midstate cached per keypair; a 2-child node hash is
       // ADRS_c (22 B) + 32 B + padding = 497 bits -> 1 compression.
-      // Hmsg/PRFmsg are message-prefixed (not cacheable) and stay at 2.
+      // Hmsg and PRFmsg for a 32-byte message and an empty context, as the
+      // SHRINCS reference implementation executes them: Hmsg is two nested
+      // SHA-256 calls of 2 compressions each (its input starts with the
+      // randomizer, so nothing is cacheable); PRFmsg is HMAC-SHA-256, 2 + 1
+      // compressions with its two key-pad blocks cached.
       const C_PRF = 1;  // PRF generation
       const C_Th1 = 1;  // tweakable hash, 1 value (WOTS chain step / leaf)
       const C_Th2 = 1;  // tweakable hash, 2 values (internal tree node)
-      const C_Hmsg = 2; // Message hash
-      const C_PRFmsg = 2; // Message PRF
+      const C_Hmsg = 4; // Message hash
+      const C_PRFmsg = 3; // Message PRF
 
       // Exact compression counts for leaf/root compressions (matches costs.sage).
       // computeTh(n) = ceil((128 + 96 + 128*n + 65) / 512):
@@ -801,12 +858,13 @@
       const sg = c_fors_fixed + c_msg + (p.d * c_merkle);
 
       // 5a. Signature Verification — average case
-      // Each WOTS digit is uniform in {0..w-1}, so the verifier walks (w-1)/2
-      // remaining steps on average. Used for filter thresholds and distance scoring.
-      const c_wots_avg = Math.floor((p.w - 1) * len / 2) * C_Th1 + Thl;
+      // Exact expected chain steps for uniformly random digests, summed over
+      // the d layers (see wotsVerifyMeanSteps). Used for filter thresholds
+      // and distance scoring.
+      const c_wots_avg = wotsVerifyMeanSteps(n, p.w, p.d) * C_Th1 + p.d * Thl;
       // FORS path verify: k leaves (C_Th1) + k*a internal nodes (C_Th2) + root (Thk)
       const c_fts = (p.k * C_Th1) + (p.k * p.a * C_Th2) + Thk;
-      const sv = C_Hmsg + c_fts + (p.d * c_wots_avg) + (p.h * C_Th2);
+      const sv = C_Hmsg + c_fts + c_wots_avg + (p.h * C_Th2);
 
       // 5b. Signature Verification — worst case (WOTS-TW)
       // All len1 message digits = 0: verifier walks w-1 steps per message chain.

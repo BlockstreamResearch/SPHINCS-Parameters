@@ -211,7 +211,8 @@
   </main>
 
   <footer>
-    All costs are SHA-256 compression calls with the PK.seed block midstate-cached. Ranges on UXMSS rows are first-last signature.
+    All costs are SHA-256 compression calls with the PK.seed block midstate-cached. Sizes include the one-byte SHRINCS indicator.
+    Ranges on UXMSS rows are first-last signature; the cached XMSS signing cost and cache size are BDS upper bounds.
   </footer>
 
   <script src="formulas.js"></script>
@@ -228,9 +229,13 @@ if (typeof location !== 'undefined' && location.hash &&
 
 // ---------- Page constants  ----------
 
-const PINNED = { h: 45, d: 5, k: 10, a: 13, w: 16 };   // Report Candidate 1 — 5,776 B
+const PINNED = { h: 45, d: 5, k: 10, a: 13, w: 16 };   // Report Candidate 1 — 5,776 B SLH-DSA signature
 const XMSS_W = 64;      // stateful cards: WOTS+C at w = 64
 const XMSS_H_MAX = 20;
+
+// A SHRINCS stateless signature is the SLH-DSA signature behind the one-byte
+// indicator: 5,777 B for the pinned parameters.
+function shrincsStatelessSize(p) { return slhMetrics(p).size + IND_SIZE; }
 
 // ---------- Render ----------
 
@@ -240,9 +245,10 @@ function row(name, value) {
 
 function renderStateless() {
   const m = slhMetrics(PINNED);
-  const cb = m.sv / m.size, cbW = m.svWorst / m.size;
+  const size = shrincsStatelessSize(PINNED);
+  const cb = m.sv / size, cbW = m.svWorst / size;
   document.getElementById('stateless-table').innerHTML = [
-    row('Signature Size', fmtBytes(m.size)),
+    row('Signature Size', fmtBytes(size)),
     row('Key Generation', fmtCompressions(m.kg) + ' C'),
     row('Signature Generation', fmtCompressions(m.sg) + ' C'),
     row('Signature Verification (average)', m.sv.toLocaleString() + ' C'),
@@ -285,8 +291,9 @@ function renderUxmss() {
   const sz1 = uxmssSize(1, hsf, XMSS_W, 'WC');
   const szMax = uxmssSize(hsf, hsf, XMSS_W, 'WC');
   const kg = uxmssKeygenC(hsf, XMSS_W, 'WC');
-  const sg = uxmssSignC(XMSS_W, swn, 'WC');
-  const sgCold = sg + hsf * wotsPkC(XMSS_W, 'WC') + hsf * C_Th2;
+  const sg1 = uxmssSignC(1, hsf, XMSS_W, swn, 'WC');
+  const sgLast = uxmssSignC(hsf + 1, hsf, XMSS_W, swn, 'WC');
+  const sgCold = uxmssSignColdC(hsf, XMSS_W, swn, 'WC');
   const sv1 = uxmssVerifyC(1, hsf, XMSS_W, swn, 'WC');
   const svMax = uxmssVerifyC(hsf, hsf, XMSS_W, swn, 'WC');
   const cb1 = sv1 / sz1, cbMax = svMax / szMax;
@@ -294,7 +301,8 @@ function renderUxmss() {
     row('Signature Budget', `${(hsf + 1).toLocaleString()} signatures`),
     row('Signature Size', `${sz1.toLocaleString()} – ${szMax.toLocaleString()} B`),
     row('Key Generation', fmtCompressions(kg) + ' C'),
-    row('Signature Generation (with cache / cold)', `${fmtCompressions(sg)} / ${fmtCompressions(sgCold)} C`),
+    row('Signature Generation (with cache / cold)',
+        `${sg1.toLocaleString()} – ${sgLast.toLocaleString()} / ${fmtCompressions(sgCold)} C`),
     row('Cache Size', fmtBytes((hsf + 1) * N)),
     row('Signature Verification', `${sv1.toLocaleString()} – ${svMax.toLocaleString()} C`),
     row('Compression-per-Byte Verification Complexity', `${fmtCpb(cb1)} - ${fmtCpb(cbMax)}`),

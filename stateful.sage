@@ -7,13 +7,13 @@ signature-count targets: 2^20 and 2^40.
 1. XMSS: Standard balanced single-layer Merkle tree (height h, 2^h signatures)
    - One layer; auth-path always h nodes (fixed per OTS/w/h combination).
    - Keygen builds 2^h WOTS keypairs (infeasible for h=40, fine for h=20).
-   - BDS amortised signing: O(h) WOTS PK computations per signature.
+   - BDS signing: at most (h-K)/2 + 1 WOTS PK computations per signature.
 
 2. XMSS-MT: Multi-tree hypertree (total height h, d layers of height h'=h/d)
    - The practical stateful solution for both 2^20 and 2^40 signatures.
    - Keygen builds only the top-layer tree (2^h' WOTS keypairs, manageable).
    - Signing (cold): rebuild d trees of height h' per signature.
-   - Signing (BDS): O(d*h') amortised WOTS PK computations per signature.
+   - Signing (BDS): at most d*((h'-K)/2 + 1) WOTS PK computations per signature.
    - No FORS/FTS needed: state prevents replay attacks.
    - Signature size grows with d (more layers → more XMSS layer sigs).
 
@@ -23,6 +23,14 @@ signature-count targets: 2^20 and 2^40.
    - Signature size grows linearly with the index (XMSS-MT: constant).
    - Target is strictly isolated to 2^40 signatures, hardcoded to use (5,712 bytes) as the reference bound.
    - hsf is additionally capped at 255.
+
+Signature layout (SHRINCS stateful path, github.com/SHRINCS/shrincs-bip):
+  indicator (1 B) | R (16 B) | leaf index | WOTS signature | auth path
+  - The indicator byte is the first byte of every SHRINCS signature.
+  - The leaf index takes ceil(min(depth, 64) / 8) bytes, depth = leaf depth.
+  - A WOTS+C signature starts with the grinding counter (2 B, 4 B for w=65536).
+The same layout is used for every scheme in this file, so sizes compare
+like for like.
 
 OTS variants:
   WOTS-classic  Original Winternitz OTS; no tweaks; l = l1 + l2 chains.
@@ -48,9 +56,10 @@ w values: 16, 32, 64, 128, 256, 65536.
 
 SHA-256 compression model: inherited from costs.sage, governed by the
 HASH_CONVENTION env var ('cached' default: PK.seed midstate cached, C_Th2=1,
-Thl_tw(l) = ceil((241+128*l)/512); 'uncached' original: C_Th2=2,
-Thl_tw(l) = ceil((289+128*l)/512)). Always: C_Th1=1 C_Th1c=1 C_PRF=1
-C_Hmsg=2 C_PRFmsg=2; Thl_classic(l) = ceil((65+128*l)/512) (plain SHA-256).
+C_Hmsg=4, C_PRFmsg=3, Thl_tw(l) = ceil((241+128*l)/512); 'uncached'
+original: C_Th2=2, C_Hmsg=2, C_PRFmsg=2, Thl_tw(l) = ceil((289+128*l)/512)).
+Always: C_Th1=1 C_Th1c=1 C_PRF=1; Thl_classic(l) = ceil((65+128*l)/512)
+(plain SHA-256).
 
 Usage:
   sage stateful.sage                     # Tables for both 2^20 and 2^40
@@ -104,9 +113,20 @@ def _parse_args(argv):
  OUTPUT_FILE, REF_OVERRIDES) = _parse_args(sys.argv)
 
 N          = hashbytes       # 16 bytes = 128-bit hash output
-C_SIZE     = counter_size    # 4 bytes (WOTS+C grinding counter)
 R_SIZE     = randomness_size # 16 bytes = n (message randomness, from costs.sage)
+IND_SIZE   = 1               # SHRINCS indicator byte (leaf height on the stateful path)
 TARGET_SEC = 128             # Minimum security level (bits)
+
+
+def counter_bytes(w):
+    """Byte size of the WOTS+C grinding counter.
+
+    SHRINCS stores it in 2 bytes. With 2^16 counters the grinding fails with
+    probability below 2^-126 for every w <= 256 (2^-1450 at w = 16).
+    w = 65536 needs about 137,000 attempts on average, more than 2 bytes can
+    count, so it keeps a 4-byte counter.
+    """
+    return 2 if w <= 256 else 4
 
 
 def idx_bytes(h):
@@ -180,13 +200,32 @@ def wots_pk_C(w, ots_type):
     return l * C_PRF + l * (w - 1) * C_Th1 + Thl
 
 
+def wots_tw_verify_steps(w, count=1):
+    """Mean chain steps to verify `count` WOTS-TW (or classic) signatures on
+    random digests, rounded to the nearest integer. Exact expectation under
+    the default convention, (w-1)*l/2 under the original one; see
+    compute_wots_tw_mean_steps in costs.sage."""
+    l1 = int(ceil(N * 8 / log(w, 2)))
+    l2 = int(floor(log(l1 * (w - 1), 2) / log(w, 2))) + 1
+    return int(compute_wots_tw_mean_steps(l1, l2, w, count))
+
+
+def wots_tw_sign_steps(w):
+    """Mean chain steps to produce one WOTS-TW (or classic) signature: the
+    signer walks the part of each chain that the verifier does not."""
+    l = wots_l(w, OTS_TW)
+    if HASH_CONVENTION != 'cached':
+        return l * (w - 1) // 2
+    return l * (w - 1) - wots_tw_verify_steps(w)
+
+
 def wots_sign_C(w, swn, ots_type):
     l = wots_l(w, ots_type)
     if ots_type == OTS_WC:
         nu     = compute_nu(l, swn, w)
         search = int((w**l + nu - 1) // nu)
         return search * C_Th1c + l * C_PRF + swn * C_Th1
-    return l * C_PRF + l * (w - 1) // 2 * C_Th1
+    return l * C_PRF + wots_tw_sign_steps(w) * C_Th1
 
 
 def wots_verify_worst_steps(w, ots_type):
@@ -201,22 +240,24 @@ def wots_verify_worst_steps(w, ots_type):
     return l1 * (w - 1) + l2 * (w - 1) - ds
 
 
-def wots_verify_C(w, swn, ots_type, worst_case=False):
+def wots_verify_C(w, swn, ots_type, worst_case=False, count=1):
+    """Compressions to verify `count` WOTS signatures: chain walks plus the
+    public-key compression (and the counter hash for WOTS+C)."""
     l   = wots_l(w, ots_type)
     Thl = wots_Thl(l, ots_type)
-    
+
     if ots_type == OTS_WC:
-        return ((w - 1) * l - swn) * C_Th1 + C_Th1c + Thl
-    
+        return count * (((w - 1) * l - swn) * C_Th1 + C_Th1c + Thl)
+
     if worst_case:
         steps = wots_verify_worst_steps(w, ots_type)
-        return steps * C_Th1 + Thl
-        
-    return l * (w - 1) // 2 * C_Th1 + Thl
+        return count * (steps * C_Th1 + Thl)
+
+    return wots_tw_verify_steps(w, count) * C_Th1 + count * Thl
 
 def tree_size_per_layer(h_prime, w, ots_type):
     l   = wots_l(w, ots_type)
-    ctr = C_SIZE if ots_type == OTS_WC else 0
+    ctr = counter_bytes(w) if ots_type == OTS_WC else 0
     return h_prime * N + l * N + ctr
 
 
@@ -226,20 +267,58 @@ def tree_keygen_C(h_prime, w, ots_type):
     return sz * pk + (sz - 1) * C_Th2
 
 
-def tree_sign_amortised_C(h_prime, w, swn, ots_type):
+# BDS tree traversal (Buchmann, Dahmen, Schneider, "Merkle Tree Traversal
+# Revisited", PQCrypto 2008). For a tree of height h' and a parameter K with
+# K >= 2 and h' - K even, each signature needs at most (h'-K)/2 + 1 leaf
+# (WOTS public key) computations and 3(h'-K-1)/2 + 1 node hashes. The
+# long-run average is about one leaf computation below the bound. The signer
+# state is counted as for the SHRINCS signer caches (shrincs-bip,
+# cache-management branch): 3h' + floor(h'/2) - 3K - 2 + 2^K nodes, see
+# bds_state_nodes.
+
+def bds_k(h_prime):
+    """Smallest admissible BDS parameter K for a tree of height h_prime."""
+    if h_prime < 2:
+        return h_prime
+    return 2 if h_prime % 2 == 0 else 3
+
+
+def bds_leaves(h_prime):
+    """Upper bound on leaf computations per signature."""
+    return (h_prime - bds_k(h_prime)) // 2 + 1
+
+
+def bds_hashes(h_prime):
+    """Upper bound on node hashes per signature."""
+    return (3 * max(0, h_prime - bds_k(h_prime) - 1)) // 2 + 1
+
+
+def bds_state_nodes(h_prime):
+    """Upper bound on stored nodes: the authentication path (h'), `keep`
+    (floor(h'/2)), `retain` (2^K - K - 1), one completed node per treehash
+    instance (h' - K) and their stack of partial results (h' - K - 1)."""
+    k = bds_k(h_prime)
+    return (h_prime + h_prime // 2 + (2**k - k - 1)
+            + max(0, h_prime - k) + max(0, h_prime - k - 1))
+
+
+def tree_sign_bds_C(h_prime, w, swn, ots_type):
+    """Cached signer of a single tree: one BDS update per signature (upper bound)."""
     pk   = wots_pk_C(w, ots_type)
     c_sg = wots_sign_C(w, swn, ots_type)
-    return C_Hmsg + C_PRFmsg + c_sg + h_prime * pk + h_prime * C_Th2
+    return (C_Hmsg + C_PRFmsg + c_sg
+            + bds_leaves(h_prime) * pk + bds_hashes(h_prime) * C_Th2)
 
 
-def tree_verify_C(h_prime, w, swn, ots_type, worst_case=False):
-    return wots_verify_C(w, swn, ots_type, worst_case) + h_prime * C_Th2
+def tree_verify_C(h_prime, w, swn, ots_type, worst_case=False, count=1):
+    return (wots_verify_C(w, swn, ots_type, worst_case, count)
+            + count * h_prime * C_Th2)
 
 
 def xmss_size_h(h, w, ots_type):
     l   = wots_l(w, ots_type)
-    ctr = C_SIZE if ots_type == OTS_WC else 0
-    return R_SIZE + ctr + l * N + h * N + idx_bytes(h)
+    ctr = counter_bytes(w) if ots_type == OTS_WC else 0
+    return IND_SIZE + R_SIZE + idx_bytes(h) + ctr + l * N + h * N
 
 
 def xmss_keygen_C_h(h, w, ots_type):
@@ -247,7 +326,7 @@ def xmss_keygen_C_h(h, w, ots_type):
 
 
 def xmss_sign_C_h(h, w, swn, ots_type):
-    return float(tree_sign_amortised_C(h, w, swn, ots_type))
+    return float(tree_sign_bds_C(h, w, swn, ots_type))
 
 
 def xmss_verify_C_h(h, w, swn, ots_type, worst_case=False):
@@ -276,7 +355,8 @@ def compute_xmss_rows(h):
 
 def xmssmt_size_h(h, d, w, ots_type):
     h_prime = h // d
-    return R_SIZE + d * tree_size_per_layer(h_prime, w, ots_type) + idx_bytes(h)
+    return (IND_SIZE + R_SIZE + idx_bytes(h)
+            + d * tree_size_per_layer(h_prime, w, ots_type))
 
 
 def xmssmt_keygen_C_h(h, d, w, ots_type):
@@ -285,24 +365,31 @@ def xmssmt_keygen_C_h(h, d, w, ots_type):
 
 
 def xmssmt_sign_cold_C_h(h, d, w, swn, ots_type):
+    """State-minimal signer: rebuild d trees of height h' per signature.
+
+    The top tree's root is the public key, so there the signer needs only the
+    authentication path: the other 2^h' - 1 leaves and every internal node
+    except the h' on the path from the signing leaf to the root."""
     h_prime = h // d
     return int(C_Hmsg + C_PRFmsg +
                d * (int(tree_keygen_C(h_prime, w, ots_type)) +
                     wots_sign_C(w, swn, ots_type))
-               - wots_pk_C(w, ots_type))
+               - wots_pk_C(w, ots_type) - h_prime * C_Th2)
 
 
 def xmssmt_sign_bds_C_h(h, d, w, swn, ots_type):
+    """Cached signer: one BDS update per layer and signature (upper bound)."""
     h_prime = h // d
     pk      = wots_pk_C(w, ots_type)
     c_sg    = wots_sign_C(w, swn, ots_type)
-    
-    return float(C_Hmsg + C_PRFmsg + c_sg + d * (h_prime * pk + h_prime * C_Th2))
+
+    return float(C_Hmsg + C_PRFmsg + c_sg
+                 + d * (bds_leaves(h_prime) * pk + bds_hashes(h_prime) * C_Th2))
 
 
 def xmssmt_verify_C_h(h, d, w, swn, ots_type, worst_case=False):
     h_prime = h // d
-    return float(C_Hmsg + d * tree_verify_C(h_prime, w, swn, ots_type, worst_case))
+    return float(C_Hmsg + tree_verify_C(h_prime, w, swn, ots_type, worst_case, d))
 
 
 def compute_xmssmt_rows(h):
@@ -326,39 +413,32 @@ def compute_xmssmt_rows(h):
             ))
     return rows
 
-def _uxmss_idx_bytes(hsf):
-    """UXMSS supports hsf+1 signatures; index only needs to distinguish those."""
-    if hsf <= 0:
-        return 1
-    return max(1, int(ceil(log(hsf + 1, 2) / 8)))
+def _uxmss_idx_bytes(depth):
+    """Bytes of the leaf index for a leaf at this depth: ceil(min(depth, 64) / 8).
+
+    SHRINCS sizes the index field by the depth of the signing leaf (a 64-bit
+    index at most), also for the unbalanced tree, where the index is only
+    ever 0 or 1."""
+    return max(1, (min(int(depth), 64) + 7) // 8)
 
 
 HSF_MAX = 255   # FXMSS encodes the node height as a single byte
 
+def uxmss_size(q, hsf, w, ots_type):
+    """Size of the q-th UXMSS signature (q = 1 is the first)."""
+    l     = wots_l(w, ots_type)
+    ctr   = counter_bytes(w) if ots_type == OTS_WC else 0
+    depth = min(q, hsf)
+    return IND_SIZE + R_SIZE + _uxmss_idx_bytes(depth) + ctr + l * N + depth * N
+
+
 def find_max_hsf(w, ots_type, target_size):
     """Largest hsf with the max UXMSS signature strictly < target_size,
-    capped at HSF_MAX = 255.
-
-    Because idx_bytes depends on hsf, we use a small fixed-point loop.
-    """
-    l   = wots_l(w, ots_type)
-    ctr = C_SIZE if ots_type == OTS_WC else 0
-    hsf = 0
-    # Iterate until the index-byte assumption is self-consistent.
-    for _ in range(64):
-        idx = _uxmss_idx_bytes(hsf)
-        avail = target_size - 1 - R_SIZE - ctr - l * N - idx
-        new_hsf = max(0, min(int(avail // N), HSF_MAX))
-        if new_hsf == hsf:
+    capped at HSF_MAX = 255."""
+    for hsf in range(HSF_MAX, 0, -1):
+        if uxmss_size(hsf, hsf, w, ots_type) < target_size:
             return hsf
-        hsf = new_hsf
-    return hsf
-
-
-def uxmss_size(q, hsf, w, ots_type):
-    l   = wots_l(w, ots_type)
-    ctr = C_SIZE if ots_type == OTS_WC else 0
-    return R_SIZE + ctr + l * N + min(q, hsf) * N + _uxmss_idx_bytes(hsf)
+    return 0
 
 
 def uxmss_keygen_C(hsf, w, ots_type):
@@ -366,15 +446,19 @@ def uxmss_keygen_C(hsf, w, ots_type):
 
 
 def uxmss_sign_C(q, hsf, w, swn, ots_type):
-    """Cached signer: the full tree is kept as state, auth nodes are lookups."""
-    return float(C_Hmsg + C_PRFmsg + wots_sign_C(w, swn, ots_type))
+    """Cached signer, q-th signature: the hsf + 1 leaf public keys are kept
+    as state. Every authentication node is one of them except the sibling of
+    the signing leaf on the spine, which is recombined from the cached leaves
+    below it: hsf - q node hashes (none for the last two signatures)."""
+    return float(C_Hmsg + C_PRFmsg + wots_sign_C(w, swn, ots_type)
+                 + (hsf - min(q, hsf)) * C_Th2)
 
 
 def uxmss_sign_cold_C(hsf, w, swn, ots_type):
-    """State-minimal signer: rebuild the hsf OTHER leaves (+ auth internals)
-    to derive the auth path, then sign."""
-    return float(C_Hmsg + C_PRFmsg + wots_sign_C(w, swn, ots_type)
-                 + hsf * wots_pk_C(w, ots_type) + hsf * C_Th2)
+    """State-minimal signer, first signature (the most expensive one):
+    rebuild the hsf other leaves, then proceed like the cached signer."""
+    return float(uxmss_sign_C(1, hsf, w, swn, ots_type)
+                 + hsf * wots_pk_C(w, ots_type))
 
 
 def uxmss_state_bytes(hsf):
@@ -383,12 +467,11 @@ def uxmss_state_bytes(hsf):
 
 
 def xmssmt_state_bytes(h, d, w, ots_type):
-    """BDS-style cached-signer state estimate: ~3.5*h' nodes per layer plus the cached
-    upper-layer WOTS signatures. See Buchmann-Dahmen-Schneider,
-    'Merkle Tree Traversal Revisited'."""
+    """Cached-signer state: the BDS state of every layer (see bds_state_nodes)
+    plus the cached upper-layer WOTS signatures."""
     h_prime = h // d
     l = wots_l(w, ots_type)
-    return int(d * ceil(3.5 * h_prime) * N + (d - 1) * l * N)
+    return int(d * bds_state_nodes(h_prime) * N + (d - 1) * l * N)
 
 def uxmss_verify_C(q, hsf, w, swn, ots_type, worst_case=False):
     return float(C_Hmsg + wots_verify_C(w, swn, ots_type, worst_case) + min(q, hsf) * C_Th2)
@@ -532,7 +615,7 @@ def print_xmss_table(rows_by_h):
     print("="*W)
     print(" XMSS — Single-Layer Balanced Tree ".center(W, "="))
     print(" OTS: WOTS-classic / WOTS-TW / WOTS+C  |  w ∈ {16,32,64,128,256} ".center(W, "="))
-    print(" Auth path = h nodes (fixed per sig); Sign-BDS = amortised ".center(W, "="))
+    print(" Auth path = h nodes (fixed per sig); Sign-BDS = bound per sig ".center(W, "="))
     print("="*W)
     print(_hdr(cols)); print(_sep_line(cols))
     for h in H_VALS:
@@ -559,7 +642,7 @@ def print_xmssmt_table(rows_by_h):
     print("="*W)
     print(" XMSS-MT — Multi-Tree Hypertree (no FORS needed; stateful) ".center(W, "="))
     print(" OTS: WOTS-classic / WOTS-TW / WOTS+C  |  w ∈ {16,32,64,128,256} ".center(W, "="))
-    print(" Keygen builds top tree only (2^h' keys); Sign-BDS amortised ".center(W, "="))
+    print(" Keygen builds top tree only (2^h' keys); Sign-BDS = bound per sig ".center(W, "="))
     print("="*W)
     print(_hdr(cols)); print(_sep_line(cols))
     cur_label = None
@@ -576,7 +659,7 @@ def print_xmssmt_table(rows_by_h):
                         fmt_c(r['verify_avg_C']), fmt_c(r['verify_worst_C'])], cols))
     print()
     print(_sep_line(cols))
-    print("Sign-cold: rebuild d trees per sig (worst-case). BDS: amortised O(d·h') PK evals.")
+    print("Sign-cold: rebuild d trees per sig (worst-case). BDS: at most d·((h'-K)/2 + 1) PK evals per sig.")
     print()
 
 

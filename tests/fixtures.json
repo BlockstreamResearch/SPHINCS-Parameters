@@ -30,9 +30,9 @@
   "role": "STANDARD baseline",
   "size": 7856,
   "kg": 292351,
-  "sg": 2218483,
-  "sv": 2155,
-  "sv_worst": 3891
+  "sg": 2218486,
+  "sv": 2193,
+  "sv_worst": 3893
  },
  "csv_rows": {
   "all_size_capped_candidates.csv": 7571,
@@ -43,364 +43,364 @@
    "role": "STANDARD baseline",
    "size": 7856,
    "kg": 292351,
-   "sg": 2218483,
-   "sv": 2155,
-   "sv_worst": 3891
+   "sg": 2218486,
+   "sv": 2193,
+   "sv_worst": 3893
   },
   "50,2,6,20,256": {
    "role": "Smallest Signature",
    "size": 3408,
    "kg": 154820149247,
-   "sg": 309659172862,
-   "sv": 4780,
-   "sv_worst": 8860
+   "sg": 309659172865,
+   "sv": 5022,
+   "sv_worst": 8862
   },
   "40,10,9,17,32": {
    "role": "Fastest Keygen",
    "size": 7728,
    "kg": 14479,
-   "sg": 3683732,
-   "sv": 4627,
-   "sv_worst": 8657
+   "sg": 3683735,
+   "sv": 4663,
+   "sv_worst": 8659
   },
   "40,8,23,8,32": {
    "role": "Fastest Signing",
    "size": 7552,
    "kg": 28959,
-   "sg": 249324,
-   "sv": 3792,
-   "sv_worst": 7016
+   "sg": 249327,
+   "sv": 3821,
+   "sv_worst": 7018
   },
   "50,2,6,20,16": {
    "role": "Fastest Verification",
    "size": 3952,
    "kg": 19159580671,
-   "sg": 38338035710,
-   "sv": 724,
-   "sv_worst": 1220
+   "sg": 38338035713,
+   "sv": 736,
+   "sv_worst": 1222
   },
   "40,2,18,20,16": {
    "role": "Best C/Byte",
    "size": 7824,
    "kg": 598736895,
-   "sg": 1254096885,
-   "sv": 969,
-   "sv_worst": 1465
+   "sg": 1254096888,
+   "sv": 981,
+   "sv_worst": 1467
   },
   "45,5,10,13,16": {
    "role": "Report Candidate 1",
    "size": 5776,
    "kg": 292351,
-   "sg": 1707512,
-   "sv": 1550,
-   "sv_worst": 2790
+   "sg": 1707515,
+   "sv": 1578,
+   "sv_worst": 2792
   },
   "45,5,8,16,16": {
    "role": "Report Candidate 2 / UXMSS ref",
    "size": 5712,
    "kg": 292351,
-   "sg": 3034618,
-   "sv": 1546,
-   "sv_worst": 2786
+   "sg": 3034621,
+   "sv": 1574,
+   "sv_worst": 2788
   },
   "40,5,19,10,16": {
    "role": "Balanced (min global X)",
    "size": 6800,
    "kg": 146175,
-   "sg": 789234,
-   "sv": 1617,
-   "sv_worst": 2857
+   "sg": 789237,
+   "sv": 1645,
+   "sv_worst": 2859
   },
   "40,5,19,9,16": {
    "role": "Case tuple",
    "size": 6496,
    "kg": 146175,
-   "sg": 760050,
-   "sv": 1598,
-   "sv_worst": 2838
+   "sg": 760053,
+   "sv": 1626,
+   "sv_worst": 2840
   },
   "40,5,13,12,16": {
    "role": "Case tuple 2",
    "size": 6160,
    "kg": 146175,
-   "sg": 890614,
-   "sv": 1575,
-   "sv_worst": 2815
+   "sg": 890617,
+   "sv": 1603,
+   "sv_worst": 2817
   },
   "40,4,9,16,16": {
    "role": "Normalized winner ref",
    "size": 5344,
    "kg": 584703,
-   "sg": 4108282,
-   "sv": 1286,
-   "sv_worst": 2278
+   "sg": 4108285,
+   "sv": 1308,
+   "sv_worst": 2280
   },
   "45,5,12,11,16": {
    "role": "Regular-weighted ref",
    "size": 5840,
    "kg": 292351,
-   "sg": 1535479,
-   "sv": 1555,
-   "sv_worst": 2795
+   "sg": 1535482,
+   "sv": 1583,
+   "sv_worst": 2797
   },
   "45,5,10,13,64": {
    "role": "w=64 spot (Candidate-1 analogue)",
    "size": 4896,
    "kg": 790527,
-   "sg": 4198392,
-   "sv": 4005,
-   "sv_worst": 7470
+   "sg": 4198395,
+   "sv": 4113,
+   "sv_worst": 7472
   },
   "45,5,10,13,128": {
    "role": "w=128 spot (Candidate-1 analogue)",
    "size": 4656,
    "kg": 1379839,
-   "sg": 7144952,
-   "sv": 6885,
-   "sv_worst": 12920
+   "sg": 7144955,
+   "sv": 7162,
+   "sv_worst": 12922
   },
   "45,5,10,13,4": {
    "role": "w=4 spot (Candidate-1 analogue)",
    "size": 8416,
    "kg": 148991,
-   "sg": 990712,
-   "sv": 790,
-   "sv_worst": 1285
+   "sg": 990715,
+   "sv": 794,
+   "sv_worst": 1287
   },
   "45,5,10,13,2": {
    "role": "w=2 spot (Candidate-1 analogue)",
    "size": 13856,
    "kg": 157695,
-   "sg": 1034232,
-   "sv": 705,
-   "sv_worst": 1040
+   "sg": 1034235,
+   "sv": 710,
+   "sv_worst": 1042
   }
  },
  "stateful": {
   "uxmss": {
    "TW,16": {
     "hsf": 255,
-    "sz_q1": 593,
-    "sz_max": 4657,
+    "sz_q1": 594,
+    "sz_max": 4665,
     "kg": 146175,
-    "sg": 301,
-    "sg_cold": 145906,
-    "sv_max": 529,
-    "sv_max_worst": 777,
+    "sg": 554,
+    "sg_cold": 145904,
+    "sv_max": 536,
+    "sv_max_worst": 779,
     "state": 4096
    },
    "TW,32": {
     "hsf": 255,
-    "sz_q1": 481,
-    "sz_max": 4545,
+    "sz_q1": 482,
+    "sz_max": 4553,
     "kg": 231679,
-    "sg": 466,
-    "sg_cold": 231241,
-    "sv_max": 699,
-    "sv_max_worst": 1102,
+    "sg": 720,
+    "sg_cold": 231240,
+    "sv_max": 704,
+    "sv_max_worst": 1104,
     "state": 4096
    },
    "TW,64": {
     "hsf": 255,
-    "sz_q1": 417,
-    "sz_max": 4481,
+    "sz_q1": 418,
+    "sz_max": 4489,
     "kg": 395263,
-    "sg": 784,
-    "sg_cold": 394504,
-    "sv_max": 1020,
-    "sv_max_worst": 1713,
+    "sg": 1020,
+    "sg_cold": 394485,
+    "sv_max": 1043,
+    "sv_max_worst": 1715,
     "state": 4096
    },
    "TW,128": {
     "hsf": 255,
-    "sz_q1": 369,
-    "sz_max": 4433,
+    "sz_q1": 370,
+    "sz_max": 4441,
     "kg": 689919,
-    "sg": 1358,
-    "sg_cold": 688583,
-    "sv_max": 1596,
-    "sv_max_worst": 2803,
+    "sg": 1561,
+    "sg_cold": 688531,
+    "sv_max": 1653,
+    "sv_max_worst": 2805,
     "state": 4096
    },
    "TW,256": {
     "hsf": 255,
-    "sz_q1": 321,
-    "sz_max": 4385,
+    "sz_q1": 322,
+    "sz_max": 4393,
     "kg": 1181183,
-    "sg": 2317,
-    "sg_cold": 1178887,
-    "sv_max": 2557,
-    "sv_max_worst": 4597,
+    "sg": 2454,
+    "sg_cold": 1178769,
+    "sv_max": 2679,
+    "sv_max_worst": 4599,
     "state": 4096
    },
    "WC,16": {
     "hsf": 255,
-    "sz_q1": 549,
-    "sz_max": 4613,
+    "sz_q1": 548,
+    "sz_max": 4619,
     "kg": 133631,
-    "sg": 342,
-    "sg_cold": 133452,
-    "sv_max": 507,
-    "sv_max_worst": 507,
+    "sg": 599,
+    "sg_cold": 133454,
+    "sv_max": 509,
+    "sv_max_worst": 509,
     "state": 4096
    },
    "WC,32": {
     "hsf": 255,
-    "sz_q1": 453,
-    "sz_max": 4517,
+    "sz_q1": 452,
+    "sz_max": 4523,
     "kg": 215039,
-    "sg": 552,
-    "sg_cold": 214752,
-    "sv_max": 668,
-    "sv_max_worst": 668,
+    "sg": 809,
+    "sg_cold": 214754,
+    "sv_max": 670,
+    "sv_max_worst": 670,
     "state": 4096
    },
    "WC,64": {
     "hsf": 255,
-    "sz_q1": 389,
-    "sz_max": 4453,
+    "sz_q1": 388,
+    "sz_max": 4459,
     "kg": 362239,
-    "sg": 938,
-    "sg_cold": 361763,
-    "sv_max": 957,
-    "sv_max_worst": 957,
+    "sg": 1195,
+    "sg_cold": 361765,
+    "sv_max": 959,
+    "sv_max_worst": 959,
     "state": 4096
    },
    "WC,128": {
     "hsf": 255,
-    "sz_q1": 341,
-    "sz_max": 4405,
+    "sz_q1": 340,
+    "sz_max": 4411,
     "kg": 624383,
-    "sg": 1636,
-    "sg_cold": 623581,
-    "sv_max": 1471,
-    "sv_max_worst": 1471,
+    "sg": 1893,
+    "sg_cold": 623583,
+    "sv_max": 1473,
+    "sv_max_worst": 1473,
     "state": 4096
    },
    "WC,256": {
     "hsf": 255,
-    "sz_q1": 293,
-    "sz_max": 4357,
+    "sz_q1": 292,
+    "sz_max": 4363,
     "kg": 1050111,
-    "sg": 2809,
-    "sg_cold": 1048819,
-    "sv_max": 2303,
-    "sv_max_worst": 2303,
+    "sg": 3066,
+    "sg_cold": 1048821,
+    "sv_max": 2305,
+    "sv_max_worst": 2305,
     "state": 4096
    },
    "TW,65536": {
     "hsf": 255,
-    "sz_q1": 193,
-    "sz_max": 4257,
+    "sz_q1": 194,
+    "sz_max": 4265,
     "kg": 167773183,
-    "sg": 327689,
-    "sg_cold": 167445509,
-    "sv_max": 327935,
-    "sv_max_worst": 590075,
+    "sg": 295182,
+    "sg_cold": 167412747,
+    "sv_max": 360701,
+    "sv_max_worst": 590077,
     "state": 4096
    },
    "WC,65536": {
     "hsf": 255,
-    "sz_q1": 165,
-    "sz_max": 4229,
+    "sz_q1": 166,
+    "sz_max": 4237,
     "kg": 134218751,
-    "sg": 398867,
-    "sg_cold": 134093327,
-    "sv_max": 262401,
-    "sv_max_worst": 262401,
+    "sg": 399124,
+    "sg_cold": 134093329,
+    "sv_max": 262403,
+    "sv_max_worst": 262403,
     "state": 4096
    }
   },
   "xmssmt": {
    "TW,20,1,16": {
-    "size": 899,
+    "size": 900,
     "kg": 598736895,
-    "sg": 11721,
-    "sg_cold": 598736626,
-    "sv": 294,
-    "sv_worst": 542,
-    "state": 1120
+    "sg": 6026,
+    "sg_cold": 598736605,
+    "sv": 301,
+    "sv_worst": 544,
+    "state": 1056
    },
    "WC,10,1,16": {
-    "size": 694,
+    "size": 693,
     "kg": 534527,
-    "sg": 5562,
-    "sg_cold": 534348,
-    "sv": 262,
-    "sv_worst": 262,
-    "state": 560
+    "sg": 2961,
+    "sg_cold": 534341,
+    "sv": 264,
+    "sv_worst": 264,
+    "state": 496
    },
    "TW,20,2,32": {
-    "size": 1235,
+    "size": 1236,
     "kg": 926719,
-    "sg": 18566,
-    "sg_cold": 1853462,
-    "sv": 906,
-    "sv_worst": 1712,
-    "state": 1568
+    "sg": 9528,
+    "sg_cold": 1853449,
+    "sv": 915,
+    "sv_worst": 1714,
+    "state": 1440
    },
    "WC,40,5,256": {
-    "size": 1961,
+    "size": 1952,
     "kg": 1050111,
-    "sg": 166889,
-    "sg_cold": 5260483,
-    "sv": 10272,
-    "sv_worst": 10272,
-    "state": 3264
+    "sg": 84872,
+    "sg_cold": 5260478,
+    "sv": 10274,
+    "sv_worst": 10274,
+    "state": 2944
    },
    "TW,40,10,16": {
-    "size": 6261,
+    "size": 6262,
     "kg": 9135,
-    "sg": 23141,
-    "sg_cold": 93754,
-    "sv": 2762,
-    "sv_worst": 5242,
-    "state": 7280
+    "sg": 11720,
+    "sg_cold": 93713,
+    "sv": 2815,
+    "sv_worst": 5244,
+    "state": 6640
    },
    "TW,30,3,16": {
-    "size": 2180,
+    "size": 2181,
     "kg": 584703,
-    "sg": 17431,
-    "sg_cold": 1754434,
-    "sv": 848,
-    "sv_worst": 1592,
-    "state": 2800
+    "sg": 8883,
+    "sg_cold": 1754415,
+    "sv": 865,
+    "sv_worst": 1594,
+    "state": 2608
    },
    "TW,20,1,64": {
-    "size": 723,
+    "size": 724,
     "kg": 1619001343,
-    "sg": 31664,
-    "sg_cold": 1619000584,
-    "sv": 785,
-    "sv_worst": 1478,
-    "state": 1120
+    "sg": 16222,
+    "sg_cold": 1619000546,
+    "sv": 808,
+    "sv_worst": 1480,
+    "state": 1056
    },
    "WC,20,1,128": {
-    "size": 647,
+    "size": 646,
     "kg": 2557476863,
-    "sg": 50416,
-    "sg_cold": 2557476061,
-    "sv": 1236,
-    "sv_worst": 1236,
-    "state": 1120
+    "sg": 26045,
+    "sg_cold": 2557476044,
+    "sv": 1238,
+    "sv_worst": 1238,
+    "state": 1056
    },
    "TW,20,1,65536": {
-    "size": 499,
+    "size": 500,
     "kg": 687198961663,
-    "sg": 13434969,
-    "sg_cold": 687198633989,
-    "sv": 327700,
-    "sv_worst": 589840,
-    "state": 1120
+    "sg": 6848584,
+    "sg_cold": 687198601208,
+    "sv": 360466,
+    "sv_worst": 589842,
+    "state": 1056
    },
    "WC,20,1,65536": {
-    "size": 471,
+    "size": 472,
     "kg": 549760008191,
-    "sg": 10884707,
-    "sg_cold": 549759882767,
-    "sv": 262166,
-    "sv_worst": 262166,
-    "state": 1120
+    "sg": 5641806,
+    "sg_cold": 549759882750,
+    "sv": 262168,
+    "sv_worst": 262168,
+    "state": 1056
    }
   }
  },
@@ -409,65 +409,65 @@
   "W+C|44,4,8,16,16,240": {
    "size": 4960,
    "kg": 1069055,
-   "sg": 5849347,
-   "sv": 1185,
-   "sv_worst": 1185
+   "sg": 5849350,
+   "sv": 1187,
+   "sv_worst": 1187
   },
   "W+C|40,5,11,14,256,2040": {
    "size": 4596,
    "kg": 1050111,
-   "sg": 5794969,
-   "sv": 10441,
-   "sv_worst": 10441
+   "sg": 5794972,
+   "sv": 10443,
+   "sv_worst": 10443
   },
   "W+C|40,5,11,14,256,2840": {
    "size": 4596,
    "kg": 1050111,
-   "sg": 5941944,
-   "sv": 6441,
-   "sv_worst": 6441
+   "sg": 5941947,
+   "sv": 6443,
+   "sv_worst": 6443
   },
   "W+C_F+C|44,4,8,16,16,240": {
    "size": 4688,
    "kg": 1069055,
-   "sg": 5914880,
-   "sv": 1168,
-   "sv_worst": 1168
+   "sg": 6111488,
+   "sv": 1170,
+   "sv_worst": 1170
   },
   "W+C_F+C|40,5,11,14,256,2040": {
    "size": 4356,
    "kg": 1050111,
-   "sg": 5811349,
-   "sv": 10425,
-   "sv_worst": 10425
+   "sg": 5860501,
+   "sv": 10427,
+   "sv_worst": 10427
   },
   "W+C_F+C|20,2,10,15,256,2040": {
    "size": 3160,
    "kg": 4200447,
-   "sg": 9418194,
-   "sv": 4261,
-   "sv_worst": 4261
+   "sg": 9516498,
+   "sv": 4263,
+   "sv_worst": 4263
   },
   "W+C_P+FP|44,4,8,16,16,240": {
    "size": 4464,
    "kg": 1069055,
-   "sg": 6337159,
-   "sv": 1151,
-   "sv_worst": 1151
+   "sg": 6703018,
+   "sv": 1153,
+   "sv_worst": 1153
   },
   "W+C_P+FP|40,5,11,14,256,2040": {
-   "size": 4020,
+   "size": 4036,
    "kg": 1050111,
-   "sg": 6237515,
-   "sv": 10401,
-   "sv_worst": 10401
+   "sg": 6251084,
+   "sv": 10404,
+   "sv_worst": 10404
   },
   "W+C_P+FP|24,2,8,16,16,240": {
    "size": 3112,
    "kg": 2138111,
-   "sg": 6337029,
-   "sv": 631,
-   "sv_worst": 631
+   "sg": 6702888,
+   "sv": 633,
+   "sv_worst": 633
   }
  },
  "variant_pool_counts": {
@@ -493,11 +493,11 @@
   },
   "uxmss|TW,16": {
    "hsf": 255,
-   "sz_q1": 593,
-   "sz_max": 4657,
+   "sz_q1": 594,
+   "sz_max": 4665,
    "kg": 146430,
-   "sg": 301,
-   "sg_cold": 146161,
+   "sg": 809,
+   "sg_cold": 146159,
    "state": 4096,
    "sv_max": 784,
    "sv_max_worst": 1032
@@ -511,5 +511,6 @@
   "32": 2913,
   "64": 3259
  },
- "_comment_w_stateful": "2026-08-24: stateful grid extended with w = 65536 (lg_w = 16, two-byte digits): l1 = 8, WOTS-TW l = 10, WOTS+C S_wn = floor(8*65535/2) = 262140 (grinding search = 136,715 attempts, exact under BigInt/int). XMSS-MT and UXMSS sweeps now cover 2 OTS x 6 w; uxmss rows 10 -> 12. Fixture spots chosen with all values < 2^53 so the site-JS comparison stays exact. The stateless grid is unaffected."
+ "_comment_w_stateful": "2026-08-24: stateful grid extended with w = 65536 (lg_w = 16, two-byte digits): l1 = 8, WOTS-TW l = 10, WOTS+C S_wn = floor(8*65535/2) = 262140 (grinding search = 136,715 attempts, exact under BigInt/int). XMSS-MT and UXMSS sweeps now cover 2 OTS x 6 w; uxmss rows 10 -> 12. Fixture spots chosen with all values < 2^53 so the site-JS comparison stays exact. The stateless grid is unaffected.",
+ "_comment_shrincs_2026_11_10": "2026-11-10: model aligned with the SHRINCS reference implementation (github.com/SHRINCS/shrincs-bip). Cached convention only: (1) WOTS-TW average verification uses the exact expected chain steps (w = 16: 267.12 per signature, not 262), rounded once over the d layers, and WOTS-TW signing walks the complement; (2) C_Hmsg = 4 (two nested SHA-256 calls) and C_PRFmsg = 3 (HMAC with its key pads cached), so each grinding attempt of FORS+C / PORS+FP costs 7 instead of 4, which moves the PORS+FP mmax of one variant spot by one node (size 4020 -> 4036). Both conventions: (3) stateful sizes follow the SHRINCS layout: indicator byte, UXMSS leaf index of ceil(min(depth, 64)/8) bytes, 2-byte WOTS+C counter (4 bytes at w = 65536); (4) cached signing is the BDS per-signature bound for XMSS / XMSS-MT ((h'-K)/2 + 1 leaves and 3(h'-K-1)/2 + 1 node hashes per layer; state 3h' + floor(h'/2) - 3K - 2 + 2^K nodes per layer) and, for UXMSS, the first signature with a leaf cache (hsf - 1 node hashes on top of the WOTS signature). Cold signing recounts its nodes: XMSS-MT does not rebuild the h' path nodes of the top tree, UXMSS is the first cached signature plus hsf leaf public keys (this supersedes the UXMSS bound in _comment_signing). baseline, stateless, stateful and variants were regenerated from tests/model.py and agree with a real SageMath 10.4 run of costs.sage, stateful.sage and the full sweep; csv_rows, site_pool_count, variant_pool_counts and optional_pool_counts are unchanged. uncached_spot: baseline and the W+C variant are untouched (the original convention is reproduced exactly); the uxmss spot changed through (3) and (4) only."
 }
