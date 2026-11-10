@@ -24,7 +24,7 @@ import model as M  # noqa: E402
 # --- Canonical grids: keep in sync with export_site_data.sage -------------
 GRID = {'h': (40, 50), 'd': (2, 25), 'k': (6, 24), 'a': (8, 20),
         'w': [2, 4, 16, 256], 'q_s_log2': 40, 'max_size': 7856}
-W_OPTIONAL = [32, 64]
+W_OPTIONAL = [32, 64, 128]
 WC_PAIRS = [(16, 240), (256, 2040)]
 STATEFUL_W = (16, 32, 64, 128, 256, 65536)
 POOL_FIELDS = ['h', 'd', 'k', 'a', 'w', 'swn', 'mmax',

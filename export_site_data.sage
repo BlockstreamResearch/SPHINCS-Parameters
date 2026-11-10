@@ -62,7 +62,7 @@ for s in schemes:
 GRID = {'h': [40, 50], 'd': [2, 25], 'k': [6, 24], 'a': [8, 20],
         'w': [2, 4, 16, 256], 'q_s_log2': 40, 'max_size': 7856}
 # Optional Winternitz extras for the SPX pool
-W_OPTIONAL = [32, 64]
+W_OPTIONAL = [32, 64, 128]
 WC_PAIRS = [(16, 240), (256, 2040)]   # (w, swn) for WOTS+C schemes
 POOL_FIELDS = ['h', 'd', 'k', 'a', 'w', 'swn', 'mmax',
                'size', 'kg', 'sg', 'sv', 'sv_worst']

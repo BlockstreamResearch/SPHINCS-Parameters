@@ -599,14 +599,14 @@
 
       <h2 class="section-title">Winternitz set</h2>
       <p class="hint">w = {2, 4, 16, 256} is always on (lg<sub>w</sub> | 8). Extras extend the SPX pool only.</p>
-      <label class="mode-toggle" title="lg_w = 5, 6 — base_2b digits straddle byte boundaries; outside strict SLH-DSA byte alignment. Exploratory.">
-        <input type="checkbox" id="optw-toggle"> include w = 32, 64 (non-aligned)
+      <label class="mode-toggle" title="lg_w = 5, 6, 7 — base_2b digits straddle byte boundaries; outside strict SLH-DSA byte alignment. Exploratory.">
+        <input type="checkbox" id="optw-toggle"> <span>include w = 32, 64, 128 <span style="white-space: nowrap;">(non-aligned)</span></span>
       </label>
 
       <h2 class="section-title">Filter coefficients</h2>
       <p class="hint">Bound each metric as a coefficient of SLH-DSA-128s. Survivors must satisfy every bound.</p>
       <div id="filter-controls"></div>
-      <label class="mode-toggle" title="Filter and rank on worst-case SigVer and ρ, compared against the baseline's worst case (SLH-DSA-128s: 3,891 C instead of 2,155 C). WOTS+C verification is deterministic, so those candidates keep the same values but gain headroom against the worst-case baseline.">
+      <label class="mode-toggle" title="Filter and rank on worst-case SigVer and ρ, compared against the baseline's worst case (SLH-DSA-128s: 3,893 C instead of 2,193 C). WOTS+C verification is deterministic, so those candidates keep the same values but gain headroom against the worst-case baseline.">
         <input type="checkbox" id="worst-toggle"> use worst-case SigVer &amp; ρ
       </label>
 
@@ -653,7 +653,7 @@
       <div class="panel">
         <h2>Compare your own candidate</h2>
         <p class="hint">Enter any (h, d, k, a, w) tuple to see how it stacks up against SLH-DSA-128s.
-          w covers the SLH-DSA-compatible choices {2, 4, 16, 256}, plus the optional extras 32 and 64.
+          w covers the SLH-DSA-compatible choices {2, 4, 16, 256}, plus the optional extras 32, 64 and 128.
           This panel always evaluates the plain SPX model (WOTS-TW + FORS), regardless of the scheme selected above.</p>
         <div class="custom-inputs" id="custom-inputs">
           <div class="field"><label>h</label><input type="number" id="cust-h" value="63" min="1" step="1"></div>
@@ -670,6 +670,7 @@
             <optgroup label="exploratory">
               <option value="32">32</option>
               <option value="64">64</option>
+              <option value="128">128</option>
             </optgroup>
           </select></div>
         </div>
@@ -692,7 +693,7 @@
     const ALLOWED_W = [2, 4, 16, 256];
 
     // Optional Winternitz extras, gated by a sidebar checkbox 
-    const OPTIONAL_W = [32, 64];
+    const OPTIONAL_W = [32, 64, 128];
     const UNIVERSE_W = [...ALLOWED_W, ...OPTIONAL_W];
 
     // ---------- Schnorr (BIP340) reference ----------
@@ -1126,7 +1127,7 @@
       pools: {},               // scheme -> candidate pool
       scheme: 'SPX',
       useWorst: false,         // filter/rank on worst-case SigVer & ρ
-      showOptW: false,         // include w = 32, 64 (non-byte-aligned extras)
+      showOptW: false,         // include w = 32, 64, 128 (non-byte-aligned extras)
       xMax: { kg: 20, sg: 20, sv: 20, cb: 20 },
       X: { ...DEFAULTS_X },
       W: { ...DEFAULTS_W },

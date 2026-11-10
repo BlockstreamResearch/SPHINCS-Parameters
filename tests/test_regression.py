@@ -302,7 +302,7 @@ def test_data_json_meta():
     assert d['meta']['grid']['h'] == [40, 50]
     assert d['meta']['grid']['k'] == [6, 24]
     assert d['meta']['grid']['w'] == [2, 4, 16, 256]
-    assert d['meta']['w_optional'] == [32, 64]
+    assert d['meta']['w_optional'] == [32, 64, 128]
     assert 'SPX' in d['meta']['schemes']
     for s in d['meta']['schemes']:
         p = d['pools'][s]
@@ -544,6 +544,8 @@ def test_site_data_integration():
 const data = JSON.parse(require('fs').readFileSync({json.dumps(data_path)}, 'utf8'));
 const pool = poolFromData(data, 'SPX');
 let ok = pool.length === data.pools.SPX.count;
+// the page's optional w set must be the one the dataset was exported with
+ok = ok && JSON.stringify(OPTIONAL_W) === JSON.stringify(data.meta.w_optional);
 const KEYS = ['size','kg','sg','sv','sv_worst'];
 ok = ok && !KEYS.some(k => STD_M[k] !== data.baseline[k]);
 const step = Math.max(1, Math.floor(pool.length / 50));
