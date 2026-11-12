@@ -7,6 +7,8 @@
 #   make figures    — report figures from the generated data         (python)
 #   make test       — regression suite (validates artifacts <-> model)
 #   make check-local — pre-push validation w/o sage
+#   make fixtures   — golden values in tests/fixtures.json that differ from the code (WRITE=1 updates them)
+#   make site-snapshot — numbers on the site pages vs tests/site_snapshot.json (UPDATE=1 records them)
 #   make clean-generated
 
 SAGE   ?= sage
@@ -18,7 +20,7 @@ IMAGES := document/content/images
 CSV_CAPPED  := $(UTILS)/all_size_capped_candidates.csv
 CSV_UNBOUND := $(UTILS)/all_unbound_candidates.csv
 
-.PHONY: generate sweeps derived data figures test check-local clean-generated
+.PHONY: generate sweeps derived data figures test check-local fixtures site-snapshot clean-generated
 
 generate: sweeps derived data figures test
 
@@ -70,6 +72,13 @@ test:
 check-local:
 	$(PYTHON) tests/synth_generated.py
 	GENERATED_REQUIRED=1 $(PYTHON) tests/test_regression.py
+
+fixtures:
+	$(PYTHON) tests/regen_fixtures.py $(if $(WRITE),--write)
+
+# Needs site/data.json and, once: npm install && npx playwright install chromium
+site-snapshot:
+	node tests/site_snapshot.js $(if $(UPDATE),--update)
 
 clean-generated:
 	rm -f $(CSV_CAPPED) $(CSV_UNBOUND)

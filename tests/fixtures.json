@@ -1,5 +1,8 @@
 {
- "_comment": "Golden values under the CACHED hash convention (default: PK.seed midstate cached, Th2=1, ADRS_c=22B \u2014 see costs.sage HASH_CONVENTION). uncached_spot holds frozen values from real prior sage runs under the original uncached convention.",
+ "_about": [
+  "Golden values for tests/test_regression.py; costs in SHA-256 compressions, sizes in bytes.",
+  "Check with `make fixtures`; after an intended change, update with `make fixtures WRITE=1`."
+ ],
  "wots_len": {
   "2": 136,
   "4": 68,
@@ -475,7 +478,6 @@
   "W+C_F+C": 7077,
   "W+C_P+FP": 7746
  },
- "_comment_variants": "variants: frozen from a real `sage costs.sage` CSV run; variant_pool_counts: frozen from the mpmath-verified 2026-07-05 generation (0 security pass/fail flips on the canonical grid).",
  "uncached_spot": {
   "baseline": {
    "size": 7856,
@@ -503,16 +505,9 @@
    "sv_max_worst": 1032
   }
  },
- "_comment_w_grid": "2026-08-07: w grid extended with 64 (l1=22, S_wn=693) and 128 (l1=19, S_wn=floor(19*127/2)=1206). csv_rows/site_pool_count recomputed by two independent local implementations (site JS sweep under node + tests/model.py sizes over the JS security-pass set); FORS security depends only on (h,k,a), so the security-pass set is unchanged from the mpmath-verified generation. Per-w capped pool: 16:2420 32:2913 64:3259 128:3542 256:3849.",
- "_comment_w_grid_2026_08_21": "2026-08-21: w grid restricted to the SLH-DSA-compatible byte-aligned choices {2, 4, 16, 256} (lg_w = log2(w) must divide 8; FIPS 205 standardises w = 16): 32/64/128 dropped, 2/4 added. FORS security depends only on (h,k,a), so the security-pass set (6,479 (h,d,k,a) combos) is unchanged from the mpmath-verified generation; csv_rows/site_pool_count recomputed by the site JS sweep under node and cross-checked against tests/model.py (w=16/256 per-w counts reproduce the frozen 2026-08-07 values exactly). Per-w capped pool: 2:165 4:1136 16:2420 256:3849.",
- "_comment_w_optional": "2026-08-21 (later): optional Winternitz extras added to the SPX pool behind an explorer checkbox \u2014 w in {32, 64} (non-byte-aligned, exploratory). Exported by export_site_data.sage sweep_spx_extra; the sweep CSVs, report and figures keep the core {2, 4, 16, 256} grid, so csv_rows are unchanged. site_pool_count covers core + extras; optional_pool_counts pins the per-w extras (both reproduce the frozen 2026-08-07 mpmath-verified counts exactly). A w = 65536 extreme mode existed briefly the same day and was removed as not meaningful.",
- "_comment_signing": "2026-08-09: WOTS signing counts signer-side work only \u2014 chains are walked to the signature positions and the leaf compress (Thl) belongs to the verifier. Cold signing rebuilds sibling leaves; the top-layer/UXMSS root is the public key, so the signer's own leaf pk is never recomputed (one wots_pk subtracted for XMSS-MT, hsf*pk + hsf*Th2 bound for UXMSS).",
  "optional_pool_counts": {
   "32": 2913,
   "64": 3259,
   "128": 3542
- },
- "_comment_w_stateful": "2026-08-24: stateful grid extended with w = 65536 (lg_w = 16, two-byte digits): l1 = 8, WOTS-TW l = 10, WOTS+C S_wn = floor(8*65535/2) = 262140 (grinding search = 136,715 attempts, exact under BigInt/int). XMSS-MT and UXMSS sweeps now cover 2 OTS x 6 w; uxmss rows 10 -> 12. Fixture spots chosen with all values < 2^53 so the site-JS comparison stays exact. The stateless grid is unaffected.",
- "_comment_shrincs_2026_11_10": "2026-11-10: model aligned with the SHRINCS reference implementation (github.com/SHRINCS/shrincs-bip). Cached convention only: (1) WOTS-TW average verification uses the exact expected chain steps (w = 16: 267.12 per signature, not 262), rounded once over the d layers, and WOTS-TW signing walks the complement; (2) C_Hmsg = 4 (two nested SHA-256 calls) and C_PRFmsg = 3 (HMAC with its key pads cached), so each grinding attempt of FORS+C / PORS+FP costs 7 instead of 4, which moves the PORS+FP mmax of one variant spot by one node (size 4020 -> 4036). Both conventions: (3) stateful sizes follow the SHRINCS layout: indicator byte, UXMSS leaf index of ceil(min(depth, 64)/8) bytes, 2-byte WOTS+C counter (4 bytes at w = 65536); (4) cached signing is the BDS per-signature bound for XMSS / XMSS-MT ((h'-K)/2 + 1 leaves and 3(h'-K-1)/2 + 1 node hashes per layer; state 3h' + floor(h'/2) - 3K - 2 + 2^K nodes per layer) and, for UXMSS, the first signature with a leaf cache (hsf - 1 node hashes on top of the WOTS signature). Cold signing recounts its nodes: XMSS-MT does not rebuild the h' path nodes of the top tree, UXMSS is the first cached signature plus hsf leaf public keys (this supersedes the UXMSS bound in _comment_signing). baseline, stateless, stateful and variants were regenerated from tests/model.py and agree with a real SageMath 10.4 run of costs.sage, stateful.sage and the full sweep; csv_rows, site_pool_count, variant_pool_counts and optional_pool_counts are unchanged. uncached_spot: baseline and the W+C variant are untouched (the original convention is reproduced exactly); the uxmss spot changed through (3) and (4) only.",
- "_comment_w_optional_2026_11_10": "2026-11-10: optional Winternitz extras extended with w = 128 (lg_w = 7; l1 = 19, l2 = 2, l = 21), behind the same explorer checkbox as 32 and 64: W_OPTIONAL = [32, 64, 128] in export_site_data.sage and tests/synth_generated.py, OPTIONAL_W in site/stateless.html. optional_pool_counts gains 128: 3542, which reproduces the frozen 2026-08-07 mpmath-verified per-w count exactly; site_pool_count 13742 -> 17284. Recomputed by three implementations: tests/model.py over the JS security-pass set, the site JS sweep under node, and a real SageMath 10.4 export. The sweep CSVs, the report and the figures keep the core {2, 4, 16, 256} grid, so csv_rows are unchanged."
+ }
 }

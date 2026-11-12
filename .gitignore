@@ -354,3 +354,6 @@ __pycache__/
 
 # Local audit notes
 AUDIT.md
+
+# Node packages
+node_modules/

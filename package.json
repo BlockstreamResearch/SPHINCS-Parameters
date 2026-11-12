@@ -1,0 +1,8 @@
+{
+  "name": "sphincs-parameters-dev",
+  "private": true,
+  "description": "Devtools for SPHINCS-Parameters: the site snapshot check.",
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}
