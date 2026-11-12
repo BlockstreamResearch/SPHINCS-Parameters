@@ -1,9 +1,5 @@
 'use strict';
 
-function uxmssStateBytes(hsf) {
-  return (hsf + 1) * N;
-}
-
 // Candidate builder 
 // Each candidate has { id, label, sub, scheme, params, metrics }
 let nextId = 1;

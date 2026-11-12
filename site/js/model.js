@@ -1,4 +1,4 @@
-// Shared cost-model layer for the three site pages.
+// Cost and security model shared by the three site pages.
 'use strict';
 
 // ---------- Cost-model constants  ----------
@@ -304,6 +304,11 @@ function uxmssSignColdC(hsf, w, swn, ots) {
   return uxmssSignC(1, hsf, w, swn, ots) + hsf * wotsPkC(w, ots);
 }
 
+// Cached-signer state: the hsf + 1 leaf public keys.
+function uxmssStateBytes(hsf) {
+  return (hsf + 1) * N;
+}
+
 function uxmssVerifyC(q, hsf, w, swn, ots, worstCase) {
   return C_Hmsg + wotsVerifyC(w, swn, ots, worstCase) + Math.min(q, hsf) * C_Th2;
 }
@@ -344,6 +349,110 @@ function slhMetrics(p) {
 
   return { size, kg, sg, sv, svWorst };
 }
+
+
+// ---------- Security ----------
+// Port of compute_security from BlockstreamResearch/SPHINCS-Parameters/security.sage.
+// Computes SLH-DSA bit security against FORS subset-forgery attacks for q_s signatures.
+// All probabilities accumulated in log2-space to avoid double-precision underflow.
+const _LOG2_E = 1 / Math.LN2;
+
+function _lgamma(z) {
+  if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - _lgamma(1 - z);
+  z -= 1;
+  const c = [
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7,
+  ];
+  let x = c[0];
+  for (let i = 1; i < 9; i++) x += c[i] / (z + i);
+  const t = z + 7.5;
+  return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+}
+
+function _log2Binom(n, k) {
+  if (k < 0 || k > n) return -Infinity;
+  if (k === 0 || k === n) return 0;
+  // For small k, direct sum (more accurate than lgamma(huge) − lgamma(huge))
+  if (k <= 500) {
+    let num = 0, denom = 0;
+    for (let i = 0; i < k; i++) num += Math.log2(n - i);
+    for (let i = 2; i <= k; i++) denom += Math.log2(i);
+    return num - denom;
+  }
+  return (_lgamma(n + 1) - _lgamma(k + 1) - _lgamma(n - k + 1)) * _LOG2_E;
+}
+
+function _log2OneMinusExp(x) {
+  if (x >= 0) return -Infinity;
+  return Math.log(-Math.expm1(x)) * _LOG2_E;
+}
+
+function _log2SumExp(a, b) {
+  if (a === -Infinity) return b;
+  if (b === -Infinity) return a;
+  if (a < b) { const tmp = a; a = b; b = tmp; }
+  return a + Math.log1p(Math.pow(2, b - a)) * _LOG2_E;
+}
+
+// Cap on the number of terms the forgery sum evaluates (see below).
+const MAX_SUM_TERMS = 1 << 16;
+
+/**
+ * FORS subset-forgery exponent -log2(forgery probability) for
+ * q_s = 2^q_s_log2 signatures (uncapped).
+ *
+ * The sum runs over r, the number of signatures that land on one FORS
+ * instance: r ~ Binomial(q_s, 2^-h) with mean lambda = q_s / 2^h. Only
+ * the terms within `spread` of lambda matter: further out the binomial
+ * weight is below e^-450 of its peak, and the forgery factor
+ * (1 - (1 - 1/t)^r)^k only grows with r, so the low side can be skipped
+ * as well as the high side. The work is therefore O(sqrt(lambda)), not
+ * O(lambda): a tuple with few hypertree leaves (h = 14 gives
+ * lambda = 2^26) used to need 67 million terms and froze the page.
+ * MAX_SUM_TERMS bounds the work for even smaller h, where the summand
+ * is smooth on the scale of the stride and a strided sum is accurate
+ * far beyond the displayed precision. For the canonical grid
+ * (lambda <= 1) nothing changes: r starts at 1 with stride 1.
+ */
+function forsForgeryExponent(q_s_log2, h, k, a) {
+  const q_s = Math.pow(2, q_s_log2);
+  const t = Math.pow(2, a);
+  const log2_p = -h;
+  const p = Math.pow(2, -h);
+  const log2_one_minus_p = p < 1e-15 ? -p * _LOG2_E : Math.log1p(-p) * _LOG2_E;
+  const ln_one_minus_1_over_t = 1 / t < 1e-15 ? -1 / t : Math.log1p(-1 / t);
+  const lambda = Math.pow(2, q_s_log2 - h);
+  let log2_sigma = -Infinity;
+  const spread = 30 * Math.sqrt(lambda + 1) + 30;
+  const r_max = Math.min(q_s, Math.max(Math.ceil(lambda + spread), 200));
+  const r_min = Math.max(1, Math.floor(lambda - spread));
+  const stride = Math.max(1, Math.ceil((r_max - r_min + 1) / MAX_SUM_TERMS));
+  const log2_stride = Math.log2(stride);
+  for (let r = r_min; r <= r_max; r += stride) {
+    const log2_C = _log2Binom(q_s, r);
+    if (!isFinite(log2_C)) continue;
+    const log2_qhp = log2_C + r * log2_p + (q_s - r) * log2_one_minus_p;
+    const log2_pf = k * _log2OneMinusExp(r * ln_one_minus_1_over_t);
+    const log2_contrib = log2_qhp + log2_pf + log2_stride;
+    if (isFinite(log2_contrib)) log2_sigma = _log2SumExp(log2_sigma, log2_contrib);
+    if (r > Math.max(lambda, 5) && log2_contrib < -500) break;
+  }
+  // sigma is a probability; rounding can leave it a hair above 1.
+  return Math.max(0, -log2_sigma);
+}
+
+/**
+ * Bit security: the forgery exponent capped by the hash preimage bound.
+ * hashbytes=16 ⇒ 128-bit cap.
+ */
+function computeSecurityBits(q_s_log2, h, k, a, hashbytes = 16) {
+  return Math.min(8 * hashbytes, forsForgeryExponent(q_s_log2, h, k, a));
+}
+
+// Report's q_s = 2^40
+const Q_S_LOG2 = 40;
 
 
 // ---------- Schnorr reference ----------

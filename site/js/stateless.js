@@ -1,9 +1,6 @@
 'use strict';
 
 // ---------- Constants ----------
-// SLH-DSA-128s baseline (matches the numbers in the tech report)
-const STD = { n: 16, h: 63, d: 7, k: 14, a: 12, w: 16 };
-
 // SLH-DSA-compatible Winternitz choices: lg_w = log2(w) must divide 8 so
 // that base_2b message digits stay byte-aligned (lg_w in {1, 2, 4, 8}).
 const ALLOWED_W = [2, 4, 16, 256];
@@ -12,194 +9,16 @@ const ALLOWED_W = [2, 4, 16, 256];
 const OPTIONAL_W = [32, 64, 128];
 const UNIVERSE_W = [...ALLOWED_W, ...OPTIONAL_W];
 
-// ---------- Schnorr (BIP340) reference ----------
-const SCHNORR_KAPPA_URL =
-  'https://raw.githubusercontent.com/mjthatch/bip340-vs-sha256/main/results/kappa.json';
-const SCHNORR_FALLBACK = {
-  cb64: 1.98,
-  impl: 'libsecp256k1',
-  commit: null, run: null, machine: null, preliminary: false,
-  live: false,
-};
-
-// ---------- Cost formulas ----------
-// WOTS+ chain components: { len1, len2, len }
-// len1 = message chains, len2 = checksum chains, len = len1 + len2
-function wotsComponents(n, w) {
-  const log2w = Math.log2(w);
-  const len1 = Math.ceil(8 * n / log2w);
-  const len2 = Math.floor(Math.log2(len1 * (w - 1)) / log2w) + 1;
-  return { len1, len2, len: len1 + len2 };
-}
-
-// Convenience wrapper kept for any callers that only need total length
-function wotsLen(n, w) { return wotsComponents(n, w).len; }
-
-// Worst-case WOTS-TW verification steps per hypertree layer.
-//
-// WOTS-TW has no constant-sum constraint (unlike WOTS+C), so the
-// average is WRONG for worst-case analysis.
-//
-// Worst case: all len1 message digits = 0 → verifier walks w-1 steps
-// on each message chain.  The checksum C = len1*(w-1) is then fixed,
-// and its base-w digit sum determines the remaining checksum work.
-//
-//   worst_steps = len1*(w-1) + len2*(w-1) - digitSum(len1*(w-1), w)
-//               = len*(w-1) - digitSum(len1*(w-1), w)
-//
-// Reference: costs.sage compute_verification_time(), SPX branch.
-function wotsVerifyWorstSteps(n, w) {
-  const { len1, len2 } = wotsComponents(n, w);
-  const C = len1 * (w - 1);
-  let ds = 0, rem = C;
-  while (rem > 0) { ds += rem % w; rem = Math.floor(rem / w); }
-  return len1 * (w - 1) + len2 * (w - 1) - ds;
-}
-
-// Average WOTS-TW verification steps over `count` hypertree layers,
-// rounded to the nearest integer (same as wotsTwMeanSteps in formulas.js
-// and compute_wots_tw_mean_steps in costs.sage).
-//
-// The len1 message chains average (w-1)/2 steps each, but the len2
-// checksum chains do not: the checksum is concentrated around
-// len1*(w-1)/2, so its leading digit is almost always 0 or 1 and the
-// verifier walks most of that chain. Exactly, with S the sum of the len1
-// message digits,
-//   E[steps] = (w-1) * (len2 + sum_{j=1}^{len2-1} E[floor(S / w^j)])
-// (267.12 for w = 16, where (w-1)*len/2 would give 262). The expectations
-// are E[floor(S / w^j)] = sum_{m>=1} P(S >= m*w^j), with the number of
-// digit strings of sum <= t counted by inclusion-exclusion:
-//   sum_i (-1)^i * C(len1, i) * C(t - i*w + len1, len1).
-function binomBig(n, k) {
-  if (k < 0n || k > n) return 0n;
-  if (k === 0n || k === n) return 1n;
-  if (k > n - k) k = n - k;
-  let num = 1n, den = 1n;
-  for (let i = 0n; i < k; i++) { num *= (n - i); den *= (i + 1n); }
-  return num / den;
-}
-
-// Per (n, w): the mean steps of one signature as the exact fraction num / W.
-const _meanStepsCache = new Map();
-function wotsVerifyMeanSteps(n, w, count) {
-  const key = n + ',' + w;
-  let mean = _meanStepsCache.get(key);
-  if (!mean) {
-    const { len1, len2 } = wotsComponents(n, w);
-    const L1 = BigInt(len1), wB = BigInt(w);
-    const top = L1 * (wB - 1n);
-    const W = wB ** L1;
-    const countLe = (t) => {
-      let total = 0n;
-      for (let i = 0n; i <= L1 && i * wB <= t; i++) {
-        const term = binomBig(L1, i) * binomBig(t - i * wB + L1, L1);
-        total += (i % 2n === 0n) ? term : -term;
-      }
-      return total;
-    };
-    let acc = 0n;
-    for (let j = 1; j < len2; j++) {
-      const step = wB ** BigInt(j);
-      for (let m = 1n; m * step <= top; m++) acc += W - countLe(m * step - 1n);
-    }
-    mean = { num: BigInt(w - 1) * (BigInt(len2) * W + acc), W };
-    _meanStepsCache.set(key, mean);
-  }
-  // count * num / W, rounded to the nearest integer
-  return Number((2n * BigInt(count) * mean.num + mean.W) / (2n * mean.W));
-}
-
-// Marginal compression-call count for a tweakable hash over n hash-sized
-// values, under the cached convention (FIPS 205 SHA-2 layout): the
-// PK.seed block is precomputed once per keypair, so each call costs only
-// ADRS_c (22 B = 176 bits) + payload (128n bits) + padding (65 bits).
-// Matches costs.sage (HASH_CONVENTION=cached, the default):
-//   compute_Th(n) = ceil((176 + 128*n + 65) / 512)
-function computeTh(n) {
-  return Math.ceil((176 + 128 * n + 65) / 512);
-}
-
+// Explorer rows use data.json's field names and carry ρ.
 function metrics(p) {
-  const n = STD.n; // 16 bytes (128-bit security)
-  const hp = p.h / p.d;
-  const { len } = wotsComponents(n, p.w);
-
-  // Compression costs: cached convention, matching costs.sage defaults:
-  // PK.seed midstate cached per keypair; a 2-child node hash is
-  // ADRS_c (22 B) + 32 B + padding = 497 bits -> 1 compression.
-  // Hmsg and PRFmsg for a 32-byte message and an empty context, as the
-  // SHRINCS reference implementation executes them: Hmsg is two nested
-  // SHA-256 calls of 2 compressions each (its input starts with the
-  // randomizer, so nothing is cacheable); PRFmsg is HMAC-SHA-256, 2 + 1
-  // compressions with its two key-pad blocks cached.
-  const C_PRF = 1;  // PRF generation
-  const C_Th1 = 1;  // tweakable hash, 1 value (WOTS chain step / leaf)
-  const C_Th2 = 1;  // tweakable hash, 2 values (internal tree node)
-  const C_Hmsg = 4; // Message hash
-  const C_PRFmsg = 3; // Message PRF
-
-  // Exact compression counts for leaf/root compressions (matches costs.sage).
-  // computeTh(n) = ceil((128 + 96 + 128*n + 65) / 512):
-  //   Thl = cost to compress len WOTS public values into one XMSS leaf
-  //   Thk = cost to compress k  FORS roots into one combined value
-  // Previously approximated as len and k respectively, which overstated both
-  // by ~25 and ~9 compressions for standard parameters, cascading into
-  // KeyGen (+12,800), SigGen (+89,609) and SigVer (+191) errors.
-  const Thl = computeTh(len);
-  const Thk = computeTh(p.k);
-
-  // 1. Signature Size (Bytes)
-  // Rand (1*n) + FORS (k*(a+1)*n) + Hypertree Auth (h*n) + WOTS (d*len*n)
-  const size = n * (1 + p.k * (p.a + 1) + p.h + p.d * len);
-
-  // 2. Cost of ONE XMSS Tree Layer (c_merkle)
-  const leavesPerTree = Math.pow(2, hp);
-  // Leaves: PRF + WOTS chains (w-1)*C_Th1 + leaf compression (Thl)
-  const wotsCost = (len * C_PRF) + (len * (p.w - 1) * C_Th1) + Thl;
-  // Internal nodes: (2^hp - 1) * C_Th2
-  const c_merkle = (leavesPerTree * wotsCost) + ((leavesPerTree - 1) * C_Th2);
-
-  // 3. Key Generation (Build top tree only)
-  const kg = c_merkle;
-
-  // 4. Signature Generation (FORS + d * c_merkle)
-  const forsLeaves = Math.pow(2, p.a);
-
-  // EXACT FORS COST: PRF + Leaf Hash (C_Th1) + Internal Nodes (C_Th2) + Root compress (Thk)
-  const c_fors_fixed = (p.k * forsLeaves * C_PRF) +
-    (p.k * forsLeaves * C_Th1) +
-    (p.k * (forsLeaves - 1) * C_Th2) +
-    Thk;
-
-  const c_msg = C_Hmsg + C_PRFmsg; // Cost to hash message
-  const sg = c_fors_fixed + c_msg + (p.d * c_merkle);
-
-  // 5a. Signature Verification — average case
-  // Exact expected chain steps for uniformly random digests, summed over
-  // the d layers (see wotsVerifyMeanSteps). Used for filter thresholds
-  // and distance scoring.
-  const c_wots_avg = wotsVerifyMeanSteps(n, p.w, p.d) * C_Th1 + p.d * Thl;
-  // FORS path verify: k leaves (C_Th1) + k*a internal nodes (C_Th2) + root (Thk)
-  const c_fts = (p.k * C_Th1) + (p.k * p.a * C_Th2) + Thk;
-  const sv = C_Hmsg + c_fts + c_wots_avg + (p.h * C_Th2);
-
-  // 5b. Signature Verification — worst case (WOTS-TW)
-  // All len1 message digits = 0: verifier walks w-1 steps per message chain.
-  // Checksum C = len1*(w-1) is fixed; its base-w digit sum determines checksum work.
-  // See wotsVerifyWorstSteps(). Displayed alongside average for comparison.
-  const c_wots_worst = (wotsVerifyWorstSteps(n, p.w) * C_Th1) + Thl;
-  const sv_worst = C_Hmsg + c_fts + (p.d * c_wots_worst) + (p.h * C_Th2);
-
-  // 6. Density (Compressions per byte)
-  // avg:   based on average-case SV (used for filter threshold and distance scoring)
-  // worst: based on worst-case SV — upper bound on verifier work per byte transferred
-  const cb = sv / size;
-  const cb_worst = sv_worst / size;
-
-  return { size, kg, sg, sv, sv_worst, cb, cb_worst };
+  const m = slhMetrics(p);
+  return {
+    size: m.size, kg: m.kg, sg: m.sg, sv: m.sv, sv_worst: m.svWorst,
+    cb: m.sv / m.size, cb_worst: m.svWorst / m.size,
+  };
 }
 
-const STD_M = metrics(STD);
+const STD_M = metrics(SLH);
 
 // ---------- Sweep ----------
 // Canonical grid — must match the report (Sec. 2) and slhdsa-2to40.sage defaults:
@@ -226,109 +45,6 @@ function sweep() {
   }
   return candidates;
 }
-
-// ---------- Security ----------
-// Port of compute_security from BlockstreamResearch/SPHINCS-Parameters/security.sage.
-// Computes SLH-DSA bit security against FORS subset-forgery attacks for q_s signatures.
-// All probabilities accumulated in log2-space to avoid double-precision underflow.
-const _LOG2_E = 1 / Math.LN2;
-
-function _lgamma(z) {
-  if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - _lgamma(1 - z);
-  z -= 1;
-  const c = [
-    0.99999999999980993, 676.5203681218851, -1259.1392167224028,
-    771.32342877765313, -176.61502916214059, 12.507343278686905,
-    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7,
-  ];
-  let x = c[0];
-  for (let i = 1; i < 9; i++) x += c[i] / (z + i);
-  const t = z + 7.5;
-  return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
-}
-
-function _log2Binom(n, k) {
-  if (k < 0 || k > n) return -Infinity;
-  if (k === 0 || k === n) return 0;
-  // For small k, direct sum (more accurate than lgamma(huge) − lgamma(huge))
-  if (k <= 500) {
-    let num = 0, denom = 0;
-    for (let i = 0; i < k; i++) num += Math.log2(n - i);
-    for (let i = 2; i <= k; i++) denom += Math.log2(i);
-    return num - denom;
-  }
-  return (_lgamma(n + 1) - _lgamma(k + 1) - _lgamma(n - k + 1)) * _LOG2_E;
-}
-
-function _log2OneMinusExp(x) {
-  if (x >= 0) return -Infinity;
-  return Math.log(-Math.expm1(x)) * _LOG2_E;
-}
-
-function _log2SumExp(a, b) {
-  if (a === -Infinity) return b;
-  if (b === -Infinity) return a;
-  if (a < b) { const tmp = a; a = b; b = tmp; }
-  return a + Math.log1p(Math.pow(2, b - a)) * _LOG2_E;
-}
-
-// Cap on the number of terms the forgery sum evaluates (see below).
-const MAX_SUM_TERMS = 1 << 16;
-
-/**
- * FORS subset-forgery exponent -log2(forgery probability) for
- * q_s = 2^q_s_log2 signatures (uncapped).
- *
- * The sum runs over r, the number of signatures that land on one FORS
- * instance: r ~ Binomial(q_s, 2^-h) with mean lambda = q_s / 2^h. Only
- * the terms within `spread` of lambda matter: further out the binomial
- * weight is below e^-450 of its peak, and the forgery factor
- * (1 - (1 - 1/t)^r)^k only grows with r, so the low side can be skipped
- * as well as the high side. The work is therefore O(sqrt(lambda)), not
- * O(lambda): a tuple with few hypertree leaves (h = 14 gives
- * lambda = 2^26) used to need 67 million terms and froze the page.
- * MAX_SUM_TERMS bounds the work for even smaller h, where the summand
- * is smooth on the scale of the stride and a strided sum is accurate
- * far beyond the displayed precision. For the canonical grid
- * (lambda <= 1) nothing changes: r starts at 1 with stride 1.
- */
-function forsForgeryExponent(q_s_log2, h, k, a) {
-  const q_s = Math.pow(2, q_s_log2);
-  const t = Math.pow(2, a);
-  const log2_p = -h;
-  const p = Math.pow(2, -h);
-  const log2_one_minus_p = p < 1e-15 ? -p * _LOG2_E : Math.log1p(-p) * _LOG2_E;
-  const ln_one_minus_1_over_t = 1 / t < 1e-15 ? -1 / t : Math.log1p(-1 / t);
-  const lambda = Math.pow(2, q_s_log2 - h);
-  let log2_sigma = -Infinity;
-  const spread = 30 * Math.sqrt(lambda + 1) + 30;
-  const r_max = Math.min(q_s, Math.max(Math.ceil(lambda + spread), 200));
-  const r_min = Math.max(1, Math.floor(lambda - spread));
-  const stride = Math.max(1, Math.ceil((r_max - r_min + 1) / MAX_SUM_TERMS));
-  const log2_stride = Math.log2(stride);
-  for (let r = r_min; r <= r_max; r += stride) {
-    const log2_C = _log2Binom(q_s, r);
-    if (!isFinite(log2_C)) continue;
-    const log2_qhp = log2_C + r * log2_p + (q_s - r) * log2_one_minus_p;
-    const log2_pf = k * _log2OneMinusExp(r * ln_one_minus_1_over_t);
-    const log2_contrib = log2_qhp + log2_pf + log2_stride;
-    if (isFinite(log2_contrib)) log2_sigma = _log2SumExp(log2_sigma, log2_contrib);
-    if (r > Math.max(lambda, 5) && log2_contrib < -500) break;
-  }
-  // sigma is a probability; rounding can leave it a hair above 1.
-  return Math.max(0, -log2_sigma);
-}
-
-/**
- * Bit security: the forgery exponent capped by the hash preimage bound.
- * hashbytes=16 ⇒ 128-bit cap.
- */
-function computeSecurityBits(q_s_log2, h, k, a, hashbytes = 16) {
-  return Math.min(8 * hashbytes, forsForgeryExponent(q_s_log2, h, k, a));
-}
-
-// Report's q_s = 2^40
-const Q_S_LOG2 = 40;
 
 // 128-bit security check using the real FORS forgery analysis
 function passesSecurity(c) {
@@ -460,7 +176,6 @@ const state = {
   candidates: [],
   initialPool: [],
   siteData: null,          // parsed data.json (null in fallback mode)
-  schnorr: { ...SCHNORR_FALLBACK },  // BIP340 ρ reference (live after loadSchnorrRef)
   pools: {},               // scheme -> candidate pool
   scheme: 'SPX',
   useWorst: false,         // filter/rank on worst-case SigVer & ρ
@@ -796,7 +511,7 @@ function ratioClass(r, inverse = false) {
 
 // Rows of the comparison tables: each metric next to its SLH-DSA-128s value.
 function comparisonRows(c) {
-  const schnorr = state.schnorr.cb64;
+  const schnorr = SCHNORR.cb64;
   const rows = [
     ['Size (B)', c.size, STD_M.size, fmtNum],
     ['KeyGen (C)', c.kg, STD_M.kg, fmtNum],
@@ -1010,12 +725,12 @@ function renderCustom() {
     statusEl.innerHTML = `<strong>Valid, with notes:</strong><ul>${v.warnings.map(w => `<li>${w}</li>`).join('')}</ul>`;
   } else {
     statusEl.className = 'custom-status ok';
-    const sameAsStd = p.h === STD.h && p.d === STD.d && p.k === STD.k && p.a === STD.a && p.w === STD.w;
+    const sameAsStd = p.h === SLH.h && p.d === SLH.d && p.k === SLH.k && p.a === SLH.a && p.w === SLH.w;
     statusEl.innerHTML = `<strong>Valid.</strong>${sameAsStd ? ' This is SLH-DSA-128s.' : ''}`;
   }
 
   const hp = p.h / p.d;
-  const wotsL = wotsLen(STD.n, p.w);
+  const chains = wotsL(p.w, 'TW');
   const secRaw = forsForgeryExponent(Q_S_LOG2, p.h, p.k, p.a);
   const rawTxt = secRaw > 300 ? '&gt; 300' : secRaw.toFixed(1);
   const secLabel = secRaw >= 128
@@ -1029,7 +744,7 @@ function renderCustom() {
     <p class="winner-tuple">(${p.h}, ${p.d}, ${p.k}, ${p.a}, ${p.w})</p>
     <div class="custom-notes">
       <div>Layer height h′ = ${hp}</div>
-      <div>WOTS chains: ${wotsL}</div>
+      <div>WOTS chains: ${chains}</div>
       <div>Security at q<sub>s</sub> = 2<sup>40</sup>: ${secLabel}</div>
     </div>
   </div>
@@ -1078,31 +793,6 @@ async function loadSiteData() {
   }
 }
 
-// Fetch the BIP340 Schnorr verification-density reference (C/B) from the bip340-vs-sha256 repo
-async function loadSchnorrRef() {
-  try {
-    const resp = await fetch(SCHNORR_KAPPA_URL, { cache: 'no-cache' });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const k = await resp.json();
-    const entry = k && k.cb && k.cb[SCHNORR_FALLBACK.impl];
-    const cb = entry && entry.cb_64;
-    if (!isFinite(cb) || cb <= 0) throw new Error('cb.' + SCHNORR_FALLBACK.impl + '.cb_64 missing');
-    return {
-      cb64: cb,
-      impl: SCHNORR_FALLBACK.impl,
-      commit: k.secp256k1_commit || null,
-      run: typeof k.run_utc === 'string' ? k.run_utc.slice(0, 10) : null,
-      machine: k.machine || null,
-      preliminary: !!k.preliminary,
-      live: true,
-    };
-  } catch (e) {
-    console.warn('Schnorr reference kappa.json unavailable (' + e.message +
-      ') — using the built-in ' + SCHNORR_FALLBACK.cb64.toFixed(2) + ' C/B.');
-    return { ...SCHNORR_FALLBACK };
-  }
-}
-
 // Cross-check the loaded data against the local formulas: the baseline
 // plus a sample of pool rows. Any divergence is a bug in one of the two
 // implementations — log it loudly.
@@ -1145,7 +835,7 @@ function renderSchemeButtons() {
 }
 
 function schnorrNote() {
-  const s = state.schnorr;
+  const s = SCHNORR;
   const src = s.live
     ? `kappa.json${s.commit ? ` at secp256k1 ${s.commit}` : ''}${s.run ? `, ${s.run}` : ''}` +
       `${s.machine ? `, ${s.machine}` : ''}${s.preliminary ? ', preliminary' : ''}`
@@ -1272,9 +962,9 @@ function exportSurvivorsCSV() {
     lines.push([state.scheme, c.h, c.d, c.k, c.a, c.w, c.swn || 0, c.mmax || 0,
       c.size, c.kg, c.sg, c.sv, c.sv_worst,
       c.cb.toFixed(6), c.cb_worst.toFixed(6),
-      (c.cb / state.schnorr.cb64).toFixed(6),
-      (c.cb_worst / state.schnorr.cb64).toFixed(6),
-      state.schnorr.cb64.toFixed(6),
+      (c.cb / SCHNORR.cb64).toFixed(6),
+      (c.cb_worst / SCHNORR.cb64).toFixed(6),
+      SCHNORR.cb64.toFixed(6),
       weightedDistance(c, state.W).toFixed(6)].join(','));
   }
   const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv' });
@@ -1288,7 +978,7 @@ function exportSurvivorsCSV() {
 async function setup() {
   const [data, schnorr] = await Promise.all([loadSiteData(), loadSchnorrRef()]);
   state.siteData = data;
-  state.schnorr = schnorr;
+  SCHNORR = schnorr;
   if (data) {
     data.meta.schemes.forEach((s, si) => {
       const pool = poolFromData(data, s);

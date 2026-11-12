@@ -85,7 +85,7 @@ function renderUxmss() {
     row('KeyGen (C)', fmtNum(kg)),
     row('SigGen, cached (C)', `${fmtNum(sg1)} → ${fmtNum(sgLast)}`),
     row('SigGen, cold (C)', fmtNum(sgCold)),
-    row('State (B)', fmtNum((hsf + 1) * N)),
+    row('State (B)', fmtNum(uxmssStateBytes(hsf))),
     row('SigVer (C)', `${fmtNum(sv1)} → ${fmtNum(svMax)}`),
     row('ρ (C/B)', `${fmtRho(cb1)} → ${fmtRho(cbMax)}`),
     row('ρ ÷ Schnorr', `${fmtRatio(cb1 / SCHNORR.cb64)} → ${fmtRatio(cbMax / SCHNORR.cb64)}`),
