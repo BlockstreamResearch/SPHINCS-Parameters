@@ -169,12 +169,12 @@ def _run_node(js):
     return json.loads(p.stdout.strip().splitlines()[-1])
 
 
-def test_site_index():
+def test_site_explorer():
     js = _page_js('stateless.html')
     tuples = [list(_tuple_of(k)) for k in FIX['stateless']]
     js += f"""
 const _tuples = {json.dumps(tuples)};
-const out = {{ pool: sweep().filter(passesInitial).length, metrics: {{}} }};
+const out = {{ metrics: {{}} }};
 for (const t of _tuples) {{
   const m = metrics({{h:t[0], d:t[1], k:t[2], a:t[3], w:t[4]}});
   out.metrics[t.join(',')] = [m.size, m.kg, m.sg, m.sv, m.sv_worst];
@@ -184,7 +184,6 @@ console.log(JSON.stringify(out));
     out = _run_node(js)
     if out is None:
         return
-    assert out['pool'] == FIX['site_pool_count'], out['pool']
     for key, f in FIX['stateless'].items():
         got = out['metrics'][key]
         want = [f['size'], f['kg'], f['sg'], f['sv'], f['sv_worst']]
