@@ -956,9 +956,25 @@
       return a + Math.log1p(Math.pow(2, b - a)) * _LOG2_E;
     }
 
+    // Cap on the number of terms the forgery sum evaluates (see below).
+    const MAX_SUM_TERMS = 1 << 16;
+
     /**
      * FORS subset-forgery exponent -log2(forgery probability) for
      * q_s = 2^q_s_log2 signatures (uncapped).
+     *
+     * The sum runs over r, the number of signatures that land on one FORS
+     * instance: r ~ Binomial(q_s, 2^-h) with mean lambda = q_s / 2^h. Only
+     * the terms within `spread` of lambda matter: further out the binomial
+     * weight is below e^-450 of its peak, and the forgery factor
+     * (1 - (1 - 1/t)^r)^k only grows with r, so the low side can be skipped
+     * as well as the high side. The work is therefore O(sqrt(lambda)), not
+     * O(lambda): a tuple with few hypertree leaves (h = 14 gives
+     * lambda = 2^26) used to need 67 million terms and froze the page.
+     * MAX_SUM_TERMS bounds the work for even smaller h, where the summand
+     * is smooth on the scale of the stride and a strided sum is accurate
+     * far beyond the displayed precision. For the canonical grid
+     * (lambda <= 1) nothing changes: r starts at 1 with stride 1.
      */
     function forsForgeryExponent(q_s_log2, h, k, a) {
       const q_s = Math.pow(2, q_s_log2);
@@ -969,17 +985,22 @@
       const ln_one_minus_1_over_t = 1 / t < 1e-15 ? -1 / t : Math.log1p(-1 / t);
       const lambda = Math.pow(2, q_s_log2 - h);
       let log2_sigma = -Infinity;
-      const r_max = Math.max(Math.ceil(lambda + 30 * Math.sqrt(lambda + 1)) + 30, 200);
-      for (let r = 1; r <= r_max; r++) {
+      const spread = 30 * Math.sqrt(lambda + 1) + 30;
+      const r_max = Math.min(q_s, Math.max(Math.ceil(lambda + spread), 200));
+      const r_min = Math.max(1, Math.floor(lambda - spread));
+      const stride = Math.max(1, Math.ceil((r_max - r_min + 1) / MAX_SUM_TERMS));
+      const log2_stride = Math.log2(stride);
+      for (let r = r_min; r <= r_max; r += stride) {
         const log2_C = _log2Binom(q_s, r);
         if (!isFinite(log2_C)) continue;
         const log2_qhp = log2_C + r * log2_p + (q_s - r) * log2_one_minus_p;
         const log2_pf = k * _log2OneMinusExp(r * ln_one_minus_1_over_t);
-        const log2_contrib = log2_qhp + log2_pf;
+        const log2_contrib = log2_qhp + log2_pf + log2_stride;
         if (isFinite(log2_contrib)) log2_sigma = _log2SumExp(log2_sigma, log2_contrib);
         if (r > Math.max(lambda, 5) && log2_contrib < -500) break;
       }
-      return -log2_sigma;
+      // sigma is a probability; rounding can leave it a hair above 1.
+      return Math.max(0, -log2_sigma);
     }
 
     /**
@@ -1303,7 +1324,7 @@
               numInp.value = v.toFixed(parseInt(numInp.dataset.dp, 10));
             }
             store[key] = v;
-            update();
+            requestUpdate();
           });
         });
         // Number input -> store + slider
@@ -1318,7 +1339,7 @@
             store[key] = clamped;
             const slider = document.querySelector(`input[data-${group}="${key}"]`);
             slider.value = slider.dataset.log ? xToPos(clamped, min, max) : clamped;
-            update();
+            requestUpdate();
           });
           // On blur, reformat to canonical precision and re-clamp the displayed value
           inp.addEventListener('blur', e => {
@@ -1533,7 +1554,16 @@
       state.lastWinner = winner;
       renderScatter(eliminatedAt, survivors, winner);
       renderWinner(winner);
-      writeHash();
+      scheduleHashWrite();
+    }
+
+    // A slider drag fires an input event per step. Recompute and redraw at
+    // most once per animation frame instead of once per event.
+    let updateQueued = false;
+    function requestUpdate() {
+      if (updateQueued) return;
+      updateQueued = true;
+      requestAnimationFrame(() => { updateQueued = false; update(); });
     }
 
     // ---------- Hover tooltip ----------
@@ -1666,7 +1696,7 @@
       const v = validateCustom(p);
       const statusEl = document.getElementById('custom-status');
       const resultEl = document.getElementById('custom-result');
-      writeHash();
+      scheduleHashWrite();
 
       if (!v.valid) {
         statusEl.className = 'custom-status invalid';
@@ -1940,7 +1970,21 @@
       const url = parts.length
         ? '#' + parts.join('&')
         : location.pathname + location.search;
-      history.replaceState(null, '', url);
+      // Safari throws once a page exceeds its history-update quota.
+      try { history.replaceState(null, '', url); } catch (err) { /* keep the page working */ }
+    }
+
+    // The address bar mirrors the state, but not on every slider step:
+    // browsers rate-limit history.replaceState (Chromium silently drops
+    // calls beyond about 200 per 10 s, which left the URL stale after a long
+    // drag; Safari throws), and every call is a same-document navigation the
+    // browser has to process in the middle of the drag. One write, shortly
+    // after the last change, is enough.
+    const HASH_WRITE_DELAY_MS = 250;
+    let hashTimer = null;
+    function scheduleHashWrite() {
+      clearTimeout(hashTimer);
+      hashTimer = setTimeout(writeHash, HASH_WRITE_DELAY_MS);
     }
 
     function applyHash() {

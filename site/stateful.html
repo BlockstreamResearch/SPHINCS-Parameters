@@ -950,7 +950,7 @@ function renderSweepFilterGroup(hostId, group, filters) {
         inp.value = v.toFixed(parseInt(inp.dataset.dp, 10));
       }
       store[key] = v;
-      renderSweepTable();
+      requestSweepRender();
     });
   });
   host.querySelectorAll('input[data-sw-input]').forEach(inp => {
@@ -963,7 +963,7 @@ function renderSweepFilterGroup(hostId, group, filters) {
       store[key] = v;
       const slider = host.querySelector(`input[data-sw="${key}"]`);
       slider.value = slider.dataset.log ? xToPos(v, min, max) : v;
-      renderSweepTable();
+      requestSweepRender();
     });
     inp.addEventListener('blur', e => {
       const key = e.target.dataset.swInput;
@@ -1023,7 +1023,7 @@ function renderSweepTable() {
     return sign * (av < bv ? -1 : 1);
   });
   sweepState.lastSurvivors = survivors;
-  writeStatefulHash();
+  scheduleStatefulHashWrite();
 
   document.getElementById('sweep-info').innerHTML =
     `<strong>${survivors.length}</strong> of ${SWEEP_FACTORIES.length} candidates pass the current bounds.`;
@@ -1055,6 +1055,8 @@ function renderSweepTable() {
   const tbody = document.createElement('tbody');
   const MAX_ROWS = 200;
   const shown = survivors.slice(0, MAX_ROWS);
+  // Collect the rows and parse them once.
+  const rowsHtml = [];
   for (const f of shown) {
     const c = f.cached;
     const m = c.metrics;
@@ -1076,11 +1078,12 @@ function renderSweepTable() {
     const disabled = inComparison.has(c.label) ? 'disabled' : '';
     row += `<td class="act-col"><button class="row-add" data-key="${f.key}" ${disabled} title="${disabled ? 'Already in comparison' : 'Add to comparison'}">+</button></td>`;
     row += '</tr>';
-    tbody.innerHTML += row;
+    rowsHtml.push(row);
   }
   if (survivors.length > MAX_ROWS) {
-    tbody.innerHTML += `<tr><td class="cand-col" colspan="${SWEEP_COLS.length + 2}" style="text-align:center;color:var(--text-mute);font-style:italic;">… and ${survivors.length - MAX_ROWS} more (tighten a bound to narrow further)</td></tr>`;
+    rowsHtml.push(`<tr><td class="cand-col" colspan="${SWEEP_COLS.length + 2}" style="text-align:center;color:var(--text-mute);font-style:italic;">… and ${survivors.length - MAX_ROWS} more (tighten a bound to narrow further)</td></tr>`);
   }
+  tbody.innerHTML = rowsHtml.join('');
 
   table.appendChild(thead);
   table.appendChild(tbody);
@@ -1148,8 +1151,27 @@ function writeStatefulHash() {
   if (sweepState.sort.col !== 'distance' || sweepState.sort.dir !== 'asc')
     parts.push('sort=' + sweepState.sort.col + '.' + sweepState.sort.dir);
   if (SIGNER_MODE !== 'cached') parts.push('m=' + SIGNER_MODE);
-  history.replaceState(null, '',
-    parts.length ? '#' + parts.join('&') : location.pathname + location.search);
+  // Safari throws once a page exceeds its history-update quota.
+  try {
+    history.replaceState(null, '',
+      parts.length ? '#' + parts.join('&') : location.pathname + location.search);
+  } catch (err) { /* keep the page working */ }
+}
+
+const HASH_WRITE_DELAY_MS = 250;
+let statefulHashTimer = null;
+function scheduleStatefulHashWrite() {
+  clearTimeout(statefulHashTimer);
+  statefulHashTimer = setTimeout(writeStatefulHash, HASH_WRITE_DELAY_MS);
+}
+
+// A slider drag fires an input event per step. Rebuild the sweep table at most
+// once per animation frame instead of once per event.
+let sweepRenderQueued = false;
+function requestSweepRender() {
+  if (sweepRenderQueued) return;
+  sweepRenderQueued = true;
+  requestAnimationFrame(() => { sweepRenderQueued = false; renderSweepTable(); });
 }
 
 function applyStatefulHash() {
@@ -1314,7 +1336,7 @@ function setupAddForm() {
 function render() {
   renderComparison();
   if (SWEEP_FACTORIES.length > 0) renderSweepTable();
-  else writeStatefulHash();
+  else scheduleStatefulHashWrite();
 }
 
 //  Init

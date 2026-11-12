@@ -194,6 +194,35 @@ console.log(JSON.stringify(out));
         assert got == want, (key, got, want)
 
 
+def test_site_security_small_trees():
+    """The custom-candidate panel accepts any (h, k, a), so the forgery sum
+    must stay cheap when the hypertree has few leaves (lambda = q_s / 2^h
+    huge): h = 14 used to take about 11 s per evaluation and froze the page."""
+    js = _extract_js('stateless.html', '// ---------- State ----------')
+    js += """
+const t0 = Date.now();
+const out = {
+  // lambda = 2^26 and 2^33: every FORS instance is reused millions of times
+  h14: forsForgeryExponent(Q_S_LOG2, 14, 14, 12),
+  h7: forsForgeryExponent(Q_S_LOG2, 7, 14, 12),
+  // same lambda with 2^40 leaves per tree: (2^26 / 2^40)^14 = 2^-196
+  h14_a40: forsForgeryExponent(Q_S_LOG2, 14, 14, 40),
+  // lambda = 2^12 and 2^5: every term is summed (stride 1)
+  h28: forsForgeryExponent(Q_S_LOG2, 28, 14, 12),
+  h35: forsForgeryExponent(Q_S_LOG2, 35, 14, 12),
+};
+out.ms = Date.now() - t0;
+console.log(JSON.stringify(out));
+"""
+    out = _run_node(js)
+    if out is None:
+        return
+    assert 0 <= out['h14'] < 1e-3 and 0 <= out['h7'] < 1e-3, out
+    assert abs(out['h14_a40'] - 196) < 1e-3, out
+    assert abs(out['h28'] - 9.2530) < 1e-3 and abs(out['h35'] - 94.7784) < 1e-3, out
+    assert out['ms'] < 5000, out     # about 0.1 s; the unbounded sum needed minutes
+
+
 def test_site_main():
     """index.html (SHRINCS main): pinned cards must match the reference model."""
     js = _extract_js('index.html', '// ---------- Render ----------')
