@@ -275,13 +275,6 @@ function renderControls() {
 
   bindSliderPairs(document.getElementById('filter-controls'), state.X, requestUpdate);
   bindSliderPairs(document.getElementById('weight-controls'), state.W, requestUpdate);
-
-  document.getElementById('reset-btn').addEventListener('click', () => {
-    state.X = { ...DEFAULTS_X };
-    state.W = { ...DEFAULTS_W };
-    renderControls();
-    update();
-  });
 }
 
 function renderFunnel(stepCounts) {
@@ -866,6 +859,12 @@ async function setup() {
     state.showOptW = e.target.checked;
     rebuildInitialPool();
     renderInfoStrip();
+    update();
+  });
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    state.X = { ...DEFAULTS_X };
+    state.W = { ...DEFAULTS_W };
+    renderControls();
     update();
   });
   bindShareButton(writeHash);
