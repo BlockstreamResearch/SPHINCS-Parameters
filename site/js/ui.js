@@ -41,7 +41,7 @@ function infoButton(id, label) {
 }
 
 (function () {
-  if (typeof document === 'undefined') return;
+  if (typeof document === 'undefined') return;   // under node, in the tests
   if (!('popover' in HTMLElement.prototype)) return;  // older browsers show the content inline
   let opener = null;
   document.addEventListener('click', e => {

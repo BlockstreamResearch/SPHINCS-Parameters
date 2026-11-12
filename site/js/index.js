@@ -1,24 +1,21 @@
+// The pinned parameters page: the stateless parameters of the report's
+// candidate 1 and the stateful XMSS and UXMSS cards.
 'use strict';
 
-// Legacy shareable links: the Parameter Explorer used to live at this URL.
-// Its hash state (#s=…&x=…&w=…&wc=…&c=…) now belongs to stateless.html.
-// (typeof guard: the regression suite runs this block under node, no DOM.)
+// Explorer links that point here (#s=…&x=…&w=…&wc=…&c=…) belong to
+// stateless.html. Under node, where the tests run, there is no location.
 if (typeof location !== 'undefined' && location.hash &&
     /(^#|[#&])(s|x|w|wc|c)=/.test(location.hash)) {
   location.replace('stateless.html' + location.hash);
 }
 
-// ---------- Page constants  ----------
-
-const PINNED = { h: 45, d: 5, k: 10, a: 13, w: 16 };   // Report Candidate 1 — 5,776 B SLH-DSA signature
-const XMSS_W = 64;      // stateful cards: WOTS+C at w = 64
+const PINNED = { h: 45, d: 5, k: 10, a: 13, w: 16 };   // the report's candidate 1
+const XMSS_W = 64;      // the stateful cards use WOTS+C with w = 64
 const XMSS_H_MAX = 20;
 
 // A SHRINCS stateless signature is the SLH-DSA signature behind the one-byte
 // indicator: 5,777 B for the pinned parameters.
 function shrincsStatelessSize(p) { return slhMetrics(p).size + IND_SIZE; }
-
-// ---------- Render ----------
 
 function row(name, value) {
   return `<tr><td>${name}</td><td>${value}</td></tr>`;
@@ -92,7 +89,6 @@ function renderUxmss() {
   ].join('');
 }
 
-// ---------- Setup ----------
 const state = { xmssH: 20 };
 
 async function setup() {
@@ -118,4 +114,5 @@ async function setup() {
   num.addEventListener('blur', () => { num.value = state.xmssH; });
 }
 
+// The tests load this file under node, without a document.
 if (typeof document !== 'undefined') setup();
