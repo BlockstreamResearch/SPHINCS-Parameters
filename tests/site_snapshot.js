@@ -2,8 +2,8 @@
 // Checks that the site pages still show the numbers recorded in tests/site_snapshot.json.
 //
 // Each page is opened in Chromium for a fixed list of share links. The script
-// reads the result tables, info lines and inputs, and compares their numbers at the
-// precision shown.
+// reads the result tables, info lines, popovers and inputs, and compares their numbers
+// at the precision shown.
 //
 //   node tests/site_snapshot.js           compare; exit 1 if a number changed
 //   node tests/site_snapshot.js --update  record what the pages show now
@@ -39,7 +39,7 @@ const STATES = {
 const REGIONS = {
   'index.html': ['#stateless-table', '#xmss-table', '#uxmss-table', '.tuple'],
   'stateless.html': ['#initial-info', '#funnel', '#winner', '#custom-status', '#custom-result'],
-  'stateful.html': ['#schnorr-ref', '#compare-table', '#sweep-info', '#sweep-table'],
+  'stateful.html': ['#compare-table', '#sweep-info', '#sweep-table'],
 };
 const MAX_ROWS = 25;
 
@@ -49,13 +49,13 @@ function readPage({ regions, maxRows }) {
   const shown = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
   // Visible text with spaces around elements ("554<span>0.00×</span>" reads as two numbers)
   // and "^" before superscripts (2<sup>40</sup> reads as 2^40).
-  const textOf = (root, skipTables) => {
+  const textOf = (root, skipTables, hiddenToo = false) => {
     let s = '';
     (function walk(node) {
       for (const n of node.childNodes) {
         if (n.nodeType === Node.TEXT_NODE) {
           s += n.nodeValue;
-        } else if (n.nodeType === Node.ELEMENT_NODE && shown(n) && !n.matches('script, style') &&
+        } else if (n.nodeType === Node.ELEMENT_NODE && (hiddenToo || shown(n)) && !n.matches('script, style') &&
                    !(skipTables && n.tagName === 'TABLE')) {
           s += n.tagName === 'SUP' ? ' ^' : ' ';
           walk(n);
@@ -78,13 +78,18 @@ function readPage({ regions, maxRows }) {
       if (text) out[name] = text;
       const tables = el.tagName === 'TABLE' ? [el] : Array.from(el.querySelectorAll('table'));
       let r = 0;
-      for (const tr of tables.flatMap(t => Array.from(t.rows))) {
+      for (const tr of tables.flatMap(t => Array.from(t.tBodies).flatMap(b => Array.from(b.rows)))) {
         if (r === maxRows) break;
         if (!shown(tr)) continue;
         const cells = Array.from(tr.cells).filter(shown).map(c => textOf(c, false));
         if (cells.some(c => /\d/.test(c))) out[`${name} row ${r++}`] = cells;
       }
     });
+  }
+  // Popovers stay hidden until opened.
+  for (const el of document.querySelectorAll('[popover][id]')) {
+    const text = textOf(el, false, true);
+    if (/\d/.test(text)) out[`popover #${el.id}`] = text;
   }
   // Inputs carry the state a share link restores, so hidden ones count too.
   for (const el of document.querySelectorAll('input[id], select[id]')) {

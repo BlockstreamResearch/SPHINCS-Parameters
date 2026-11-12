@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SHRINCS Stateful Comparison</title>
+<link rel="stylesheet" href="style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦐</text></svg>">
 <style>
   :root {
@@ -26,9 +27,6 @@
   html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
   body { padding: 24px; }
   header { max-width: 1280px; margin: 0 auto 20px; }
-  .breadcrumb { font-size: 13px; color: var(--text-soft); margin-bottom: 8px; }
-  .breadcrumb a { color: var(--accent); text-decoration: none; }
-  .breadcrumb a:hover { text-decoration: underline; }
   h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
   .tagline { color: var(--text-soft); margin: 0; font-size: 14px; }
 
@@ -36,8 +34,8 @@
 
   .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
   .panel + .panel { margin-top: 16px; }
-  .panel h2 { margin: 0 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-soft); font-weight: 600; }
-  .panel .hint { margin: 0 0 12px; color: var(--text-mute); font-size: 12px; }
+  .panel h2 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-soft); font-weight: 600; }
+  .panel .hint { margin: -4px 0 12px; color: var(--text-mute); font-size: 12px; }
 
   /* Comparison table */
   .compare-wrap { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
@@ -55,6 +53,8 @@
     vertical-align: top;
   }
   table.compare thead th {
+    white-space: normal;
+    vertical-align: bottom;
     color: var(--text-soft);
     font-weight: 600;
     font-size: 11px;
@@ -75,7 +75,6 @@
   }
   table.compare thead th.cand-col { background: var(--bg); }
   .cand-title { font-size: 12px; font-weight: 600; display: block; color: var(--text); }
-  .cand-sub { font-size: 10px; color: var(--text-soft); font-weight: 400; display: block; margin-top: 1px; }
   /* Last column: actions */
   table.compare th.act-col, table.compare td.act-col {
     text-align: center;
@@ -113,6 +112,7 @@
   .btn.btn-ghost { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
   .btn.btn-ghost:hover { background: var(--accent-soft); color: var(--accent); }
 
+  .add-form[hidden] { display: none; }
   .add-form {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -303,10 +303,11 @@
 <body>
 
 <header>
-  <div class="breadcrumb"><a href="index.html">← SHRINCS recommended parameters</a> &nbsp;·&nbsp; <a href="stateless.html">Parameter Explorer</a></div>
-  <h1>Stateful Scheme Comparison</h1>
+  <nav class="crumbs"><a href="index.html">SHRINCS pinned parameters</a> › <a href="stateless.html">Parameter Explorer</a> · Stateful Comparison</nav>
+  <h1>SHRINCS Stateful Comparison</h1>
   <p class="tagline">
-    Comparison of stateful signature candidates. You can add and compare your own by clicking <strong>+ Add candidate</strong>.
+    Compare stateful schemes with SLH-DSA-128s, or add your own with <strong>+ Add candidate</strong>.
+    <button type="button" class="text-btn" popovertarget="glossary">Glossary</button>
   </p>
 </header>
 
@@ -316,33 +317,39 @@
     <div class="actions">
       <button class="btn" id="show-add">+ Add candidate</button>
       <button class="btn btn-ghost" id="reset-defaults">Reset to defaults</button>
-      <button class="btn btn-ghost" id="share-btn" title="Copy a link that reproduces the current comparison list, signer mode, bounds, weights and sort">Copy shareable link</button>
-      <label class="signer-mode" title="cached: the signer keeps tree state — a BDS update per signature for XMSS/XMSS-MT (its per-signature bound is shown), a leaf cache for UXMSS. stateless-recompute: no cached tree material, trees are rebuilt per signature. SLH-DSA is stateless by design, so its SigGen is identical in both modes.">
+      <button class="btn btn-ghost" id="share-btn">Copy shareable link</button>
+      <label class="signer-mode">
         Signer:
         <select id="signer-mode">
-          <option value="cached">cached (BDS state)</option>
-          <option value="cold">stateless-recompute</option>
+          <option value="cached">cached</option>
+          <option value="cold">cold</option>
         </select>
       </label>
+      <button type="button" class="info" popovertarget="about-signer" aria-label="About the signer modes">i</button>
+      <div class="pop" id="about-signer" popover>
+        <p>A cached signer keeps tree state between signatures: a BDS state for XMSS and XMSS-MT, and a leaf cache
+          for UXMSS. A cold signer keeps none and rebuilds its trees for every signature. SLH-DSA-128s is stateless,
+          so its SigGen is the same in both modes.</p>
+      </div>
     </div>
 
     <form class="add-form" id="add-form" hidden>
       <label>Scheme
         <select id="f-scheme">
           <option value="xmssmt">XMSS / XMSS-MT</option>
-          <option value="uxmss">UXMSS (left-leaning)</option>
+          <option value="uxmss">UXMSS</option>
         </select>
       </label>
-      <label>OTS family
+      <label>OTS
         <select id="f-ots">
           <option value="TW">WOTS</option>
           <option value="WC">WOTS+C</option>
         </select>
       </label>
-      <label data-scheme="xmssmt">Tree height (h)
+      <label data-scheme="xmssmt">Tree height h
         <input type="number" id="f-h" value="20" min="2" max="60" step="1">
       </label>
-      <label data-scheme="xmssmt">Layers (d)
+      <label data-scheme="xmssmt">Layers d
         <select id="f-d"></select>
       </label>
       <label>Winternitz w
@@ -362,55 +369,54 @@
       </div>
     </form>
 
-    <h2 style="margin-top: 20px;">Comparison table</h2>
-    <p class="hint">All cost columns are SHA-256 compression-function calls with the PK.seed block midstate-cached
-      (FIPS 205 SHA-2 layout; the original uncached convention remains available in the scripts via
-      <code>HASH_CONVENTION=uncached</code>). Cost ratios under each value compare against SLH-DSA-128s.
-      UXMSS signatures grow with the signature index: the size and C/B columns show the first→largest range
-      (C/B <em>falls</em> with the index — each extra auth node adds 16 B of signature but only one
-      compression of verify work), and all ratios, filters and verification costs use the worst case
-      (hsf auth nodes, reached by the last two of the hsf+1 signatures).
-      The <strong>Signer</strong> selector switches SigGen between the cached signer (tree state kept between
-      signatures) and a state-minimized signer that rebuilds its trees per signature. The cached cost is an
-      upper bound per signature: one BDS update per layer for XMSS/XMSS-MT (at most (h'−K)/2+1 leaf
-      computations), and for UXMSS the first signature, which recombines the most spine nodes from the cached leaves.
-      <strong>State</strong> shows the cached signer's memory — UXMSS: all hsf+1 leaf hashes;
-      XMSS/XMSS-MT: the BDS state bound; "—" for the stateless SLH-DSA baseline and in state-minimized mode.
-      Sizes use the SHRINCS stateful layout: indicator byte, 16 B randomizer, leaf index, then per layer the
-      WOTS+C counter (2 B), chains and auth path.</p>
-    <p class="hint" id="schnorr-ref"></p>
+    <h2 style="margin-top: 20px;">Comparison</h2>
+    <p class="hint">Ratios under each value compare with SLH-DSA-128s.</p>
+    <div class="pop" id="about-size" popover>
+      <p>Sizes follow the SHRINCS stateful layout: a one-byte indicator, a 16-byte randomizer and the leaf index,
+        then per layer the WOTS+C counter (2 bytes; 4 at w = 65536), the chains and the authentication path.</p>
+      <p>UXMSS signatures grow by one 16-byte node per signature, so size and ρ show first → last.
+        Ratios, bounds, sorting and SigVer use the largest signature.</p>
+    </div>
+    <div class="pop" id="about-siggen" popover>
+      <p>Cached: an upper bound per signature. For XMSS and XMSS-MT that is one BDS update per layer, at most
+        (h′ − K)/2 + 1 leaf computations; for UXMSS it is the first signature, which combines the most nodes from
+        the leaf cache. Cold: the trees are rebuilt for every signature.</p>
+    </div>
+    <div class="pop" id="about-state" popover>
+      <p>What a cached signer stores: all hsf + 1 leaf hashes for UXMSS, the BDS state bound for XMSS and XMSS-MT.
+        Empty for SLH-DSA-128s and for a cold signer.</p>
+    </div>
+    <div class="pop" id="about-schnorr" popover></div>
     <div class="compare-wrap">
       <table class="compare" id="compare-table"></table>
     </div>
   </div>
 
   <div class="panel" id="all-candidates-panel">
-    <h2>All stateful candidates</h2>
-    <p class="hint">
-      Pre-swept over h = [10, 40], d = [1, 10] (with d ⏐ h), OTS = {WOTS, WOTS+C}, w = {16, 32, 64, 128, 256, 65536},
-      plus the 12 UXMSS variants (2 OTS * 6 w). Every candidate has signature size strictly smaller than SLH-DSA-128s.
-      UXMSS tree height is capped at hsf = 255.
-      UXMSS C/B cells show the first→largest-signature range (density falls with the index);
-      bounds and sorting use the largest-signature value.
-      Tighten the bounds to narrow the pool; click a row's <strong>+</strong> to add it to the comparison above.
-    </p>
+    <h2>All stateful candidates <button type="button" class="info" popovertarget="about-sweep" aria-label="About the candidates">i</button></h2>
+    <div class="pop" id="about-sweep" popover>
+      <p>XMSS and XMSS-MT with h = 10 to 40, d = 1 to 10 dividing h, WOTS or WOTS+C and
+        w ∈ {16, 32, 64, 128, 256, 65536}, plus the 12 UXMSS variants, whose tree height is capped at hsf = 255.
+        Only candidates smaller than SLH-DSA-128s are listed.</p>
+    </div>
+    <p class="hint">Narrow the list with the bounds; <strong>+</strong> adds a row to the comparison.</p>
 
     <div class="filter-section">
-      <div class="filter-section-label">Bounds — restrict which candidates appear</div>
+      <div class="filter-section-label">Bounds (× <span class="keep-case">SLH-DSA-128s</span>)</div>
       <div class="filter-grid" id="sweep-bounds"></div>
     </div>
     <details class="filter-section filter-collapsible">
       <summary class="filter-section-label">
         <span class="chev">▸</span>
         Weights
-        <span class="filter-section-hint">(advanced — distance uses metric-normalised ratios across current survivors, as in the Parameter Explorer)</span>
+        <span class="filter-section-hint">(distance as in the Parameter Explorer)</span>
       </summary>
       <div class="filter-grid" id="sweep-weights"></div>
     </details>
 
     <div class="sweep-info" id="sweep-info"></div>
     <div class="actions">
-      <button class="btn btn-ghost" id="sweep-export" title="Download the candidates passing the current bounds (with distances) as CSV">Export table (CSV)</button>
+      <button class="btn btn-ghost" id="sweep-export" title="Download the candidates within the bounds">Export CSV</button>
     </div>
 
     <div class="compare-wrap">
@@ -420,6 +426,7 @@
 
 </main>
 
+<script src="js/ui.js"></script>
 <script src="formulas.js"></script>
 <script>
 'use strict';
@@ -434,6 +441,11 @@ let nextId = 1;
 function makeId() { return 'c' + (nextId++); }
 
 function otsShort(ots) { return ots === 'WC' ? 'WOTS+C' : 'WOTS'; }
+
+function xmssLabel(ots, h, d, w) {
+  return d > 1 ? `XMSS-MT (${otsShort(ots)}, w = ${w}, h = ${h}, d = ${d})`
+               : `XMSS (${otsShort(ots)}, w = ${w}, h = ${h})`;
+}
 
 function buildSLH() {
   const s = SITE_DATA ? SITE_DATA.stateful.slh : null;
@@ -461,7 +473,7 @@ function buildXmssMt(ots, h, d, w) {
   return {
     id: makeId(),
     key: `xmssmt-${ots}-${w}-${h}-${d}`,
-    label: `XMSS-2^${h} (${otsShort(ots)}, w=${w}, d=${d})`,
+    label: xmssLabel(ots, h, d, w),
     scheme: d > 1 ? 'XMSS-MT' : 'XMSS',
     canRemove: true,
     metrics: {
@@ -484,11 +496,10 @@ function buildUxmss(ots, w) {
   return {
     id: makeId(),
     key: `uxmss-${ots}-${w}`,
-    label: `UXMSS (${otsShort(ots)}, w=${w})`,
+    label: `UXMSS (${otsShort(ots)}, w = ${w})`,
     scheme: 'UXMSS',
     canRemove: true,
     hsf,
-    sub: `sig grows with index — worst case shown (${hsf} auth nodes); capacity ${hsf + 1} sigs`,
     metrics: {
       size: uxmssSize(hsf, hsf, w, ots),
       sizeQ1: uxmssSize(1, hsf, w, ots),
@@ -520,7 +531,7 @@ function candFromXmssMtRec(rec, idx) {
   return {
     id: makeId(),
     key: `xmssmt-${ots}-${w}-${h}-${d}`,
-    label: `XMSS-2^${h} (${otsShort(ots)}, w=${w}, d=${d})`,
+    label: xmssLabel(ots, h, d, w),
     scheme: d > 1 ? 'XMSS-MT' : 'XMSS',
     canRemove: true,
     metrics: {
@@ -537,11 +548,10 @@ function candFromUxmssRec(rec, idx) {
   return {
     id: makeId(),
     key: `uxmss-${ots}-${w}`,
-    label: `UXMSS (${otsShort(ots)}, w=${w})`,
+    label: `UXMSS (${otsShort(ots)}, w = ${w})`,
     scheme: 'UXMSS',
     canRemove: true,
     hsf,
-    sub: `sig grows with index — worst case shown (${hsf} auth nodes); capacity ${hsf + 1} sigs`,
     metrics: {
       size: rec[idx.sz_max], sizeQ1: rec[idx.sz_q1],
       keygen: rec[idx.kg], siggen: rec[idx.sg],
@@ -603,36 +613,33 @@ function defaultCandidates() {
   ];
 }
 
-// Size cell: schemes with q-dependent signatures (UXMSS) show best–worst range;
-// ratios/filters/sorting always use the worst case (m.size).
-function fmtSize(m) {
-  if (m.sizeQ1 !== undefined && m.sizeQ1 !== m.size) {
-    return `${m.sizeQ1.toLocaleString()}–${m.size.toLocaleString()} B`;
-  }
-  return fmtBytes(m.size);
+// UXMSS signatures grow with the index: cells show first → last, while ratios,
+// bounds and sorting use the last (m.size).
+function sizeCell(m) {
+  if (m.sizeQ1 !== undefined && m.sizeQ1 !== m.size) return `${fmtNum(m.sizeQ1)} → ${fmtNum(m.size)}`;
+  return fmtNum(m.size);
 }
 
-function fmtRatio(target, std) {
-  if (target === std) return '';
-  if (!isFinite(target) || !isFinite(std)) return '';
-  const r = target / std;
-  if (r >= 100) return `${r.toExponential(1)}×`;
-  if (r >= 10)  return `${r.toFixed(1)}×`;
-  return `${r.toFixed(2)}×`;
+function ratioNote(target, std) {
+  if (target === std || !isFinite(target) || !isFinite(std)) return '';
+  return fmtRatio(target / std);
 }
 
-function fmtCpbCell(m, c, sv, scale, suffix) {
+// ρ for SigVer sv, divided by `scale` (1, or the Schnorr ρ) and printed with `fmt`.
+function rhoCell(m, c, sv, scale, fmt) {
   const cbMax = sv / m.size / scale;
   if (c && c.hsf !== undefined && m.sizeQ1 !== undefined && m.sizeQ1 !== m.size) {
     const cb1 = (sv - (c.hsf - 1) * C_Th2) / m.sizeQ1 / scale;
-    return fmtCpb(cb1) + '→' + fmtCpb(cbMax) + suffix;
+    return `${fmt(cb1)} → ${fmt(cbMax)}`;
   }
-  return fmtCpb(cbMax) + suffix;
+  return fmt(cbMax);
 }
-function fmtQs(c) {
-  if (c.qsLog2 !== null) return `2^${c.qsLog2}`;
-  return c.qsExact.toLocaleString();
+
+function qsCell(c) {
+  return c.qsLog2 !== null ? fmtPow2(c.qsLog2) : fmtNum(c.qsExact);
 }
+
+const RHO = '<span class="keep-case">ρ</span>';
 
 //  State
 const state = { candidates: [] };   // filled by init() once data.json is resolved
@@ -640,17 +647,20 @@ const state = { candidates: [] };   // filled by init() once data.json is resolv
 // Render 
 // Metric column descriptors
 const METRIC_COLS = [
-  { label: 'Sig size',    value: m => fmtSize(m),                                  ratioField: 'size',    lowerIsBetter: true },
-  { label: 'KeyGen (C)',  value: m => fmtCompressions(m.keygen),                   ratioField: 'keygen',  lowerIsBetter: true },
-  { label: () => `SigGen (C, ${SIGNER_MODE === 'cold' ? 'cold' : 'BDS'})`,
-                          value: m => fmtCompressions(sigGenOf(m)),                ratioFn: m => sigGenOf(m), lowerIsBetter: true },
-  { label: 'State (B)',   value: m => (SIGNER_MODE === 'cold' || m.state === undefined) ? '—' : fmtBytes(m.state) },
-  { label: 'SigVer (C)',  value: m => fmtCompressions(m.sigver),                   ratioField: 'sigver',  lowerIsBetter: true },
-  { label: 'C/B (avg)',   value: (m, c) => fmtCpbCell(m, c, m.sigver, 1, ''),      ratioFn: m => (m.sigver      / m.size),  lowerIsBetter: true },
-  { label: 'C/B (worst)', value: (m, c) => fmtCpbCell(m, c, m.sigverWorst, 1, ''), ratioFn: m => (m.sigverWorst / m.size),  lowerIsBetter: true },
-  { label: `<span title="Verify compressions per signature byte as a multiple of BIP340 Schnorr verification (libsecp256k1) — see the ρ reference note above">ρ ÷ Schnorr</span>`,
-                          value: (m, c) => fmtCpbCell(m, c, m.sigver, SCHNORR.cb64, '×') },
-  { label: 'Max sigs',    value: (_, c) => fmtQs(c.metrics) },
+  { label: () => 'Size (B)' + infoButton('about-size', 'About the size'),
+                          value: m => sizeCell(m),                                 ratioField: 'size',    lowerIsBetter: true },
+  { label: 'KeyGen (C)',  value: m => fmtNum(m.keygen),                            ratioField: 'keygen',  lowerIsBetter: true },
+  { label: () => `SigGen, ${SIGNER_MODE} (C)` + infoButton('about-siggen', 'About SigGen'),
+                          value: m => fmtNum(sigGenOf(m)),                         ratioFn: m => sigGenOf(m), lowerIsBetter: true },
+  { label: () => 'State (B)' + infoButton('about-state', 'About the state'),
+                          value: m => (SIGNER_MODE === 'cold' || m.state === undefined) ? '—' : fmtNum(m.state) },
+  { label: 'SigVer (C)',  value: m => fmtNum(m.sigver),                            ratioField: 'sigver',  lowerIsBetter: true },
+  { label: `${RHO} (C/B)`, value: (m, c) => rhoCell(m, c, m.sigver, 1, fmtRho),    ratioFn: m => (m.sigver      / m.size),  lowerIsBetter: true },
+  { label: `${RHO}, worst (C/B)`,
+                          value: (m, c) => rhoCell(m, c, m.sigverWorst, 1, fmtRho), ratioFn: m => (m.sigverWorst / m.size),  lowerIsBetter: true },
+  { label: () => `${RHO} ÷ Schnorr` + infoButton('about-schnorr', 'About ρ ÷ Schnorr'),
+                          value: (m, c) => rhoCell(m, c, m.sigver, SCHNORR.cb64, fmtRatio) },
+  { label: 'Max signatures', value: (_, c) => qsCell(c.metrics) },
 ];
 
 function ratioClass(ratio, lowerIsBetter) {
@@ -679,7 +689,7 @@ function renderComparison() {
     const isStd = (i === 0);
 
     let row = `<tr class="${isStd ? 'baseline' : ''}">`;
-    row += `<td class="cand-col"><span class="cand-title">${c.label}</span>${c.sub ? `<span class="cand-sub">${c.sub}</span>` : ''}</td>`;
+    row += `<td class="cand-col"><span class="cand-title">${c.label}</span></td>`;
 
     for (const col of METRIC_COLS) {
       let cell = col.value(m, c);
@@ -695,7 +705,7 @@ function renderComparison() {
         if (target !== null && isFinite(target) && isFinite(stdVal) && stdVal > 0) {
           const ratio = target / stdVal;
           const cls = ratioClass(ratio, col.lowerIsBetter);
-          cell += `<span class="ratio ${cls}">${fmtRatio(target, stdVal)}</span>`;
+          cell += `<span class="ratio ${cls}">${ratioNote(target, stdVal)}</span>`;
         }
       }
       row += `<td>${cell}</td>`;
@@ -800,20 +810,20 @@ const sweepState = {
 
 // Bound coefficient descriptors
 const SWEEP_BOUND_FILTERS = [
-  { key: 'size',  label: 'X_size',         min: 0.10, max: 1.00,  step: 0.01, dp: 2 },
-  { key: 'kg',    label: 'X_kg',           min: 0.10, log: true },
-  { key: 'sg',    label: 'X_sg',           min: 0.10, log: true },
-  { key: 'sv',    label: 'X_sv',           min: 0.10, log: true },
-  { key: 'cb',    label: 'X_cb',           min: 0.10, log: true },
-  { key: 'minQs', label: 'Min sigs (2^h)', min: 0,    max: 40,    step: 1,    dp: 0 },
+  { key: 'size',  label: 'Size',   min: 0.10, max: 1.00,  step: 0.01, dp: 2 },
+  { key: 'kg',    label: 'KeyGen', min: 0.10, log: true },
+  { key: 'sg',    label: 'SigGen', min: 0.10, log: true },
+  { key: 'sv',    label: 'SigVer', min: 0.10, log: true },
+  { key: 'cb',    label: 'ρ',      min: 0.10, log: true },
+  { key: 'minQs', label: 'Min. sigs (log₂)', min: 0, max: 40, step: 1, dp: 0 },
 ];
 // Importance-weight descriptors (W)
 const SWEEP_WEIGHT_FILTERS = [
-  { key: 'size', label: 'w_size', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
-  { key: 'kg',   label: 'w_kg',   min: 0.10, max: 10.00, step: 0.10, dp: 1 },
-  { key: 'sg',   label: 'w_sg',   min: 0.10, max: 10.00, step: 0.10, dp: 1 },
-  { key: 'sv',   label: 'w_sv',   min: 0.10, max: 10.00, step: 0.10, dp: 1 },
-  { key: 'cb',   label: 'w_cb',   min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+  { key: 'size', label: 'Size',   min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+  { key: 'kg',   label: 'KeyGen', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+  { key: 'sg',   label: 'SigGen', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+  { key: 'sv',   label: 'SigVer', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+  { key: 'cb',   label: 'ρ',      min: 0.10, max: 10.00, step: 0.10, dp: 1 },
 ];
 
 // Metric-normalised weighted Euclidean distance — same definition as the
@@ -931,7 +941,7 @@ function renderSweepFilterGroup(hostId, group, filters) {
                value="${numVal}"
                data-sw-input="${f.key}"${f.log ? '' : ` data-dp="${f.dp}"`}>
       </label>
-      <input type="range" ${sliderAttrs}>
+      <input type="range" aria-label="${f.label} ${group === 'X' ? 'bound' : 'weight'}" ${sliderAttrs}>
     </div>
   `;
   }).join('');
@@ -981,19 +991,19 @@ function renderSweepFilters() {
 
 // Sweep-table metric columns
 const SWEEP_COLS = [
-  { field: 'size',     label: 'Sig size',   value: m => fmtSize(m),                             sortFn: (m) => m.size,                                                  ratioFn: m => m.size,             lowerIsBetter: true },
-  { field: 'keygen',   label: 'KeyGen (C)', value: m => fmtCompressions(m.keygen),              sortFn: (m) => m.keygen,                                                ratioFn: m => m.keygen,           lowerIsBetter: true },
-  { field: 'siggen',   label: () => `SigGen (C, ${SIGNER_MODE === 'cold' ? 'cold' : 'BDS'})`,
-                                            value: m => fmtCompressions(sigGenOf(m)),           sortFn: (m) => sigGenOf(m),                                             ratioFn: m => sigGenOf(m),        lowerIsBetter: true },
-  { field: 'state',    label: 'State (B)',  value: m => (SIGNER_MODE === 'cold' || m.state === undefined) ? '—' : fmtBytes(m.state),
+  { field: 'size',     label: 'Size (B)',   value: m => sizeCell(m),                            sortFn: (m) => m.size,                                                  ratioFn: m => m.size,             lowerIsBetter: true },
+  { field: 'keygen',   label: 'KeyGen (C)', value: m => fmtNum(m.keygen),                       sortFn: (m) => m.keygen,                                                ratioFn: m => m.keygen,           lowerIsBetter: true },
+  { field: 'siggen',   label: () => `SigGen, ${SIGNER_MODE} (C)`,
+                                            value: m => fmtNum(sigGenOf(m)),                    sortFn: (m) => sigGenOf(m),                                             ratioFn: m => sigGenOf(m),        lowerIsBetter: true },
+  { field: 'state',    label: 'State (B)',  value: m => (SIGNER_MODE === 'cold' || m.state === undefined) ? '—' : fmtNum(m.state),
                                                                                                 sortFn: (m) => m.state || 0 },
-  { field: 'sigver',   label: 'SigVer (C)', value: m => fmtCompressions(m.sigver),              sortFn: (m) => m.sigver,                                                ratioFn: m => m.sigver,           lowerIsBetter: true },
-  { field: 'cb',       label: 'C/B (avg)',  value: (m, c) => fmtCpbCell(m, c, m.sigver, 1, ''), sortFn: (m) => m.sigver / m.size,                                       ratioFn: m => m.sigver / m.size,  lowerIsBetter: true },
-  { field: 'cbSchnorr', label: `<span title="Verify compressions per signature byte as a multiple of BIP340 Schnorr verification (libsecp256k1) — see the ρ reference note in the comparison panel">ρ ÷ Schnorr</span>`,
-                                            value: (m, c) => fmtCpbCell(m, c, m.sigver, SCHNORR.cb64, '×'), sortFn: (m) => m.sigver / m.size },
+  { field: 'sigver',   label: 'SigVer (C)', value: m => fmtNum(m.sigver),                       sortFn: (m) => m.sigver,                                                ratioFn: m => m.sigver,           lowerIsBetter: true },
+  { field: 'cb',       label: `${RHO} (C/B)`, value: (m, c) => rhoCell(m, c, m.sigver, 1, fmtRho), sortFn: (m) => m.sigver / m.size,                                   ratioFn: m => m.sigver / m.size,  lowerIsBetter: true },
+  { field: 'cbSchnorr', label: `${RHO} ÷ Schnorr`,
+                                            value: (m, c) => rhoCell(m, c, m.sigver, SCHNORR.cb64, fmtRatio), sortFn: (m) => m.sigver / m.size },
   { field: 'distance', label: 'Distance',   value: (m, c, std) => sweepDistance(m, std, sweepState.W).toFixed(4),
                                             sortFn: (m, c, std) => sweepDistance(m, std, sweepState.W) },
-  { field: 'qs',       label: 'Max sigs',   value: (_, c) => fmtQs(c.metrics),                  sortFn: (m) => (m.qsLog2 !== null ? Math.pow(2, m.qsLog2) : m.qsExact) },
+  { field: 'qs',       label: 'Max signatures', value: (_, c) => qsCell(c.metrics),             sortFn: (m) => (m.qsLog2 !== null ? Math.pow(2, m.qsLog2) : m.qsExact) },
 ];
 
 function renderSweepTable() {
@@ -1026,13 +1036,14 @@ function renderSweepTable() {
   scheduleStatefulHashWrite();
 
   document.getElementById('sweep-info').innerHTML =
-    `<strong>${survivors.length}</strong> of ${SWEEP_FACTORIES.length} candidates pass the current bounds.`;
+    `<strong>${survivors.length.toLocaleString('en-US')}</strong> of ` +
+    `${SWEEP_FACTORIES.length.toLocaleString('en-US')} candidates within the bounds.`;
 
   const table = document.getElementById('sweep-table');
   table.innerHTML = '';
 
   if (survivors.length === 0) {
-    table.innerHTML = `<thead><tr><th class="cand-col" colspan="${SWEEP_COLS.length + 2}" style="text-align:center;color:var(--text-mute);font-style:italic;padding:24px;">No candidates pass. Relax a bound.</th></tr></thead>`;
+    table.innerHTML = `<thead><tr><th class="cand-col" colspan="${SWEEP_COLS.length + 2}" style="text-align:center;color:var(--text-mute);font-style:italic;padding:24px;">No candidate is within all bounds. Relax one.</th></tr></thead>`;
     return;
   }
 
@@ -1061,7 +1072,7 @@ function renderSweepTable() {
     const c = f.cached;
     const m = c.metrics;
     let row = `<tr>`;
-    row += `<td class="cand-col"><span class="cand-title">${c.label}</span>${c.sub ? `<span class="cand-sub">${c.sub}</span>` : ''}</td>`;
+    row += `<td class="cand-col"><span class="cand-title">${c.label}</span></td>`;
     for (const col of SWEEP_COLS) {
       let cell = col.value(m, c, std);
       if (col.ratioFn) {
@@ -1070,7 +1081,7 @@ function renderSweepTable() {
         if (isFinite(target) && isFinite(stdVal) && stdVal > 0) {
           const ratio = target / stdVal;
           const cls = ratioClass(ratio, col.lowerIsBetter);
-          cell += `<span class="ratio ${cls}">${fmtRatio(target, stdVal)}</span>`;
+          cell += `<span class="ratio ${cls}">${ratioNote(target, stdVal)}</span>`;
         }
       }
       row += `<td>${cell}</td>`;
@@ -1081,7 +1092,7 @@ function renderSweepTable() {
     rowsHtml.push(row);
   }
   if (survivors.length > MAX_ROWS) {
-    rowsHtml.push(`<tr><td class="cand-col" colspan="${SWEEP_COLS.length + 2}" style="text-align:center;color:var(--text-mute);font-style:italic;">… and ${survivors.length - MAX_ROWS} more (tighten a bound to narrow further)</td></tr>`);
+    rowsHtml.push(`<tr><td class="cand-col" colspan="${SWEEP_COLS.length + 2}" style="text-align:center;color:var(--text-mute);font-style:italic;">… and ${(survivors.length - MAX_ROWS).toLocaleString('en-US')} more; tighten a bound to see them.</td></tr>`);
   }
   tbody.innerHTML = rowsHtml.join('');
 
@@ -1100,7 +1111,8 @@ function renderSweepTable() {
   });
 
   table.querySelectorAll('th.sortable').forEach(th => {
-    th.addEventListener('click', () => {
+    th.addEventListener('click', e => {
+      if (e.target.closest('.info')) return;
       const col = th.dataset.sort;
       if (sweepState.sort.col === col) {
         sweepState.sort.dir = (sweepState.sort.dir === 'asc') ? 'desc' : 'asc';
@@ -1221,10 +1233,10 @@ function applyStatefulHash() {
 function exportSweepCSV() {
   const std = state.candidates[0].metrics;
   const header = ['scheme', 'label', 'max_sigs', 'size_B', 'keygen_C',
-    'siggen_bds_C', 'siggen_cold_C', 'state_B',
-    'sigver_C', 'sigver_worst_C', 'c_per_byte', 'c_per_byte_worst',
-    'cb_vs_schnorr', 'cb_worst_vs_schnorr', 'schnorr_cb64',
-    'signer_mode', 'distance'];
+    'siggen_cached_C', 'siggen_cold_C', 'state_B',
+    'sigver_C', 'sigver_worst_C', 'rho', 'rho_worst',
+    'rho_vs_schnorr', 'rho_worst_vs_schnorr', 'schnorr_rho',
+    'signer', 'distance'];
   const lines = [header.join(',')];
   for (const f of sweepState.lastSurvivors) {
     const c = f.cached, m = c.metrics;
@@ -1356,14 +1368,14 @@ function renderSchnorrNote() {
   const m = state.candidates[0].metrics;
   const cb = m.sigver / m.size;
   const src = s.live
-    ? `kappa.json${s.commit ? ` @ secp256k1 ${s.commit}` : ''}${s.run ? `, ${s.run}` : ''}` +
+    ? `kappa.json${s.commit ? ` at secp256k1 ${s.commit}` : ''}${s.run ? `, ${s.run}` : ''}` +
       `${s.machine ? `, ${s.machine}` : ''}${s.preliminary ? ', preliminary' : ''}`
-    : `built-in 1.98 C/B — live kappa.json unreachable`;
-  document.getElementById('schnorr-ref').innerHTML =
-    `The <strong>ρ ÷ Schnorr</strong> columns compare average-case C/B against BIP340 Schnorr ` +
-    `verification ≈ <strong>${s.cb64.toFixed(2)} C/B</strong> (${s.impl}, single verify over a ` +
-    `64 B wire signature; <a href="https://github.com/mjthatch/bip340-vs-sha256">bip340-vs-sha256</a>: ${src}). ` +
-    `SLH-DSA-128s baseline: ${fmtCpb(cb)} C/B = <strong>${fmtCpb(cb / s.cb64)}×</strong> Schnorr.`;
+    : 'built-in value, the live kappa.json did not load';
+  document.getElementById('about-schnorr').innerHTML =
+    `<p>The average ρ divided by the ρ of a BIP340 Schnorr verification, ${s.cb64.toFixed(2)} C/B ` +
+    `(${s.impl}, one 64-byte signature; ` +
+    `<a href="https://github.com/mjthatch/bip340-vs-sha256">bip340-vs-sha256</a>, ${src}). ` +
+    `SLH-DSA-128s has ρ = ${fmtRho(cb)} C/B, ${fmtRatio(cb / s.cb64)} Schnorr.</p>`;
 }
 
 async function init() {

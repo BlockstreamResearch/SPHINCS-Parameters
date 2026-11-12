@@ -7,6 +7,7 @@
   <title>SHRINCS Parameter Explorer</title>
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦐</text></svg>">
+  <link rel="stylesheet" href="style.css">
   <style>
     :root {
       --bg: #f7f7f5;
@@ -90,7 +91,7 @@
     }
 
     .panel h2 {
-      margin: 0 0 4px;
+      margin: 0 0 8px;
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.06em;
@@ -99,7 +100,7 @@
     }
 
     .panel .hint {
-      margin: 0 0 12px;
+      margin: -4px 0 12px;
       color: var(--text-mute);
       font-size: 12px;
     }
@@ -228,6 +229,11 @@
     .mode-toggle input {
       accent-color: var(--accent);
       margin: 0;
+    }
+
+    .mode-row {
+      display: flex;
+      align-items: center;
     }
 
     .funnel-row {
@@ -549,13 +555,6 @@
       margin: 2px 0;
     }
 
-    .custom-notes code {
-      font-family: var(--mono);
-      background: var(--bg);
-      padding: 1px 4px;
-      border-radius: 3px;
-    }
-
     .info-strip {
       background: var(--accent-soft);
       color: var(--accent);
@@ -580,64 +579,82 @@
 <body>
 
   <header>
-    <div style="font-size:12px;margin-bottom:4px;"><a href="index.html" style="color:var(--accent);text-decoration:none;">← SHRINCS recommended parameters</a></div>
+    <nav class="crumbs"><a href="index.html">SHRINCS pinned parameters</a> › Parameter Explorer · <a href="stateful.html">Stateful Comparison</a></nav>
     <h1>SHRINCS Parameter Explorer</h1>
     <p class="tagline">
-      Interactive search over SLH-DSA-compatible parameter tuples.
-      Methodology from the <a href="report.pdf" target="_blank">SHRINCS Parameter
-        Search</a> tech report.
-      See also: <a href="stateful.html">Stateful Scheme Comparison →</a>
+      Search SLH-DSA-compatible parameter sets as in the
+      <a href="report.pdf" target="_blank">SHRINCS Parameter Search</a> report.
+      <button type="button" class="text-btn" popovertarget="glossary">Glossary</button>
     </p>
   </header>
 
   <main class="layout">
 
     <aside class="panel sidebar">
-      <h2>Scheme</h2>
-      <p class="hint" id="scheme-hint">FTS/OTS variant from the report. All ratios compare against the SLH-DSA-128s (SPX) baseline.</p>
+      <h2>Scheme <button type="button" class="info" popovertarget="about-scheme" aria-label="About the schemes">i</button></h2>
+      <div class="pop" id="about-scheme" popover>
+        <p>The stateless schemes of the report:</p>
+        <ul>
+          <li><strong>SPX</strong>: SLH-DSA, with WOTS and FORS.</li>
+          <li><strong>W+C</strong>: WOTS+C instead of WOTS.</li>
+          <li><strong>FORS+C</strong>: WOTS+C, and FORS+C, which grinds away the last FORS tree.</li>
+          <li><strong>PORS+FP</strong>: WOTS+C, and PORS+FP, a single tree with Octopus authentication.</li>
+        </ul>
+      </div>
+      <p class="hint" id="scheme-hint" hidden></p>
       <div class="seg" id="scheme-controls"></div>
 
-      <h2 class="section-title">Winternitz set</h2>
-      <p class="hint">w = {2, 4, 16, 256} is always on (lg<sub>w</sub> | 8). Extras extend the SPX pool only.</p>
-      <label class="mode-toggle" title="lg_w = 5, 6, 7 — base_2b digits straddle byte boundaries; outside strict SLH-DSA byte alignment. Exploratory.">
+      <h2 class="section-title">Winternitz parameter <button type="button" class="info" popovertarget="about-w" aria-label="About the Winternitz parameter">i</button></h2>
+      <div class="pop" id="about-w" popover>
+        <p>The pool always includes w = 2, 4, 16 and 256, whose digits fit whole bytes as SLH-DSA requires.
+          w = 32, 64 and 128 do not, so they are exploratory and extend only the SPX pool.</p>
+      </div>
+      <label class="mode-toggle">
         <input type="checkbox" id="optw-toggle"> <span>include w = 32, 64, 128 <span style="white-space: nowrap;">(non-aligned)</span></span>
       </label>
 
-      <h2 class="section-title">Filter coefficients</h2>
-      <p class="hint">Bound each metric as a coefficient of SLH-DSA-128s. Survivors must satisfy every bound.</p>
+      <h2 class="section-title">Bounds</h2>
+      <p class="hint">Keep candidates within these multiples of SLH-DSA-128s.</p>
       <div id="filter-controls"></div>
-      <label class="mode-toggle" title="Filter and rank on worst-case SigVer and ρ, compared against the baseline's worst case (SLH-DSA-128s: 3,893 C instead of 2,193 C). WOTS+C verification is deterministic, so those candidates keep the same values but gain headroom against the worst-case baseline.">
-        <input type="checkbox" id="worst-toggle"> use worst-case SigVer &amp; ρ
-      </label>
+      <div class="mode-row">
+        <label class="mode-toggle"><input type="checkbox" id="worst-toggle"> use worst-case SigVer and ρ</label>
+        <button type="button" class="info" popovertarget="about-worst" aria-label="About the worst case">i</button>
+      </div>
+      <div class="pop" id="about-worst" popover>
+        <p>Filter and rank on worst-case SigVer and ρ, against the worst case of SLH-DSA-128s
+          (<span data-std="sv_worst"></span> C instead of <span data-std="sv"></span> C). WOTS+C verification costs
+          the same for every message, so candidates with WOTS+C keep their values and gain headroom.</p>
+      </div>
 
-      <h2 class="section-title">Importance weights</h2>
-      <p class="hint">Higher weight = more important. Each metric's ratio is <strong>range-normalised across the
-          surviving pool</strong> before scoring.</p>
+      <h2 class="section-title">Weights <button type="button" class="info" popovertarget="about-weights" aria-label="About the weights">i</button></h2>
+      <div class="pop" id="about-weights" popover>
+        <p>The best candidate has the smallest distance: the weighted root mean square of its five ratios to
+          SLH-DSA-128s, each rescaled to 0–1 across the candidates within the bounds.</p>
+      </div>
+      <p class="hint">A higher weight gives a metric more say in the ranking.</p>
       <div id="weight-controls"></div>
 
       <button class="reset-btn" id="reset-btn">Reset to defaults</button>
-      <button class="reset-btn" id="share-btn" title="Copy a link that reproduces the current scheme, filters, weights and custom tuple">Copy shareable link</button>
-      <button class="reset-btn" id="export-btn" title="Download the current survivor set (with distances) as CSV">Export survivors (CSV)</button>
+      <button class="reset-btn" id="share-btn">Copy shareable link</button>
+      <button class="reset-btn" id="export-btn" title="Download the candidates within the bounds">Export CSV</button>
     </aside>
 
     <section>
       <div class="panel">
-        <div id="initial-info" class="info-strip"></div>
+        <div class="info-strip"><span id="initial-info"></span> <button type="button" class="info" popovertarget="about-pool" aria-label="About the pool and its sources">i</button></div>
+        <div class="pop pop-wide" id="about-pool" popover></div>
         <h2>Filtering funnel</h2>
-        <p class="hint">Each filter is applied in sequence. Bars show how many candidates survive each step.
-          All costs are SHA-256 compression calls with the PK.seed block midstate-cached (FIPS 205 SHA-2 layout).</p>
         <div id="funnel"></div>
       </div>
 
       <div class="panel">
-        <h2>Candidate sieve</h2>
-        <p class="hint">
-          Each dot is one (h, d, k, a, w) tuple. Positions are random — the layout carries no meaning.
-          Survivors are coloured by their weighted distance to the origin (blue = closer to ideal, red = farther).
-          Filtered-out candidates fade to grey. The winner is ringed.
-        </p>
+        <h2>Candidate sieve <button type="button" class="info" popovertarget="about-sieve" aria-label="About the candidate sieve">i</button></h2>
+        <div class="pop" id="about-sieve" popover>
+          <p>Each dot is one parameter set, placed at random. Candidates within the bounds are coloured by distance,
+            from blue (closest to ideal) to red; the others are grey and the winner is ringed. Hover a dot for its numbers.</p>
+        </div>
         <div class="scatter-wrap">
-          <canvas id="scatter" width="800" height="500"></canvas>
+          <canvas id="scatter" width="800" height="500" role="img" aria-label="Candidate sieve"></canvas>
           <div id="hover-ring"></div>
         </div>
         <div class="scatter-legend" id="scatter-legend"></div>
@@ -646,21 +663,22 @@
       <div id="tooltip"></div>
 
       <div class="panel">
-        <h2>Best candidate (minimum weighted distance)</h2>
+        <h2>Best candidate</h2>
         <div id="winner"></div>
       </div>
 
       <div class="panel">
-        <h2>Compare your own candidate</h2>
-        <p class="hint">Enter any (h, d, k, a, w) tuple to see how it stacks up against SLH-DSA-128s.
-          w covers the SLH-DSA-compatible choices {2, 4, 16, 256}, plus the optional extras 32, 64 and 128.
-          This panel always evaluates the plain SPX model (WOTS-TW + FORS), regardless of the scheme selected above.</p>
+        <h2>Compare your own candidate <button type="button" class="info" popovertarget="about-custom" aria-label="About your own candidate">i</button></h2>
+        <div class="pop" id="about-custom" popover>
+          <p>This panel always uses the SPX model (WOTS and FORS), whichever scheme is selected.</p>
+        </div>
+        <p class="hint">Enter any (h, d, k, a, w) to compare it with SLH-DSA-128s.</p>
         <div class="custom-inputs" id="custom-inputs">
-          <div class="field"><label>h</label><input type="number" id="cust-h" value="63" min="1" step="1"></div>
-          <div class="field"><label>d</label><input type="number" id="cust-d" value="7" min="1" step="1"></div>
-          <div class="field"><label>k</label><input type="number" id="cust-k" value="14" min="1" step="1"></div>
-          <div class="field"><label>a</label><input type="number" id="cust-a" value="12" min="1" step="1"></div>
-          <div class="field"><label>w</label><select id="cust-w">
+          <div class="field"><label for="cust-h">h</label><input type="number" id="cust-h" value="63" min="1" step="1"></div>
+          <div class="field"><label for="cust-d">d</label><input type="number" id="cust-d" value="7" min="1" step="1"></div>
+          <div class="field"><label for="cust-k">k</label><input type="number" id="cust-k" value="14" min="1" step="1"></div>
+          <div class="field"><label for="cust-a">a</label><input type="number" id="cust-a" value="12" min="1" step="1"></div>
+          <div class="field"><label for="cust-w">w</label><select id="cust-w">
             <optgroup label="SLH-DSA-compatible">
               <option value="2">2</option>
               <option value="4">4</option>
@@ -681,6 +699,7 @@
 
   </main>
 
+  <script src="js/ui.js"></script>
   <script>
     'use strict';
 
@@ -1063,11 +1082,11 @@
 
     // ---------- Filter pipeline ----------
     const FILTER_STEPS = [
-      { key: 'size', metric: 'size', label: 'Size', stdLabel: '·std' },
-      { key: 'kg', metric: 'kg', label: 'KeyGen', stdLabel: '·std' },
-      { key: 'sg', metric: 'sg', label: 'SigGen', stdLabel: '·std' },
-      { key: 'sv', metric: 'sv', label: 'SigVer', stdLabel: '·std' },
-      { key: 'cb', metric: 'cb', label: 'Comp/Byte', stdLabel: '·std' },
+      { key: 'size', metric: 'size', label: 'Size' },
+      { key: 'kg', metric: 'kg', label: 'KeyGen' },
+      { key: 'sg', metric: 'sg', label: 'SigGen' },
+      { key: 'sv', metric: 'sv', label: 'SigVer' },
+      { key: 'cb', metric: 'cb', label: 'ρ' },
     ];
 
     // Returns an array: each element holds the survivors after step i, and which step eliminated each candidate
@@ -1089,9 +1108,9 @@
           }
         }
         cur = next;
-        const worstTag = (mk !== step.metric) ? ' (worst)' : '';
+        const worstTag = (mk !== step.metric) ? ', worst' : '';
         stepCounts.push({
-          name: `${step.label}${worstTag} ≤ ${fmtX(X[step.key])}·std`,
+          name: `${step.label}${worstTag} ≤ ${fmtX(X[step.key])}×`,
           count: cur.length
         });
       });
@@ -1228,15 +1247,6 @@
     }
 
     // ---------- Rendering ----------
-    function fmt(n) {
-      if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
-      if (n >= 1e3) return n.toLocaleString();
-      return n.toFixed(0);
-    }
-    function fmtRatio(r) {
-      if (r >= 1000) return r.toExponential(2) + '×';
-      return r.toFixed(3) + '×';
-    }
 
     // Log-position mapping for the cost-coefficient sliders: integer track
     // positions 0..SLIDER_STEPS <-> X in [min, max], geometrically spaced.
@@ -1260,23 +1270,23 @@
 
     function renderControls() {
       const filterDefs = [
-        { key: 'size', label: 'X<sub>size</sub>', min: 0.30, max: 1.00, step: 0.01, dp: 2 },
-        { key: 'kg', label: 'X<sub>kg</sub>', min: 0.10, max: state.xMax.kg, log: true },
-        { key: 'sg', label: 'X<sub>sg</sub>', min: 0.10, max: state.xMax.sg, log: true },
-        { key: 'sv', label: 'X<sub>sv</sub>', min: 0.10, max: state.xMax.sv, log: true },
-        { key: 'cb', label: 'X<sub>cb</sub>', min: 0.10, max: state.xMax.cb, log: true },
+        { key: 'size', label: 'Size', min: 0.30, max: 1.00, step: 0.01, dp: 2 },
+        { key: 'kg', label: 'KeyGen', min: 0.10, max: state.xMax.kg, log: true },
+        { key: 'sg', label: 'SigGen', min: 0.10, max: state.xMax.sg, log: true },
+        { key: 'sv', label: 'SigVer', min: 0.10, max: state.xMax.sv, log: true },
+        { key: 'cb', label: 'ρ', min: 0.10, max: state.xMax.cb, log: true },
       ];
       document.getElementById('filter-controls').innerHTML = filterDefs.map(d => `
     <div class="control">
       <label>
         <span class="name">${d.label}</span>
-        <input type="number" class="val-input"
+        <input type="number" class="val-input" aria-label="${d.label} bound"
                id="X_${d.key}_val"
                min="${d.min}" max="${d.max}" step="${d.log ? 'any' : d.step}"
                value="${d.log ? fmtX(state.X[d.key]) : state.X[d.key].toFixed(d.dp)}"
                data-coef-input="${d.key}"${d.log ? '' : ` data-dp="${d.dp}"`}>
       </label>
-      <input type="range" min="${d.log ? 0 : d.min}" max="${d.log ? SLIDER_STEPS : d.max}"
+      <input type="range" aria-label="${d.label} bound" min="${d.log ? 0 : d.min}" max="${d.log ? SLIDER_STEPS : d.max}"
              step="${d.log ? 1 : d.step}"
              value="${d.log ? xToPos(state.X[d.key], d.min, d.max) : state.X[d.key]}"
              data-coef="${d.key}"${d.log ? ' data-log="1"' : ''}>
@@ -1284,23 +1294,23 @@
   `).join('');
 
       const weightDefs = [
-        { key: 'size', label: 'w<sub>size</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 1 },
-        { key: 'kg', label: 'w<sub>kg</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 1 },
-        { key: 'sg', label: 'w<sub>sg</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 1 },
-        { key: 'sv', label: 'w<sub>sv</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 1 },
-        { key: 'cb', label: 'w<sub>cb</sub>', min: 0.10, max: 20.00, step: 0.10, dp: 1 },
+        { key: 'size', label: 'Size', min: 0.10, max: 20.00, step: 0.10, dp: 1 },
+        { key: 'kg', label: 'KeyGen', min: 0.10, max: 20.00, step: 0.10, dp: 1 },
+        { key: 'sg', label: 'SigGen', min: 0.10, max: 20.00, step: 0.10, dp: 1 },
+        { key: 'sv', label: 'SigVer', min: 0.10, max: 20.00, step: 0.10, dp: 1 },
+        { key: 'cb', label: 'ρ', min: 0.10, max: 20.00, step: 0.10, dp: 1 },
       ];
       document.getElementById('weight-controls').innerHTML = weightDefs.map(d => `
     <div class="control">
       <label>
         <span class="name">${d.label}</span>
-        <input type="number" class="val-input"
+        <input type="number" class="val-input" aria-label="${d.label} weight"
                id="W_${d.key}_val"
                min="${d.min}" max="${d.max}" step="${d.step}"
                value="${state.W[d.key].toFixed(d.dp)}"
                data-weight-input="${d.key}" data-dp="${d.dp}">
       </label>
-      <input type="range" min="${d.min}" max="${d.max}" step="${d.step}"
+      <input type="range" aria-label="${d.label} weight" min="${d.min}" max="${d.max}" step="${d.step}"
              value="${state.W[d.key]}" data-weight="${d.key}">
     </div>
   `).join('');
@@ -1372,7 +1382,7 @@
       <div class="funnel-row ${eliminated}">
         <div class="label">${s.name}</div>
         <div><div class="bar" style="width: ${widthPct}%;"></div></div>
-        <div class="count">${s.count.toLocaleString()}</div>
+        <div class="count">${s.count.toLocaleString('en-US')}</div>
       </div>
     `;
       }).join('');
@@ -1460,13 +1470,17 @@
         ctx.stroke();
       }
 
+      canvas.setAttribute('aria-label', `Candidate sieve: ${survivors.length.toLocaleString('en-US')} of ` +
+        `${state.initialPool.length.toLocaleString('en-US')} candidates within the bounds` +
+        (winner ? `, best (${winner.h}, ${winner.d}, ${winner.k}, ${winner.a}, ${winner.w})` : ''));
+
       // Legend
       const legendHTML = `
     <div class="item"><span class="swatch" style="background:#d4d4d0;"></span>filtered out</div>
-    <div class="item"><span class="swatch" style="background:${distanceColor(0)};"></span>survivor (closer to ideal)</div>
-    <div class="item"><span class="swatch" style="background:${distanceColor(0.5)};"></span>survivor (mid)</div>
-    <div class="item"><span class="swatch" style="background:${distanceColor(1)};"></span>survivor (farther)</div>
-    <div class="item"><span class="swatch" style="background:#1a1a1a;"></span>winner</div>
+    <div class="item"><span class="swatch" style="background:${distanceColor(0)};"></span>closest</div>
+    <div class="item"><span class="swatch" style="background:${distanceColor(0.5)};"></span>middle</div>
+    <div class="item"><span class="swatch" style="background:${distanceColor(1)};"></span>farthest</div>
+    <div class="item"><span class="swatch" style="background:#1a1a1a;"></span>best</div>
   `;
       document.getElementById('scatter-legend').innerHTML = legendHTML;
     }
@@ -1483,53 +1497,49 @@
       return 'bad';
     }
 
+    // Rows of the comparison tables: each metric next to its SLH-DSA-128s value.
+    function comparisonRows(c) {
+      const schnorr = state.schnorr.cb64;
+      const rows = [
+        ['Size (B)', c.size, STD_M.size, fmtNum],
+        ['KeyGen (C)', c.kg, STD_M.kg, fmtNum],
+        ['SigGen (C)', c.sg, STD_M.sg, fmtNum],
+        ['SigVer (C)', c.sv, STD_M.sv, fmtNum],
+        ['SigVer, worst (C)', c.sv_worst, STD_M.sv_worst, fmtNum],
+        ['ρ (C/B)', c.cb, STD_M.cb, fmtRho],
+        ['ρ, worst (C/B)', c.cb_worst, STD_M.cb_worst, fmtRho],
+        ['ρ ÷ Schnorr', c.cb / schnorr, STD_M.cb / schnorr, fmtRatio],
+        ['ρ ÷ Schnorr, worst', c.cb_worst / schnorr, STD_M.cb_worst / schnorr, fmtRatio],
+      ];
+      return rows.map(([name, value, std, fmtValue]) => {
+        const r = value / std;
+        return `<tr><td>${name}</td><td>${fmtValue(value)}</td><td>${fmtValue(std)}</td>` +
+          `<td class="ratio ${ratioClass(r, true)}">${fmtRatio(r)}</td></tr>`;
+      }).join('');
+    }
+
+    function comparisonTable(c, column) {
+      return `<table class="metrics">
+          <thead><tr><th>Metric</th><th>${column}</th><th><span class="keep-case">SLH-DSA-128s</span></th><th>Ratio</th></tr></thead>
+          <tbody>${comparisonRows(c)}</tbody>
+        </table>`;
+    }
+
     function renderWinner(winner) {
       const el = document.getElementById('winner');
       if (!winner) {
-        el.innerHTML = '<div class="empty-state">No candidates survived all filters. Relax a bound and try again.</div>';
+        el.innerHTML = '<div class="empty-state">No candidate is within all bounds. Relax one.</div>';
         return;
       }
       const d = weightedDistance(winner, state.W);
-      const rows = [
-        ['Signature size (B)', winner.size, STD_M.size],
-        ['KeyGen cost', winner.kg, STD_M.kg],
-        ['SigGen cost', winner.sg, STD_M.sg],
-        ['SigVer cost (avg)', winner.sv, STD_M.sv],
-        ['SigVer cost (worst)', winner.sv_worst, STD_M.sv_worst],
-        ['Comp/Byte ρ (avg)', winner.cb, STD_M.cb],
-        ['Comp/Byte ρ (worst)', winner.cb_worst, STD_M.cb_worst],
-        ['ρ ÷ Schnorr (avg)', winner.cb / state.schnorr.cb64, STD_M.cb / state.schnorr.cb64],
-        ['ρ ÷ Schnorr (worst)', winner.cb_worst / state.schnorr.cb64, STD_M.cb_worst / state.schnorr.cb64],
-      ];
-      const rowsHTML = rows.map(([name, target, std]) => {
-        const ratio = target / std;
-        const cls = ratioClass(ratio, true);
-        return `
-      <tr>
-        <td>${name}</td>
-        <td>${typeof target === 'number' && target < 10 ? target.toFixed(4) : fmt(target)}</td>
-        <td>${typeof std === 'number' && std < 10 ? std.toFixed(4) : fmt(std)}</td>
-        <td class="ratio ${cls}">${fmtRatio(ratio)}</td>
-      </tr>
-    `;
-      }).join('');
-
       el.innerHTML = `
     <div class="winner-grid">
       <div>
         <p class="winner-tuple">(${winner.h}, ${winner.d}, ${winner.k}, ${winner.a}, ${winner.w})</p>
-        <p class="winner-distance">Weighted distance: <strong>${d.toFixed(4)}</strong></p>
-        <p class="winner-distance">h' = h/d = ${(winner.h / winner.d).toFixed(0)} per XMSS layer</p>
-        ${winner.swn ? `<p class="winner-distance">S<sub>wn</sub> = ${winner.swn}${winner.mmax ? ` · mmax = ${winner.mmax}` : ''}</p>` : ''}
+        <p class="winner-distance">Distance <strong>${d.toFixed(4)}</strong> · h′ = ${winner.h / winner.d}</p>
+        ${winner.swn ? `<p class="winner-distance">S<sub>wn</sub> = ${winner.swn}${winner.mmax ? ` · m<sub>max</sub> = ${winner.mmax}` : ''}</p>` : ''}
       </div>
-      <div>
-        <table class="metrics">
-          <thead>
-            <tr><th>Metric</th><th>Target</th><th>Std</th><th>Ratio</th></tr>
-          </thead>
-          <tbody>${rowsHTML}</tbody>
-        </table>
-      </div>
+      <div>${comparisonTable(winner, 'Winner')}</div>
     </div>
   `;
     }
@@ -1581,48 +1591,29 @@
     }
 
     function statusFor(c) {
-      if (c === state.lastWinner) return { cls: 'winner', text: '★ Winner — minimum weighted distance' };
+      if (c === state.lastWinner) return { cls: 'winner', text: '★ Best candidate' };
       const elimStep = state.lastEliminatedAt ? state.lastEliminatedAt.get(c) : null;
       if (elimStep === null || elimStep === undefined) {
-        return { cls: 'survivor', text: 'Survivor — passed all filters' };
+        return { cls: 'survivor', text: 'Within all bounds' };
       }
-      return { cls: 'eliminated', text: `Eliminated at step ${elimStep + 1}: ${FILTER_STEPS[elimStep].label}` };
+      return { cls: 'eliminated', text: `Outside the ${FILTER_STEPS[elimStep].label} bound` };
     }
 
     function renderTooltip(c, clientX, clientY) {
       const tt = document.getElementById('tooltip');
       if (!c) { tt.style.display = 'none'; document.getElementById('hover-ring').style.display = 'none'; return; }
       const st = statusFor(c);
-      const rows = [
-        ['Signature size (B)', c.size, STD_M.size],
-        ['KeyGen cost', c.kg, STD_M.kg],
-        ['SigGen cost', c.sg, STD_M.sg],
-        ['SigVer cost (avg)', c.sv, STD_M.sv],
-        ['SigVer cost (worst)', c.sv_worst, STD_M.sv_worst],
-        ['Comp/Byte ρ (avg)', c.cb, STD_M.cb],
-        ['Comp/Byte ρ (worst)', c.cb_worst, STD_M.cb_worst],
-        ['ρ ÷ Schnorr (avg)', c.cb / state.schnorr.cb64, STD_M.cb / state.schnorr.cb64],
-        ['ρ ÷ Schnorr (worst)', c.cb_worst / state.schnorr.cb64, STD_M.cb_worst / state.schnorr.cb64],
-      ];
-      const tbody = rows.map(([name, target, std]) => {
-        const r = target / std;
-        const cls = ratioClass(r, true);
-        const tval = target < 10 ? target.toFixed(4) : fmt(target);
-        const sval = std < 10 ? std.toFixed(4) : fmt(std);
-        return `<tr><td>${name}</td><td>${tval}</td><td>${sval}</td><td class="ratio ${cls}">${fmtRatio(r)}</td></tr>`;
-      }).join('');
-
       const isSurvivor = st.cls === 'survivor' || st.cls === 'winner';
       const distHTML = isSurvivor
-        ? `<div class="tt-distance">Weighted distance: <strong>${weightedDistance(c, state.W).toFixed(4)}</strong></div>`
+        ? `<div class="tt-distance">Distance <strong>${weightedDistance(c, state.W).toFixed(4)}</strong></div>`
         : '';
 
       tt.innerHTML = `
     <p class="tt-tuple">(${c.h}, ${c.d}, ${c.k}, ${c.a}, ${c.w})${c.swn ? ` <span style="font-size:11px;color:var(--text-soft);">S<sub>wn</sub>=${c.swn}${c.mmax ? `, mmax=${c.mmax}` : ''}</span>` : ''}</p>
     <div class="tt-status ${st.cls}">${st.text}</div>
     <table>
-      <thead><tr><td></td><td>target</td><td>std</td><td>ratio</td></tr></thead>
-      <tbody>${tbody}</tbody>
+      <thead><tr><td></td><td>candidate</td><td>SLH-DSA-128s</td><td>ratio</td></tr></thead>
+      <tbody>${comparisonRows(c)}</tbody>
     </table>
     ${distHTML}
   `;
@@ -1663,14 +1654,12 @@
       if (errors.length) return { valid: false, errors, warnings };
 
       if (p.h % p.d !== 0) {
-        errors.push(`d must divide h evenly — h/d = ${(p.h / p.d).toFixed(3)} is not an integer.`);
+        errors.push(`d must divide h (h/d = ${(p.h / p.d).toFixed(3)}).`);
       }
       if (!UNIVERSE_W.includes(p.w)) {
-        errors.push(`w = ${p.w} is not supported. Choose w ∈ {${UNIVERSE_W.join(', ')}} ` +
-          `({2, 4, 16, 256} are SLH-DSA-compatible; FIPS 205 itself standardises w = 16).`);
+        errors.push(`w must be one of ${UNIVERSE_W.join(', ')}.`);
       } else if (OPTIONAL_W.includes(p.w)) {
-        warnings.push(`w = ${p.w}: lg_w = ${Math.log2(p.w)} does not divide 8, so base_2b digits ` +
-          `straddle byte boundaries — exploratory, outside strict SLH-DSA compatibility.`);
+        warnings.push(`w = ${p.w} is exploratory: its digits do not fit whole bytes, as SLH-DSA requires.`);
       }
 
       if (errors.length) return { valid: false, errors, warnings };
@@ -1678,7 +1667,7 @@
       // Real security check (FORS subset-forgery analysis, q_s = 2^40)
       const secBits = computeSecurityBits(Q_S_LOG2, p.h, p.k, p.a);
       if (secBits < 128) {
-        warnings.push(`Does not reach 128-bit security: computed security ≈ ${secBits.toFixed(1)} bits at q_s = 2⁴⁰.`);
+        warnings.push(`Below 128-bit security: ${secBits.toFixed(1)} bits at q<sub>s</sub> = 2<sup>40</sup>.`);
       }
 
       return { valid: true, errors: [], warnings, secBits };
@@ -1700,7 +1689,7 @@
 
       if (!v.valid) {
         statusEl.className = 'custom-status invalid';
-        statusEl.innerHTML = `<strong>Invalid tuple.</strong><ul>${v.errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
+        statusEl.innerHTML = `<strong>Invalid.</strong><ul>${v.errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
         resultEl.innerHTML = '';
         return;
       }
@@ -1712,9 +1701,8 @@
       // and the model stops being meaningful long before that.
       if (!isFinite(m.kg) || !isFinite(m.sg)) {
         statusEl.className = 'custom-status invalid';
-        statusEl.innerHTML = `<strong>Out of range.</strong> h' = h/d = ${(p.h / p.d).toFixed(0)} ` +
-          `is too large — the 2<sup>h'</sup> per-layer tree cost overflows this model. ` +
-          `Reduce h or increase d.`;
+        statusEl.innerHTML = `<strong>Out of range.</strong> h′ = ${p.h / p.d} is too large for this model; ` +
+          `reduce h or increase d.`;
         resultEl.innerHTML = '';
         return;
       }
@@ -1726,28 +1714,8 @@
       } else {
         statusEl.className = 'custom-status ok';
         const sameAsStd = p.h === STD.h && p.d === STD.d && p.k === STD.k && p.a === STD.a && p.w === STD.w;
-        statusEl.innerHTML = `<strong>Valid tuple.</strong>${sameAsStd ? ' (This is the SLH-DSA-128s baseline.)' : ''}`;
+        statusEl.innerHTML = `<strong>Valid.</strong>${sameAsStd ? ' This is SLH-DSA-128s.' : ''}`;
       }
-
-      // Comparison table
-      const rows = [
-        ['Signature size (B)', m.size, STD_M.size],
-        ['KeyGen cost', m.kg, STD_M.kg],
-        ['SigGen cost', m.sg, STD_M.sg],
-        ['SigVer cost (avg)', m.sv, STD_M.sv],
-        ['SigVer cost (worst)', m.sv_worst, STD_M.sv_worst],
-        ['Comp/Byte ρ (avg)', m.cb, STD_M.cb],
-        ['Comp/Byte ρ (worst)', m.cb_worst, STD_M.cb_worst],
-        ['ρ ÷ Schnorr (avg)', m.cb / state.schnorr.cb64, STD_M.cb / state.schnorr.cb64],
-        ['ρ ÷ Schnorr (worst)', m.cb_worst / state.schnorr.cb64, STD_M.cb_worst / state.schnorr.cb64],
-      ];
-      const rowsHTML = rows.map(([name, target, std]) => {
-        const r = target / std;
-        const cls = ratioClass(r, true);
-        const tval = target < 10 ? target.toFixed(4) : fmt(target);
-        const sval = std < 10 ? std.toFixed(4) : fmt(std);
-        return `<tr><td>${name}</td><td>${tval}</td><td>${sval}</td><td class="ratio ${cls}">${fmtRatio(r)}</td></tr>`;
-      }).join('');
 
       const hp = p.h / p.d;
       const wotsL = wotsLen(STD.n, p.w);
@@ -1755,7 +1723,7 @@
       const rawTxt = secRaw > 300 ? '&gt; 300' : secRaw.toFixed(1);
       const secLabel = secRaw >= 128
         ? `<span style="color:var(--good);">128 bits ✓</span> <span style="color:var(--text-mute);font-size:11px;">` +
-          `(FORS-forgery exponent ≈ ${rawTxt} — capped by the 2<sup>−128</sup> preimage bound)</span>`
+          `(${rawTxt} bits against FORS forgery, capped by the 2<sup>−128</sup> preimage bound)</span>`
         : `<span style="color:var(--bad);">${secRaw.toFixed(1)} bits</span>`;
 
       resultEl.innerHTML = `
@@ -1763,19 +1731,12 @@
       <div>
         <p class="winner-tuple">(${p.h}, ${p.d}, ${p.k}, ${p.a}, ${p.w})</p>
         <div class="custom-notes">
-          <div><code>h' = h / d = ${hp}</code> (XMSS layer height)</div>
-          <div><code>len = ${wotsL}</code> (WOTS+ chains per signature)</div>
-          <div>Security at q<sub>s</sub> = 2⁴⁰: ${secLabel}</div>
+          <div>Layer height h′ = ${hp}</div>
+          <div>WOTS chains: ${wotsL}</div>
+          <div>Security at q<sub>s</sub> = 2<sup>40</sup>: ${secLabel}</div>
         </div>
       </div>
-      <div>
-        <table class="metrics">
-          <thead>
-            <tr><th>Metric</th><th>Yours</th><th>Std</th><th>Ratio</th></tr>
-          </thead>
-          <tbody>${rowsHTML}</tbody>
-        </table>
-      </div>
+      <div>${comparisonTable(m, 'Yours')}</div>
     </div>
   `;
     }
@@ -1869,12 +1830,6 @@
 
     // ---------- Schemes ----------
     const SCHEME_LABELS = { 'SPX': 'SPX', 'W+C': 'W+C', 'W+C_F+C': 'FORS+C', 'W+C_P+FP': 'PORS+FP' };
-    const SCHEME_TITLES = {
-      'SPX': 'Plain SLH-DSA structure: WOTS-TW + FORS',
-      'W+C': 'WOTS+C (grinding counter instead of checksum chains) + FORS',
-      'W+C_F+C': 'WOTS+C + FORS+C (grinding removes the last FORS tree)',
-      'W+C_P+FP': 'WOTS+C + PORS+FP (single tree with Octopus authentication)',
-    };
     const SCHEME_IDS = { 'SPX': 'spx', 'W+C': 'wc', 'W+C_F+C': 'fc', 'W+C_P+FP': 'pfp' };
     const SCHEME_FROM_ID = Object.fromEntries(Object.entries(SCHEME_IDS).map(([k, v]) => [v, k]));
 
@@ -1882,30 +1837,27 @@
       const host = document.getElementById('scheme-controls');
       const schemes = state.siteData ? state.siteData.meta.schemes : ['SPX'];
       host.innerHTML = schemes.map(s =>
-        `<button class="${s === state.scheme ? 'active' : ''}" data-scheme="${s}"
-                 title="${SCHEME_TITLES[s]}">${SCHEME_LABELS[s]}</button>`).join('');
+        `<button class="${s === state.scheme ? 'active' : ''}" data-scheme="${s}">${SCHEME_LABELS[s]}</button>`).join('');
       host.querySelectorAll('button').forEach(b =>
         b.addEventListener('click', () => activateScheme(b.dataset.scheme)));
       if (!state.siteData) {
-        document.getElementById('scheme-hint').innerHTML =
-          'Variants need <code>data.json</code> (unavailable — SPX computed in-browser).';
+        const hint = document.getElementById('scheme-hint');
+        hint.textContent = 'Only SPX: data.json did not load.';
+        hint.hidden = false;
       }
     }
 
     function schnorrNote() {
       const s = state.schnorr;
-      const rAvg = (STD_M.cb / s.cb64).toFixed(3);
-      const rWorst = (STD_M.cb_worst / s.cb64).toFixed(3);
       const src = s.live
-        ? `kappa.json${s.commit ? ` @ secp256k1 ${s.commit}` : ''}${s.run ? `, ${s.run}` : ''}` +
+        ? `kappa.json${s.commit ? ` at secp256k1 ${s.commit}` : ''}${s.run ? `, ${s.run}` : ''}` +
           `${s.machine ? `, ${s.machine}` : ''}${s.preliminary ? ', preliminary' : ''}`
-        : `built-in 1.98 C/B — live kappa.json unreachable`;
-      return `<br><span style="opacity:0.65;font-size:11px;">` +
-        `ρ reference: BIP340 Schnorr verify ≈ <strong>${s.cb64.toFixed(2)} C/B</strong> ` +
-        `(${s.impl}, single verify over a 64 B wire signature; ` +
-        `<a href="https://github.com/mjthatch/bip340-vs-sha256" style="color:inherit;">bip340-vs-sha256</a>: ${src}). ` +
-        `SLH-DSA-128s baseline: ${STD_M.cb.toFixed(4)} C/B = ` +
-        `<strong>${rAvg}×</strong> Schnorr (avg), ${rWorst}× (worst).</span>`;
+        : 'built-in value, the live kappa.json did not load';
+      return `<p>Schnorr reference: a BIP340 verification takes ${s.cb64.toFixed(2)} C/B ` +
+        `(${s.impl}, one 64-byte signature; ` +
+        `<a href="https://github.com/mjthatch/bip340-vs-sha256">bip340-vs-sha256</a>, ${src}). ` +
+        `SLH-DSA-128s has ρ = ${fmtRho(STD_M.cb)} C/B, ${fmtRatio(STD_M.cb / s.cb64)} Schnorr ` +
+        `(${fmtRatio(STD_M.cb_worst / s.cb64)} worst).</p>`;
     }
 
     function renderInfoStrip() {
@@ -1915,31 +1867,21 @@
       const wtxt = state.scheme === 'SPX'
         ? `w = {${act.join(', ')}}`
         : `(w, S<sub>wn</sub>) ∈ {(16, 240), (256, 2040)}`;
-      const bounds = `(≥ 128-bit security at q<sub>s</sub> = 2⁴⁰, size &lt; 7,856 B, ${wtxt})`;
-      let html;
-      if (d) {
-        const pm = d.pools[state.scheme];
-        const swept = state.scheme === 'SPX'
-          ? consideredPerW(d.meta.grid) * act.length
-          : pm.considered;
-        html =
-          `Scheme: <strong>${SCHEME_LABELS[state.scheme]}</strong> · ` +
-          `<strong>${swept.toLocaleString()}</strong> tuples swept · ` +
-          `<strong>${pool.length.toLocaleString()}</strong> pass the initial bounds ${bounds}. ` +
-          `<span style="opacity:0.65;font-size:11px;">` +
-          `Data: <code>data.json</code> (generated ${d.meta.generated}, commit ${d.meta.commit}); ` +
-          `security via the FORS / PORS+FP subset-forgery analysis of the report's ` +
-          `<a href="https://github.com/BlockstreamResearch/SPHINCS-Parameters/blob/main/security.sage" style="color:inherit;">security.sage</a>.` +
-          `</span>` + schnorrNote();
-      } else {
-        html =
-          `Scheme: <strong>SPX</strong> · ` +
-          `<strong>${(consideredPerW(null) * act.length).toLocaleString()}</strong> tuples · ` +
-          `<strong>${pool.length.toLocaleString()}</strong> pass the initial bounds ${bounds}. ` +
-          `<span style="opacity:0.65;font-size:11px;">Pool computed in-browser ` +
-          `(data.json unavailable — scheme variants disabled).</span>` + schnorrNote();
-      }
-      document.getElementById('initial-info').innerHTML = html;
+      const swept = d
+        ? (state.scheme === 'SPX' ? consideredPerW(d.meta.grid) * act.length : d.pools[state.scheme].considered)
+        : consideredPerW(null) * act.length;
+      document.getElementById('initial-info').innerHTML =
+        `Scheme <strong>${SCHEME_LABELS[state.scheme]}</strong> · ` +
+        `<strong>${swept.toLocaleString('en-US')}</strong> tuples swept · ` +
+        `<strong>${pool.length.toLocaleString('en-US')}</strong> pass the initial bounds`;
+      const source = d
+        ? `<p>Pool: <code>data.json</code>, generated ${d.meta.generated} from commit ${d.meta.commit}. ` +
+          `Security from the FORS and PORS+FP subset-forgery analysis in ` +
+          `<a href="https://github.com/BlockstreamResearch/SPHINCS-Parameters/blob/main/security.sage">security.sage</a>.</p>`
+        : '<p>Pool computed in the browser, because <code>data.json</code> did not load.</p>';
+      document.getElementById('about-pool').innerHTML =
+        `<p>Initial bounds: at least 128-bit security at q<sub>s</sub> = 2<sup>40</sup>, ` +
+        `size below ${fmtNum(STD_M.size)} B, ${wtxt}.</p>` + source + schnorrNote();
     }
 
     function activateScheme(scheme) {
@@ -2025,10 +1967,9 @@
 
     // ---------- CSV export ----------
     function exportSurvivorsCSV() {
-      const header = ['scheme', 'h', 'd', 'k', 'a', 'w', 'swn', 'mmax', 'size',
-        'keygen_C', 'sign_C', 'verify_C', 'verify_worst_C',
-        'c_per_byte', 'c_per_byte_worst',
-        'cb_vs_schnorr', 'cb_worst_vs_schnorr', 'schnorr_cb64', 'distance'];
+      const header = ['scheme', 'h', 'd', 'k', 'a', 'w', 'swn', 'mmax', 'size_B',
+        'keygen_C', 'siggen_C', 'sigver_C', 'sigver_worst_C',
+        'rho', 'rho_worst', 'rho_vs_schnorr', 'rho_worst_vs_schnorr', 'schnorr_rho', 'distance'];
       const lines = [header.join(',')];
       for (const c of state.lastSurvivors) {
         lines.push([state.scheme, c.h, c.d, c.k, c.a, c.w, c.swn || 0, c.mmax || 0,
@@ -2073,6 +2014,7 @@
       renderControls();
       document.getElementById('worst-toggle').checked = state.useWorst;
       document.getElementById('optw-toggle').checked = state.showOptW;
+      document.querySelectorAll('[data-std]').forEach(el => { el.innerHTML = fmtNum(STD_M[el.dataset.std]); });
       renderSchemeButtons();
       renderInfoStrip();
       update();
