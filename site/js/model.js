@@ -455,6 +455,38 @@ function computeSecurityBits(q_s_log2, h, k, a, hashbytes = 16) {
 const Q_S_LOG2 = 40;
 
 
+// ---------- Distance ----------
+
+// The report's metric-normalised weighted distance: each ratio to SLH-DSA-128s
+// is scaled to [0, 1] over the candidates within the bounds, so a weight sets
+// its metric's share of the squared distance however loose the bounds are.
+const DISTANCE_KEYS = ['size', 'kg', 'sg', 'sv', 'cb'];
+
+// Per-metric min and max of a list of ratio sets; a flat metric spans [min, min + 1].
+function ratioRanges(ratioSets) {
+  const ranges = {};
+  for (const k of DISTANCE_KEYS) {
+    let min = Infinity, max = -Infinity;
+    for (const r of ratioSets) {
+      if (r[k] < min) min = r[k];
+      if (r[k] > max) max = r[k];
+    }
+    ranges[k] = isFinite(min) ? { min, max: max === min ? min + 1 : max } : { min: 0, max: 1 };
+  }
+  return ranges;
+}
+
+function weightedDistance(ratios, ranges, W) {
+  const sum = W.size + W.kg + W.sg + W.sv + W.cb;
+  let d2 = 0;
+  for (const k of DISTANCE_KEYS) {
+    const norm = (ratios[k] - ranges[k].min) / (ranges[k].max - ranges[k].min);
+    d2 += (W[k] / sum) * norm * norm;
+  }
+  return Math.sqrt(d2);
+}
+
+
 // ---------- Schnorr reference ----------
 
 const SCHNORR_KAPPA_URL =

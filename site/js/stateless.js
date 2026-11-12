@@ -66,7 +66,7 @@ function passesInitial(c) {
 // fallback, and are cross-checked against the loaded SPX pool at startup.
 function poolFromData(data, scheme) {
   const p = data.pools[scheme];
-  const idx = Object.fromEntries(p.fields.map((f, i) => [f, i]));
+  const idx = fieldIndex(p);
   // Guard against a stale data.json generated on an older grid: only the
   // swept w universe survives (a freshly exported dataset drops none).
   const rows = p.rows.filter(r => UNIVERSE_W.includes(r[idx.w]));
@@ -131,41 +131,15 @@ function runFilters(pool, X) {
   return { stepCounts, survivors: cur, eliminatedAt };
 }
 
-// ---------- Distance ----------
-// Compute per-metric ratio range across the survivor pool so that
-// weights have equal leverage regardless of filter tightness.
-const METRIC_KEYS = ['size', 'kg', 'sg', 'sv', 'cb'];
-
-function computeRanges(survivors) {
-  const ranges = {};
-  METRIC_KEYS.forEach(key => {
-    const mk = mkey(key);
-    const stdVal = STD_M[mk];
-    if (!survivors.length) { ranges[key] = { min: 0, max: 1 }; return; }
-    const vals = survivors.map(c => c[mk] / stdVal);
-    const lo = Math.min(...vals), hi = Math.max(...vals);
-    ranges[key] = { min: lo, max: hi === lo ? lo + 1 : hi }; // avoid /0
-  });
-  return ranges;
+// Ratios to SLH-DSA-128s, with the worst-case SigVer and ρ in worst-case mode.
+function ratiosOf(c) {
+  const r = {};
+  for (const k of DISTANCE_KEYS) r[k] = c[mkey(k)] / STD_M[mkey(k)];
+  return r;
 }
 
-function weightedDistance(c, W) {
-  const sum = W.size + W.kg + W.sg + W.sv + W.cb;
-  const p = {
-    size: W.size / sum, kg: W.kg / sum, sg: W.sg / sum,
-    sv: W.sv / sum, cb: W.cb / sum
-  };
-  const ranges = state.lastRanges;
-  let dist2 = 0;
-  METRIC_KEYS.forEach(key => {
-    const wKey = key; // same key names in W
-    const mk = mkey(key);
-    const ratio = c[mk] / STD_M[mk];
-    const { min, max } = ranges[key];
-    const norm = (ratio - min) / (max - min); // in [0,1] for survivors
-    dist2 += p[wKey] * norm * norm;
-  });
-  return Math.sqrt(dist2);
+function distanceOf(c, W) {
+  return weightedDistance(ratiosOf(c), state.lastRanges, W);
 }
 
 // ---------- State ----------
@@ -203,14 +177,6 @@ function activeWSet() {
 function rebuildInitialPool() {
   const act = activeWSet();
   state.initialPool = (state.pools[state.scheme] || []).filter(c => act.includes(c.w));
-}
-
-// Round a ratio up to a 1-2-5 decade; 20x is the floor so the classic slider range never shrinks.
-function niceCap(m) {
-  if (!isFinite(m) || m <= 20) return 20;
-  const e = Math.pow(10, Math.floor(Math.log10(m)));
-  for (const f of [1, 2, 5, 10]) if (f * e >= m) return f * e;
-  return 10 * e;
 }
 
 // X-slider caps: the largest per-metric ratio present in ANY loaded pool
@@ -260,26 +226,6 @@ function mulberry32(seed) {
 
 // ---------- Rendering ----------
 
-// Log-position mapping for the cost-coefficient sliders: integer track
-// positions 0..SLIDER_STEPS <-> X in [min, max], geometrically spaced.
-// (~2% per tick — finer than the old 0.1 linear step near X = 1, and it
-// reaches the pool's extreme ratios that a linear 0.1..20 track cannot.)
-const SLIDER_STEPS = 1000;
-function posToX(pos, min, max) {
-  return min * Math.pow(max / min, pos / SLIDER_STEPS);
-}
-function xToPos(x, min, max) {
-  const t = Math.log(x / min) / Math.log(max / min);
-  return Math.round(SLIDER_STEPS * Math.max(0, Math.min(1, t)));
-}
-function fmtX(v) {
-  // Keep the string short enough for the 92px value inputs: plain
-  // integers up to 6 digits, compact exponential beyond.
-  if (v < 100) return v.toFixed(2);
-  if (v < 1e6) return String(Math.round(v));
-  return v.toExponential(1);
-}
-
 function renderControls() {
   const filterDefs = [
     { key: 'size', label: 'Size', min: 0.30, max: 1.00, step: 0.01, dp: 2 },
@@ -296,12 +242,12 @@ function renderControls() {
            id="X_${d.key}_val"
            min="${d.min}" max="${d.max}" step="${d.log ? 'any' : d.step}"
            value="${d.log ? fmtX(state.X[d.key]) : state.X[d.key].toFixed(d.dp)}"
-           data-coef-input="${d.key}"${d.log ? '' : ` data-dp="${d.dp}"`}>
+           data-key="${d.key}"${d.log ? '' : ` data-dp="${d.dp}"`}>
   </label>
   <input type="range" aria-label="${d.label} bound" min="${d.log ? 0 : d.min}" max="${d.log ? SLIDER_STEPS : d.max}"
          step="${d.log ? 1 : d.step}"
          value="${d.log ? xToPos(state.X[d.key], d.min, d.max) : state.X[d.key]}"
-         data-coef="${d.key}"${d.log ? ' data-log="1"' : ''}>
+         data-key="${d.key}"${d.log ? ' data-log="1"' : ''}>
 </div>
   `).join('');
 
@@ -320,61 +266,15 @@ function renderControls() {
            id="W_${d.key}_val"
            min="${d.min}" max="${d.max}" step="${d.step}"
            value="${state.W[d.key].toFixed(d.dp)}"
-           data-weight-input="${d.key}" data-dp="${d.dp}">
+           data-key="${d.key}" data-dp="${d.dp}">
   </label>
   <input type="range" aria-label="${d.label} weight" min="${d.min}" max="${d.max}" step="${d.step}"
-         value="${state.W[d.key]}" data-weight="${d.key}">
+         value="${state.W[d.key]}" data-key="${d.key}">
 </div>
   `).join('');
 
-  // --- Wire bidirectional input <-> slider for both X and W ---
-  // Sliders flagged data-log store a 0..SLIDER_STEPS track position; the
-  // real range lives on the paired number input's min/max attributes.
-  function bindPair(group, store) {
-    // Slider -> store + number-input
-    document.querySelectorAll(`input[data-${group}]`).forEach(slider => {
-      slider.addEventListener('input', e => {
-        const key = e.target.dataset[group];
-        const numInp = document.querySelector(`input[data-${group}-input="${key}"]`);
-        let v;
-        if (e.target.dataset.log) {
-          v = posToX(parseFloat(e.target.value),
-                     parseFloat(numInp.min), parseFloat(numInp.max));
-          numInp.value = fmtX(v);
-        } else {
-          v = parseFloat(e.target.value);
-          numInp.value = v.toFixed(parseInt(numInp.dataset.dp, 10));
-        }
-        store[key] = v;
-        requestUpdate();
-      });
-    });
-    // Number input -> store + slider
-    document.querySelectorAll(`input[data-${group}-input]`).forEach(inp => {
-      inp.addEventListener('input', e => {
-        const key = e.target.dataset[`${group}Input`];
-        let v = parseFloat(e.target.value);
-        if (!isFinite(v)) return;
-        const min = parseFloat(e.target.min);
-        const max = parseFloat(e.target.max);
-        const clamped = Math.max(min, Math.min(max, v));
-        store[key] = clamped;
-        const slider = document.querySelector(`input[data-${group}="${key}"]`);
-        slider.value = slider.dataset.log ? xToPos(clamped, min, max) : clamped;
-        requestUpdate();
-      });
-      // On blur, reformat to canonical precision and re-clamp the displayed value
-      inp.addEventListener('blur', e => {
-        const key = e.target.dataset[`${group}Input`];
-        e.target.value = e.target.dataset.dp
-          ? store[key].toFixed(parseInt(e.target.dataset.dp, 10))
-          : fmtX(store[key]);
-      });
-    });
-  }
-
-  bindPair('coef', state.X);
-  bindPair('weight', state.W);
+  bindSliderPairs(document.getElementById('filter-controls'), state.X, requestUpdate);
+  bindSliderPairs(document.getElementById('weight-controls'), state.W, requestUpdate);
 
   document.getElementById('reset-btn').addEventListener('click', () => {
     state.X = { ...DEFAULTS_X };
@@ -436,7 +336,7 @@ function renderScatter(eliminatedAt, survivors, winner) {
   state.scatterLayout = { pad, w, h, cssW, cssH };
 
   // Compute distance for survivors to drive colour
-  const dists = survivors.map(c => weightedDistance(c, state.W));
+  const dists = survivors.map(c => distanceOf(c, state.W));
   const dmin = dists.length ? Math.min(...dists) : 0;
   const dmax = dists.length ? Math.max(...dists) : 1;
   const drange = (dmax - dmin) || 1;
@@ -497,15 +397,10 @@ function renderScatter(eliminatedAt, survivors, winner) {
   document.getElementById('scatter-legend').innerHTML = legendHTML;
 }
 
-function ratioClass(r, inverse = false) {
-  // r is target/std. inverse=true means lower is better (default for cost metrics)
-  if (inverse) {
-    if (r <= 0.8) return 'good';
-    if (r <= 1.05) return 'warn';
-    return 'bad';
-  }
-  if (r >= 1.2) return 'good';
-  if (r >= 0.95) return 'warn';
+// Colour of a ratio to SLH-DSA-128s; lower is better.
+function ratioTone(r) {
+  if (r <= 0.8) return 'good';
+  if (r <= 1.05) return 'warn';
   return 'bad';
 }
 
@@ -526,7 +421,7 @@ function comparisonRows(c) {
   return rows.map(([name, value, std, fmtValue]) => {
     const r = value / std;
     return `<tr><td>${name}</td><td>${fmtValue(value)}</td><td>${fmtValue(std)}</td>` +
-      `<td class="ratio ${ratioClass(r, true)}">${fmtRatio(r)}</td></tr>`;
+      `<td class="ratio ${ratioTone(r)}">${fmtRatio(r)}</td></tr>`;
   }).join('');
 }
 
@@ -543,7 +438,7 @@ function renderWinner(winner) {
     el.innerHTML = '<div class="empty-state">No candidate is within all bounds. Relax one.</div>';
     return;
   }
-  const d = weightedDistance(winner, state.W);
+  const d = distanceOf(winner, state.W);
   el.innerHTML = `
 <div class="winner-grid">
   <div>
@@ -561,13 +456,13 @@ function update() {
   const { stepCounts, survivors, eliminatedAt } = runFilters(state.initialPool, state.X);
   renderFunnel(stepCounts);
   // Recompute normalisation ranges for this survivor pool
-  state.lastRanges = computeRanges(survivors);
+  state.lastRanges = ratioRanges(survivors.map(ratiosOf));
   let winner = null;
   if (survivors.length > 0) {
     winner = survivors[0];
-    let bestD = weightedDistance(winner, state.W);
+    let bestD = distanceOf(winner, state.W);
     for (let i = 1; i < survivors.length; i++) {
-      const d = weightedDistance(survivors[i], state.W);
+      const d = distanceOf(survivors[i], state.W);
       if (d < bestD) { bestD = d; winner = survivors[i]; }
     }
   }
@@ -579,14 +474,7 @@ function update() {
   scheduleHashWrite();
 }
 
-// A slider drag fires an input event per step. Recompute and redraw at
-// most once per animation frame instead of once per event.
-let updateQueued = false;
-function requestUpdate() {
-  if (updateQueued) return;
-  updateQueued = true;
-  requestAnimationFrame(() => { updateQueued = false; update(); });
-}
+const requestUpdate = oncePerFrame(update);
 
 // ---------- Hover tooltip ----------
 function findNearestCandidate(mx, my) {
@@ -617,7 +505,7 @@ function renderTooltip(c, clientX, clientY) {
   const st = statusFor(c);
   const isSurvivor = st.cls === 'survivor' || st.cls === 'winner';
   const distHTML = isSurvivor
-    ? `<div class="tt-distance">Distance <strong>${weightedDistance(c, state.W).toFixed(4)}</strong></div>`
+    ? `<div class="tt-distance">Distance <strong>${distanceOf(c, state.W).toFixed(4)}</strong></div>`
     : '';
 
   tt.innerHTML = `
@@ -782,17 +670,6 @@ function attachScatterHover() {
 }
 
 // ---------- Setup ----------
-async function loadSiteData() {
-  try {
-    const resp = await fetch('data.json', { cache: 'no-cache' });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    return await resp.json();
-  } catch (e) {
-    console.warn('data.json unavailable (' + e.message + ') — computing the pool in-browser as fallback.');
-    return null;
-  }
-}
-
 // Cross-check the loaded data against the local formulas: the baseline
 // plus a sample of pool rows. Any divergence is a bug in one of the two
 // implementations — log it loudly.
@@ -896,35 +773,13 @@ function writeHash() {
   if (state.showOptW) parts.push('ow=1');
   const cust = CUSTOM_IDS.map(id => document.getElementById(id).value).join(',');
   if (cust !== CUSTOM_DEFAULTS) parts.push('c=' + cust);
-  const url = parts.length
-    ? '#' + parts.join('&')
-    : location.pathname + location.search;
-  // Safari throws once a page exceeds its history-update quota.
-  try { history.replaceState(null, '', url); } catch (err) { /* keep the page working */ }
+  replaceHash(parts);
 }
 
-// The address bar mirrors the state, but not on every slider step:
-// browsers rate-limit history.replaceState (Chromium silently drops
-// calls beyond about 200 per 10 s, which left the URL stale after a long
-// drag; Safari throws), and every call is a same-document navigation the
-// browser has to process in the middle of the drag. One write, shortly
-// after the last change, is enough.
-const HASH_WRITE_DELAY_MS = 250;
-let hashTimer = null;
-function scheduleHashWrite() {
-  clearTimeout(hashTimer);
-  hashTimer = setTimeout(writeHash, HASH_WRITE_DELAY_MS);
-}
+const scheduleHashWrite = hashWriter(writeHash);
 
 function applyHash() {
-  const raw = location.hash.replace(/^#/, '');
-  if (!raw) return;
-  const params = {};
-  for (const part of raw.split('&')) {
-    const eq = part.indexOf('=');
-    if (eq > 0) params[part.slice(0, eq)] = decodeURIComponent(part.slice(eq + 1));
-  }
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const params = readHash();
   const setVec = (str, store, isX) => {
     const vals = (str || '').split(',').map(parseFloat);
     if (vals.length !== 5 || !vals.every(isFinite)) return;
@@ -965,14 +820,9 @@ function exportSurvivorsCSV() {
       (c.cb / SCHNORR.cb64).toFixed(6),
       (c.cb_worst / SCHNORR.cb64).toFixed(6),
       SCHNORR.cb64.toFixed(6),
-      weightedDistance(c, state.W).toFixed(6)].join(','));
+      distanceOf(c, state.W).toFixed(6)].join(','));
   }
-  const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `survivors_${SCHEME_IDS[state.scheme]}_${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  downloadCSV(`survivors_${SCHEME_IDS[state.scheme]}`, lines);
 }
 
 async function setup() {
@@ -1018,17 +868,7 @@ async function setup() {
     renderInfoStrip();
     update();
   });
-  document.getElementById('share-btn').addEventListener('click', async e => {
-    writeHash();
-    const btn = e.target;
-    try {
-      await navigator.clipboard.writeText(location.href);
-      btn.textContent = 'Link copied ✓';
-      setTimeout(() => { btn.textContent = 'Copy shareable link'; }, 1500);
-    } catch (err) {
-      prompt('Copy this link:', location.href);
-    }
-  });
+  bindShareButton(writeHash);
   document.getElementById('export-btn').addEventListener('click', exportSurvivorsCSV);
 
   // Re-render the scatter when the canvas CSS size changes

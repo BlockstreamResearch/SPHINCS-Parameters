@@ -127,10 +127,6 @@ function candFromUxmssRec(rec, idx) {
   };
 }
 
-function fieldIndex(section) {
-  return Object.fromEntries(section.fields.map((f, i) => [f, i]));
-}
-
 // Cross-check data.json against the local formulas (SLH baseline, a sample
 // of the XMSS-MT grid, and every UXMSS variant); log divergences loudly.
 function selfCheckStateful(data) {
@@ -207,7 +203,7 @@ function qsCell(c) {
 const RHO = '<span class="keep-case">ρ</span>';
 
 //  State
-const state = { candidates: [] };   // filled by init() once data.json is resolved
+const state = { candidates: [] };   // filled by setup() once data.json is resolved
 
 // Render 
 // Metric column descriptors
@@ -391,12 +387,6 @@ const SWEEP_WEIGHT_FILTERS = [
   { key: 'cb',   label: 'ρ',      min: 0.10, max: 10.00, step: 0.10, dp: 1 },
 ];
 
-// Metric-normalised weighted Euclidean distance — same definition as the
-// Parameter Explorer (report, "Metric-Normalized Weighted Distance"): each
-// ratio axis is range-normalised to [0, 1] across the CURRENT survivor pool,
-// so weights keep equal leverage regardless of how loose each bound is.
-const SWEEP_METRIC_KEYS = ['size', 'kg', 'sg', 'sv', 'cb'];
-
 function sweepRatios(m, std) {
   return {
     size: m.size / std.size,
@@ -407,59 +397,8 @@ function sweepRatios(m, std) {
   };
 }
 
-function computeSweepRanges(survivors, std) {
-  const ranges = {};
-  SWEEP_METRIC_KEYS.forEach(k => ranges[k] = { min: Infinity, max: -Infinity });
-  for (const f of survivors) {
-    const r = sweepRatios(f.cached.metrics, std);
-    SWEEP_METRIC_KEYS.forEach(k => {
-      if (r[k] < ranges[k].min) ranges[k].min = r[k];
-      if (r[k] > ranges[k].max) ranges[k].max = r[k];
-    });
-  }
-  SWEEP_METRIC_KEYS.forEach(k => {
-    if (!isFinite(ranges[k].min)) ranges[k] = { min: 0, max: 1 };
-    else if (ranges[k].max === ranges[k].min) ranges[k].max = ranges[k].min + 1; // avoid /0
-  });
-  return ranges;
-}
-
 function sweepDistance(m, std, W) {
-  const sum = W.size + W.kg + W.sg + W.sv + W.cb;
-  const R = sweepState.lastRanges;
-  const X = sweepRatios(m, std);
-  let d2 = 0;
-  for (const k of SWEEP_METRIC_KEYS) {
-    const norm = (X[k] - R[k].min) / (R[k].max - R[k].min); // in [0,1] for survivors
-    d2 += (W[k] / sum) * norm * norm;
-  }
-  return Math.sqrt(d2);
-}
-
-// Shared slider/number-input renderer.
-// Filters flagged `log: true` get a geometric slider: the range element
-// stores an integer track position 0..SLIDER_STEPS while the real bound
-// range lives on the paired number input's min/max (max = sweepState.xMax).
-const SLIDER_STEPS = 1000;
-function posToX(pos, min, max) {
-  return min * Math.pow(max / min, pos / SLIDER_STEPS);
-}
-function xToPos(x, min, max) {
-  const t = Math.log(x / min) / Math.log(max / min);
-  return Math.round(SLIDER_STEPS * Math.max(0, Math.min(1, t)));
-}
-function fmtX(v) {
-  if (v < 100) return v.toFixed(2);
-  if (v < 1e6) return String(Math.round(v));
-  return v.toExponential(1);
-}
-
-// Round a ratio up to a 1-2-5 decade; 20x is the floor.
-function niceCap(m) {
-  if (!isFinite(m) || m <= 20) return 20;
-  const e = Math.pow(10, Math.floor(Math.log10(m)));
-  for (const f of [1, 2, 5, 10]) if (f * e >= m) return f * e;
-  return 10 * e;
+  return weightedDistance(sweepRatios(m, std), sweepState.lastRanges, W);
 }
 
 // Largest per-metric ratio across the sweep pool (both signer modes and both
@@ -493,9 +432,9 @@ function renderSweepFilterGroup(hostId, group, filters) {
     const numVal = f.log ? fmtX(store[f.key]) : store[f.key].toFixed(f.dp);
     const sliderAttrs = f.log
       ? `min="0" max="${SLIDER_STEPS}" step="1"
-             value="${xToPos(store[f.key], f.min, max)}" data-sw="${f.key}" data-log="1"`
+             value="${xToPos(store[f.key], f.min, max)}" data-key="${f.key}" data-log="1"`
       : `min="${f.min}" max="${f.max}" step="${f.step}"
-             value="${store[f.key]}" data-sw="${f.key}"`;
+             value="${store[f.key]}" data-key="${f.key}"`;
     return `
     <div class="ctrl">
       <label>
@@ -504,49 +443,14 @@ function renderSweepFilterGroup(hostId, group, filters) {
                id="sw-${group}-${f.key}-val"
                min="${f.min}" max="${max}" step="${f.log ? 'any' : f.step}"
                value="${numVal}"
-               data-sw-input="${f.key}"${f.log ? '' : ` data-dp="${f.dp}"`}>
+               data-key="${f.key}"${f.log ? '' : ` data-dp="${f.dp}"`}>
       </label>
       <input type="range" aria-label="${f.label} ${group === 'X' ? 'bound' : 'weight'}" ${sliderAttrs}>
     </div>
   `;
   }).join('');
 
-  host.querySelectorAll('input[data-sw]').forEach(slider => {
-    slider.addEventListener('input', e => {
-      const key = e.target.dataset.sw;
-      const inp = host.querySelector(`input[data-sw-input="${key}"]`);
-      let v;
-      if (e.target.dataset.log) {
-        v = posToX(parseFloat(e.target.value),
-                   parseFloat(inp.min), parseFloat(inp.max));
-        inp.value = fmtX(v);
-      } else {
-        v = parseFloat(e.target.value);
-        inp.value = v.toFixed(parseInt(inp.dataset.dp, 10));
-      }
-      store[key] = v;
-      requestSweepRender();
-    });
-  });
-  host.querySelectorAll('input[data-sw-input]').forEach(inp => {
-    inp.addEventListener('input', e => {
-      const key = e.target.dataset.swInput;
-      const raw = parseFloat(e.target.value);
-      if (!isFinite(raw)) return;
-      const min = parseFloat(e.target.min), max = parseFloat(e.target.max);
-      const v = Math.max(min, Math.min(max, raw));
-      store[key] = v;
-      const slider = host.querySelector(`input[data-sw="${key}"]`);
-      slider.value = slider.dataset.log ? xToPos(v, min, max) : v;
-      requestSweepRender();
-    });
-    inp.addEventListener('blur', e => {
-      const key = e.target.dataset.swInput;
-      e.target.value = e.target.dataset.dp
-        ? store[key].toFixed(parseInt(e.target.dataset.dp, 10))
-        : fmtX(store[key]);
-    });
-  });
+  bindSliderPairs(host, store, requestSweepRender);
 }
 
 function renderSweepFilters() {
@@ -588,7 +492,7 @@ function renderSweepTable() {
     if (candQs < minQsAbs) continue;
     survivors.push(f);
   }
-  sweepState.lastRanges = computeSweepRanges(survivors, std);
+  sweepState.lastRanges = ratioRanges(survivors.map(f => sweepRatios(f.cached.metrics, std)));
   const sortCol = SWEEP_COLS.find(c => c.field === sweepState.sort.col) || SWEEP_COLS[0];
   const sign = sweepState.sort.dir === 'asc' ? 1 : -1;
   survivors.sort((a, b) => {
@@ -598,7 +502,7 @@ function renderSweepTable() {
     return sign * (av < bv ? -1 : 1);
   });
   sweepState.lastSurvivors = survivors;
-  scheduleStatefulHashWrite();
+  scheduleHashWrite();
 
   document.getElementById('sweep-info').innerHTML =
     `<strong>${survivors.length.toLocaleString('en-US')}</strong> of ` +
@@ -717,7 +621,7 @@ function candidateFromKey(key) {
   return null;
 }
 
-function writeStatefulHash() {
+function writeHash() {
   const parts = [];
   const keys = state.candidates.slice(1).map(c => c.key).filter(Boolean);
   if (keys.join(',') !== DEFAULT_CAND_KEYS.join(',')) parts.push('cand=' + keys.join(','));
@@ -728,38 +632,14 @@ function writeStatefulHash() {
   if (sweepState.sort.col !== 'distance' || sweepState.sort.dir !== 'asc')
     parts.push('sort=' + sweepState.sort.col + '.' + sweepState.sort.dir);
   if (SIGNER_MODE !== 'cached') parts.push('m=' + SIGNER_MODE);
-  // Safari throws once a page exceeds its history-update quota.
-  try {
-    history.replaceState(null, '',
-      parts.length ? '#' + parts.join('&') : location.pathname + location.search);
-  } catch (err) { /* keep the page working */ }
+  replaceHash(parts);
 }
 
-const HASH_WRITE_DELAY_MS = 250;
-let statefulHashTimer = null;
-function scheduleStatefulHashWrite() {
-  clearTimeout(statefulHashTimer);
-  statefulHashTimer = setTimeout(writeStatefulHash, HASH_WRITE_DELAY_MS);
-}
+const scheduleHashWrite = hashWriter(writeHash);
+const requestSweepRender = oncePerFrame(renderSweepTable);
 
-// A slider drag fires an input event per step. Rebuild the sweep table at most
-// once per animation frame instead of once per event.
-let sweepRenderQueued = false;
-function requestSweepRender() {
-  if (sweepRenderQueued) return;
-  sweepRenderQueued = true;
-  requestAnimationFrame(() => { sweepRenderQueued = false; renderSweepTable(); });
-}
-
-function applyStatefulHash() {
-  const raw = location.hash.replace(/^#/, '');
-  if (!raw) return;
-  const params = {};
-  for (const part of raw.split('&')) {
-    const eq = part.indexOf('=');
-    if (eq > 0) params[part.slice(0, eq)] = decodeURIComponent(part.slice(eq + 1));
-  }
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+function applyHash() {
+  const params = readHash();
   if (params.b) {
     const v = params.b.split(',').map(parseFloat);
     if (v.length === 6 && v.every(isFinite)) {
@@ -816,12 +696,7 @@ function exportSweepCSV() {
       SIGNER_MODE,
       sweepDistance(m, std, sweepState.W).toFixed(6)].join(','));
   }
-  const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `stateful_candidates_${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  downloadCSV('stateful_candidates', lines);
 }
 
 function setupAddForm() {
@@ -913,21 +788,10 @@ function setupAddForm() {
 function render() {
   renderComparison();
   if (SWEEP_FACTORIES.length > 0) renderSweepTable();
-  else scheduleStatefulHashWrite();
+  else scheduleHashWrite();
 }
 
 //  Init
-async function loadSiteData() {
-  try {
-    const resp = await fetch('data.json', { cache: 'no-cache' });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    return await resp.json();
-  } catch (e) {
-    console.warn('data.json unavailable (' + e.message + ') — computing candidates in-browser as fallback.');
-    return null;
-  }
-}
-
 function renderSchnorrNote() {
   const s = SCHNORR;
   const m = state.candidates[0].metrics;
@@ -943,13 +807,13 @@ function renderSchnorrNote() {
     `SLH-DSA-128s has ρ = ${fmtRho(cb)} C/B, ${fmtRatio(cb / s.cb64)} Schnorr.</p>`;
 }
 
-async function init() {
+async function setup() {
   const [siteData, schnorr] = await Promise.all([loadSiteData(), loadSchnorrRef()]);
   SITE_DATA = siteData;
   SCHNORR = schnorr;
   if (SITE_DATA) selfCheckStateful(SITE_DATA);
   state.candidates = defaultCandidates();
-  applyStatefulHash();
+  applyHash();
   document.getElementById('signer-mode').value = SIGNER_MODE;
   document.getElementById('signer-mode').addEventListener('change', e => {
     SIGNER_MODE = e.target.value === 'cold' ? 'cold' : 'cached';
@@ -964,17 +828,7 @@ async function init() {
   renderSweepFilters();
   renderSweepTable();    // first paint of the sweep table
 
-  document.getElementById('share-btn').addEventListener('click', async e => {
-    writeStatefulHash();
-    const btn = e.target;
-    try {
-      await navigator.clipboard.writeText(location.href);
-      btn.textContent = 'Link copied ✓';
-      setTimeout(() => { btn.textContent = 'Copy shareable link'; }, 1500);
-    } catch (err) {
-      prompt('Copy this link:', location.href);
-    }
-  });
+  bindShareButton(writeHash);
   document.getElementById('sweep-export').addEventListener('click', exportSweepCSV);
 }
-if (typeof document !== 'undefined') init();
+if (typeof document !== 'undefined') setup();
