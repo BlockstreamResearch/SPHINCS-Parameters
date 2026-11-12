@@ -466,7 +466,7 @@ function renderTooltip(c, clientX, clientY) {
     : '';
 
   tt.innerHTML = `
-<p class="tt-tuple">(${c.h}, ${c.d}, ${c.k}, ${c.a}, ${c.w})${c.swn ? ` <span style="font-size:11px;color:var(--text-soft);">S<sub>wn</sub>=${c.swn}${c.mmax ? `, mmax=${c.mmax}` : ''}</span>` : ''}</p>
+<p class="tt-tuple">(${c.h}, ${c.d}, ${c.k}, ${c.a}, ${c.w})${c.swn ? ` <span class="tt-swn">S<sub>wn</sub>=${c.swn}${c.mmax ? `, mmax=${c.mmax}` : ''}</span>` : ''}</p>
 <div class="tt-status ${st.cls}">${st.text}</div>
 <table>
   <thead><tr><td></td><td>candidate</td><td>SLH-DSA-128s</td><td>ratio</td></tr></thead>
@@ -579,9 +579,9 @@ function renderCustom() {
   const secRaw = forsForgeryExponent(Q_S_LOG2, p.h, p.k, p.a);
   const rawTxt = secRaw > 300 ? '&gt; 300' : secRaw.toFixed(1);
   const secLabel = secRaw >= 128
-    ? `<span style="color:var(--good);">128 bits ✓</span> <span style="color:var(--text-mute);font-size:11px;">` +
+    ? `<span class="sec-ok">128 bits ✓</span> <span class="sec-detail">` +
       `(${rawTxt} bits against FORS forgery, capped by the 2<sup>−128</sup> preimage bound)</span>`
-    : `<span style="color:var(--bad);">${secRaw.toFixed(1)} bits</span>`;
+    : `<span class="sec-low">${secRaw.toFixed(1)} bits</span>`;
 
   resultEl.innerHTML = `
 <div class="winner-grid">

@@ -439,7 +439,7 @@ function renderSweepFilterGroup(hostId, group, filters) {
     <div class="ctrl">
       <label>
         <span class="name">${f.label}</span>
-        <input type="number" class="val"
+        <input type="number" class="val-input"
                id="sw-${group}-${f.key}-val"
                min="${f.min}" max="${max}" step="${f.log ? 'any' : f.step}"
                value="${numVal}"
@@ -512,7 +512,7 @@ function renderSweepTable() {
   table.innerHTML = '';
 
   if (survivors.length === 0) {
-    table.innerHTML = `<thead><tr><th class="cand-col" colspan="${SWEEP_COLS.length + 2}" style="text-align:center;color:var(--text-mute);font-style:italic;padding:24px;">No candidate is within all bounds. Relax one.</th></tr></thead>`;
+    table.innerHTML = `<thead><tr><th class="cand-col note" colspan="${SWEEP_COLS.length + 2}">No candidate is within all bounds. Relax one.</th></tr></thead>`;
     return;
   }
 
@@ -561,7 +561,7 @@ function renderSweepTable() {
     rowsHtml.push(row);
   }
   if (survivors.length > MAX_ROWS) {
-    rowsHtml.push(`<tr><td class="cand-col" colspan="${SWEEP_COLS.length + 2}" style="text-align:center;color:var(--text-mute);font-style:italic;">… and ${(survivors.length - MAX_ROWS).toLocaleString('en-US')} more; tighten a bound to see them.</td></tr>`);
+    rowsHtml.push(`<tr><td class="cand-col note" colspan="${SWEEP_COLS.length + 2}">… and ${(survivors.length - MAX_ROWS).toLocaleString('en-US')} more; tighten a bound to see them.</td></tr>`);
   }
   tbody.innerHTML = rowsHtml.join('');
 
