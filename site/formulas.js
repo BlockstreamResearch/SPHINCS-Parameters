@@ -384,19 +384,3 @@ async function loadSchnorrRef() {
   }
 }
 
-
-// ---------- Shared formatters ----------
-
-function fmtBytes(n) { return n.toLocaleString() + ' B'; }
-
-function fmtCompressions(n) {
-  if (!isFinite(n)) return '—';
-  if (n >= 1e15) return n.toExponential(2);
-  if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
-  if (n >= 1e9)  return (n / 1e9).toFixed(2) + 'G';
-  if (n >= 1e6)  return (n / 1e6).toFixed(2) + 'M';
-  if (n >= 1e3)  return (n / 1e3).toFixed(1) + 'K';
-  return Math.round(n).toLocaleString();
-}
-
-function fmtCpb(n) { return n.toFixed(3); }
