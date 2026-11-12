@@ -40,6 +40,7 @@ function infoButton(id, label) {
 }
 
 (function () {
+  if (typeof document === 'undefined') return;
   if (!('popover' in HTMLElement.prototype)) return;  // older browsers show the content inline
   let opener = null;
   document.addEventListener('click', e => {
@@ -72,7 +73,7 @@ function infoButton(id, label) {
 
 // Glossary
 
-document.body.insertAdjacentHTML('beforeend', `
+if (typeof document !== 'undefined') document.body.insertAdjacentHTML('beforeend', `
 <div class="pop pop-wide" id="glossary" popover>
   <h3>Glossary</h3>
   <dl>
