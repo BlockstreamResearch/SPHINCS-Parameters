@@ -34,6 +34,16 @@ body { padding: 24px; }
 
 header, main { max-width: 1280px; margin: 0 auto; }
 header { margin-bottom: 20px; }
+header { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; }
+header > * { grid-column: 1; }
+header > .glossary-btn { grid-column: 2; grid-row: 1 / span 3; align-self: start; }
+.glossary-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--panel); color: var(--text-soft);
+  font: inherit; font-size: 13px; cursor: pointer;
+}
+.glossary-btn:hover, .glossary-btn:focus-visible { border-color: var(--accent); color: var(--accent); }
 
 h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
 
@@ -43,12 +53,6 @@ h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
 
 .crumbs a, .tagline a, .card-link a { color: var(--accent); text-decoration: none; }
 .crumbs a:hover, .tagline a:hover, .card-link a:hover { text-decoration: underline; }
-
-.text-btn {
-  padding: 0; border: 0; background: none; font: inherit;
-  color: var(--accent); cursor: pointer;
-}
-.text-btn:hover { text-decoration: underline; }
 
 /* Names whose case matters, inside uppercase headings */
 .keep-case { text-transform: none; }

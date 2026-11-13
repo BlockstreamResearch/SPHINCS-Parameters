@@ -1,0 +1,19 @@
+\section{Hash-Cost Convention} \label{app:hash-convention}
+All compression counts in this report use the \emph{midstate-cached} convention. The SHA-2 instantiation of FIPS~205 zero-pads $\mathsf{PK.seed}$ to a full 64-byte block precisely so that implementations can precompute the SHA-256 compression state after that block once per key pair and reuse it for every tweakable-hash call. Under this convention, each call therefore costs only its \emph{marginal} compressions over the compressed address $\mathsf{ADRS}_c$ (22 bytes) plus the payload and padding: a WOTS chain step or FORS leaf ($22 + 16$ bytes) costs one compression, and — importantly — a two-child Merkle node hash ($22 + 32$ bytes $= 497$ bits) also costs exactly \emph{one} compression. The two message functions are counted as the SHRINCS reference implementation\footnote{\url{https://github.com/SHRINCS/shrincs-bip}} executes them for a 32-byte message. The midstate trick does not apply to the message hash $H_{\mathsf{msg}}$, whose input begins with the randomizer $R$: it consists of two nested SHA-256 calls and costs four compressions. $\mathsf{PRF}_{\mathsf{msg}}$ is HMAC-SHA-256 and costs three compressions once its two key-pad blocks are cached in the same way as the $\mathsf{PK.seed}$ block.
+
+Under this convention the SLH-DSA-128s baseline costs are: KeyGen $292{,}351$, SigGen $2{,}218{,}486$, and SigVer $2{,}193$ (average) / $3{,}893$ (worst-case) compressions. The original convention of the accompanying scripts is kept at the repository tag \texttt{uncached-convention}: every call pays for its full input (a node hash then costs two compressions), the two message functions are single two-block hashes, and WOTS chain walks are averaged as $(w-1)/2$ steps per chain, giving the baseline SigVer $2{,}387$.
+
+\section{Average-Case and Worst-Case Costs} \label{app:average-case}
+All verification costs in this report are \emph{average-case}: they reflect the expected number of compressions for a uniformly random message.
+The expectation is exact. The message chains of a WOTS signature are walked for $(w-1)/2$ steps on average, but the checksum chains are not, because the leading base-$w$ digit of the checksum is almost always $0$ or $1$: for $w = 16$ a signature takes $267.1$ chain steps on average, rather than the $262.5$ that $(w-1)/2$ steps per chain would give.
+The \emph{worst-case} verification cost is approximately $1.78\times$ the average for the standard parameter set ($3{,}893$ vs.\ $2{,}193$ compressions): the WOTS chain-walk component alone grows by up to ${\approx}1.91\times$, while the FORS and authentication-path costs are message-independent.
+The worst case depends solely on the message being signed — it cannot be influenced by the verifier.
+We also use an \emph{average-case} signing cost; the \emph{worst case} does not significantly increase the number of compressions required to generate a signature.
+
+\section{Normalization within the Feasible Region} \label{app:normalization}
+The normalization is computed fresh from the survivors after each change to the filter coefficients.
+This means that the same weight vector $\mathbf{w}$ can produce a different winner when the filter is tightened, because the pool shrinks and the per-axis ranges change accordingly.
+This behavior is intentional: the weights express relative importance \emph{within the feasible region}, and that region is itself defined by the filter.
+
+\section{SHRINCS Framing} \label{app:framing}
+The sizes in this report are those of the SLH-DSA signature itself. SHRINCS places a one-byte indicator in front of every signature, so a stateless SHRINCS signature under Candidate~1 occupies $5{,}777$ bytes.

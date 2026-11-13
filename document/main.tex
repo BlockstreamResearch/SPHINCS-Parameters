@@ -9,10 +9,8 @@
 \usepackage{subcaption}
 \usepackage{booktabs}
 \usepackage{array}
-\usepackage{tikz}
-
-\usepackage{framed}
-
+\usepackage{xcolor}
+\usepackage{xurl}
 
 \usepackage[colorlinks=true,
             linkcolor=black,
@@ -20,6 +18,7 @@
             urlcolor=blue!60!black]{hyperref}
 
 \title{SHRINCS Stateless Parameter Search Methodology}
+\author{Blockstream Research}
 \date{\today}
 
 \begin{document}
@@ -32,10 +31,14 @@
 \input{content/1-introduction}
 \input{content/2-parameters}
 \input{content/3-search}
+\input{content/4-candidate}
 
 \newpage
 
 \bibliographystyle{plain}
 \bibliography{refs}
+
+\appendix
+\input{content/appendix}
 
 \end{document}

@@ -3,7 +3,7 @@
 \subsection{Initial Bounds}
 As mentioned in the introduction, our objective is to find parameters that make the signature ``better'' than SLH-DSA. Before we can do so, we have to fix the strict boundaries that we will not cross:
 \begin{enumerate}
-    \item We obviously do not want a signature larger than SLH-DSA - otherwise, why bother in the first place?
+    \item We obviously do not want a signature larger than SLH-DSA — otherwise, why bother in the first place?
     \item For Bitcoin, we require at least a 128-bit security level. None of the parameters we select may degrade security below this floor.
     \item At least $q_{s} = 2^{40}$ supported signatures. SLH-DSA-128s defines the maximum number of signatures as $q_{s} = 2^{64}$, which is generous. For Bitcoin, we assume that $q_{s} = 2^{40}$ is a practical compromise, comfortably covering the foreseeable needs of on-chain operations and the Lightning Network.
     \item Sub-algorithms, hash, and addressing functions remain unchanged.
@@ -22,7 +22,7 @@ To ensure a symmetric construction across all internal boundaries, our search pi
 \begin{equation*}
     h' = \frac{h}{d}.
 \end{equation*}
-Adjusting the ratio between $h$ and $d$ governs the balance between signature size and key-generation cost. Reducing the number of layers $d$ shrinks the total number of intermediate public keys and authentication paths in the signature payload, saving valuable bytes. However, this exponentially increases the height $h'$ of each constituent tree, requiring significantly more hash operations to compute the root node during key generation.
+Adjusting the ratio between $h$ and $d$ governs the balance between signature size and key-generation cost. Reducing the number of layers $d$ shrinks the total number of intermediate public keys and authentication paths in the signature payload, saving valuable bytes. However, this increases the height $h'$ of each constituent tree, requiring exponentially more hash operations to compute the root node during key generation.
 
 \paragraph{Few-Time Signature Layer ($k$ and $a$).}
 The lowest layer of the hyper-tree authenticates the Forest of Random Subsets (FORS) few-time signature scheme, which directly signs the message digest.
@@ -34,7 +34,7 @@ The lowest layer of the hyper-tree authenticates the Forest of Random Subsets (F
 Increasing $k$ and $a$ strengthens the scheme against multi-target subset-forgery attacks and allows the structure to support larger capacities safely. However, expanding these dimensions directly increases the byte footprint of the appended authentication paths.
 
 \paragraph{One-Time Signature Base ($w$).}
-Internal tree roots are signed using the Winternitz One-Time Signature Plus (WOTS+) scheme. The base parameter $w$ defines the digit representation used to split the message digest during signing. Our framework evaluates candidate configurations across the SLH-DSA-compatible settings $w \in \{2, 4, 16, 256\}$: these are exactly the powers of two for which $\lg w$ divides $8$, so the \texttt{base\_2b} message digits remain byte-aligned and the SLH-DSA algorithm structure carries over unchanged (FIPS 205 standardises $w = 16$; the remaining values are exploratory). The non-divisor powers of two ($w \in \{8, 32, 64, 128\}$) are deliberately excluded.
+Internal tree roots are signed using the Winternitz One-Time Signature Plus (WOTS+) scheme. The base parameter $w$ defines the digit representation used to split the message digest during signing. Our framework evaluates candidate configurations across the SLH-DSA-compatible settings $w \in \{2, 4, 16, 256\}$: these are exactly the powers of two for which $\lg w$ divides $8$, so the \texttt{base\_2b} message digits remain byte-aligned and the SLH-DSA algorithm structure carries over unchanged (FIPS 205 standardizes $w = 16$; the remaining values are exploratory). The non-divisor powers of two ($w \in \{8, 32, 64, 128\}$) are deliberately excluded.
 
 Selecting a larger base reduces the number of parallel hash chains $\ell$, which in turn reduces the overall WOTS+ payload size. This spatial efficiency comes at the cost of local compute: larger base parameters require longer hash chains, resulting in higher execution costs during key and signature generation.
 
@@ -45,4 +45,4 @@ We sweep the ranges as follows:
 
 The lower bound $k \geq 6$ discards only insecure configurations: with $a \leq 20$ and $h \leq 50$, any $k \leq 5$ falls short of the 128-bit security floor at $q_s = 2^{40}$, so smaller values of $k$ never survive the security filter. The same grid is used by the sweep script (\texttt{scripts/slhdsa-2to40.sage}) and the interactive explorer, so the counts reported below are reproducible in both.
 
-\textit{The SLH-DSA-128s baseline tuple (63, 7, 14, 12, 16) sits outside this range and is included for comparison}
+\textit{The SLH-DSA-128s baseline tuple (63, 7, 14, 12, 16) sits outside this range and is included for comparison.}

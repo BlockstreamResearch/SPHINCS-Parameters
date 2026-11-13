@@ -54,7 +54,8 @@ function infoButton(id, label) {
       ? opener : document.querySelector(`[popovertarget="${pop.id}"]`);
     if (!btn) return;
     const r = btn.getBoundingClientRect(), gap = 6, edge = 8;
-    const left = Math.max(edge, Math.min(r.left, innerWidth - pop.offsetWidth - edge));
+    const from = r.left + pop.offsetWidth > innerWidth - edge ? r.right - pop.offsetWidth : r.left;
+    const left = Math.max(edge, Math.min(from, innerWidth - pop.offsetWidth - edge));
     let top = r.bottom + gap;
     if (top + pop.offsetHeight > innerHeight - edge && r.top - gap - pop.offsetHeight >= edge) {
       top = r.top - gap - pop.offsetHeight;
