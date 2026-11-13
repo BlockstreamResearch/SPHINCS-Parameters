@@ -41,7 +41,7 @@ These filters can be combined and parameterized in different ways to produce dif
 \subsubsection{Case 1: Best in Class}
 In this case, we find the most efficient signature for a single metric at a time, leaving the other metrics unbounded. The results are shown in Table~\ref{tab:minimal_metric_each}.
 
-\begin{table}[h!]
+\begin{table}[!ht]
 \small
 \raggedright 
 \caption{Absolute Global Extremes}
@@ -73,7 +73,7 @@ Table~\ref{tab:minimal_metric_each} confirms what one would suspect: each metric
 
 \subsubsection{Case 2: Balanced Metrics}
 In the next experiment, we look for ``average'' candidates whose metrics all stay below a uniform threshold $X \cdot \mathsf{std}$ (the filter is applied to every metric, with the exception of the maximum signature size $\leq \mathsf{std}$). By gradually increasing $X$, we obtain the following picture.
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=0.8\textwidth]{content/images/concentric_diagram.png}
     \caption{Global Minimax Expansion: Concentric Euler diagram illustrating the volume of candidates unlocked at expanding uniform multiplier thresholds.}
@@ -82,7 +82,7 @@ In the next experiment, we look for ``average'' candidates whose metrics all sta
 
 Naturally, the smaller the multiplier $X$, the fewer candidates survive the filter. A clear winner emerges at $X \approx 0.8666$; let us see how compelling it actually is (Table~\ref{tab:optimal_candidate_metrics}).
 
-\begin{table}[h!]
+\begin{table}[!ht]
     \centering
 \small
 \caption{Performance Comparison between the Standard Baseline and the Balanced Candidate}
@@ -116,7 +116,7 @@ Each candidate is uniquely defined by its tuple of metric values, so the search 
 
 To build intuition, suppose we care about only two metrics — signature size and signature generation cost. We require the signature size to be no larger than that of SLH-DSA, and we are willing to tolerate a signing cost of at most $2\times$ the standard. In this case all admissible candidates fit inside the green rectangle in Figure~\ref{fig:scatter_plot}, which makes brute-force inspection easy: the best candidate is simply the point closest to the origin $(0, 0)$.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=0.7\textwidth]{content/images/scatter_plot.png}
     \caption{Visualization of Candidates with Prioritization of Size and SigGen.}
@@ -136,7 +136,7 @@ As an example, consider the following filter coefficients:
 
 The filtering process is shown in Figure~\ref{fig:full_filtering_process}.
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     % Row 1
     \begin{subfigure}[b]{0.32\textwidth}
@@ -375,7 +375,7 @@ The regular weighted distance chooses a more balanced best candidate, while the 
 The outcome of each distance method is shown in Figure~\ref{fig:distance_result_comparison}.
 
 
-\begin{figure}[h!]
+\begin{figure}[!ht]
     \centering
     \begin{subfigure}[b]{0.49\textwidth}
         \centering
