@@ -1,54 +1,41 @@
 #!/usr/bin/env sage
 """
-Standard SLH-DSA-128s VS custom variants sweeping (h, d, k, a) for various OTS/FTS combinations.
+Sweeps the stateless grid of parameters.json for one scheme, keeps the parameter
+sets that reach the security target and pass the filters, prints them against
+SLH-DSA-128s, and writes them to candidates.csv, SLH-DSA-128s first as STANDARD.
+make sweeps runs it twice for utils/all_size_capped_candidates.csv and
+utils/all_unbound_candidates.csv.
 
-Variant is selected via --ots and --fts flags:
-  --ots {wots-tw, wots+c}        (default: wots-tw)
-  --fts {fors, fors+c, pors+fp}  (default: fors)
-
-Supported (ots, fts) combinations:
-  (wots-tw, fors)    -> SPX        (plain SLH-DSA / SPHINCS+)
-  (wots+c, fors)     -> W+C
-  (wots+c, fors+c)   -> W+C_F+C
-  (wots+c, pors+fp)  -> W+C_P+FP
-
-Sweep behavior per OTS (values from parameters.json):
-  - wots-tw : w from the stateless grid, swn = 0
-  - wots+c  : w from stateless.wc_w with its S_wn
-
-Filters (defaults; override via CLI):
-  --max-size BYTES         Reject if size >= BYTES                (default: max_size, the SLH-DSA-128s size)
-  --max-keygen-ratio X     Reject if keygen  > X * std keygen     (default: no limit)
-  --max-sign-ratio X       Reject if sign    > X * std sign       (default: no limit)
-  --max-verify-ratio X     Reject if verify  > X * std verify     (default: no limit)
-  --max-c-per-byte X       Reject if verify_C / size > X          (default: no limit)
-  --max-cpb-ratio X        Reject if verify_C / size > X * std C/byte (default: no limit)
-
-Sweep ranges (comma-separated lists):
-  --h N1,N2,...            Hypertree heights to sweep            (default: the grid's h range)
-  --d N1,N2,...            Layer counts to sweep                 (default: the grid's d range)
-                           Combinations where h % d != 0 are auto-skipped.
-
-Usage:
-  sage slhdsa-2to40.sage                                  # default (SPX, h=40)
-  sage slhdsa-2to40.sage --ots wots+c --fts pors+fp       # W+C_P+FP variant
-  sage slhdsa-2to40.sage --ots wots+c --fts fors+c        # W+C_F+C variant
-  sage slhdsa-2to40.sage --max-size 4500 --max-keygen-ratio 10 --max-sign-ratio 10
-  sage slhdsa-2to40.sage --h 40,42,45,48 --d 2,3,4,5,6,8
+  sage slhdsa-2to40.sage [--ots wots-tw|wots+c] [--fts fors|fors+c|pors+fp] [filters]
+  sage slhdsa-2to40.sage --help
 """
+import csv
 import os
 import sys
-
-_DOC = __doc__   # loading costs.sage replaces __doc__
 
 os.environ['COSTS_SAGE_NO_MAIN'] = '1'   # its functions, without its CLI
 load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "costs.sage"))
 
 GRID = PARAMETERS['stateless']['grid']
 
-# -----------------------------------------------------------------------------
-# CLI parsing
-# -----------------------------------------------------------------------------
+USAGE = """usage: sage slhdsa-2to40.sage [options]
+
+  --ots wots-tw|wots+c         the one-time signature (default wots-tw); wots+c
+                               sweeps the w of wc_w with their S_wn
+  --fts fors|fors+c|pors+fp    the few-time signature (default fors); wots-tw
+                               goes with fors only
+  --h N1,N2,...                hypertree heights (default: the grid)
+  --d N1,N2,...                layers (default: the grid); d must divide h
+  --max-size BYTES             keep sizes below BYTES (default: the grid's max_size)
+  --max-keygen-ratio X         keep KeyGen up to X times that of SLH-DSA-128s
+  --max-sign-ratio X           the same for SigGen
+  --max-verify-ratio X         the same for SigVer
+  --max-c-per-byte X           keep SigVer compressions per byte up to X
+  --max-cpb-ratio X            keep them up to X times those of SLH-DSA-128s
+
+The filters other than the size have no limit by default.
+"""
+
 
 def _parse_int_list(s):
     return [int(x) for x in s.split(",") if x.strip()]
@@ -98,7 +85,7 @@ def _parse_args(argv):
             d_values = _parse_int_list(argv[i + 1])
             i += 2
         elif a == "--help":
-            print(_DOC)
+            print(USAGE)
             sys.exit(0)
         else:
             print("Unknown argument: {}".format(a), file=sys.stderr)
@@ -122,23 +109,17 @@ if (OTS, FTS) not in SCHEME_MAP:
     sys.exit(2)
 SCHEME = SCHEME_MAP[(OTS, FTS)]
 
-# (w, swn) sweep pairs depend on OTS
 if OTS == "wots-tw":
     W_SWN_PAIRS = [(w, 0) for w in GRID['w']]
 else:  # wots+c
     W_SWN_PAIRS = [(w, SWN[w]) for w in PARAMETERS['stateless']['wc_w']]
 
-# -----------------------------------------------------------------------------
-# Sweep parameters
-# -----------------------------------------------------------------------------
-
-# Standard baseline is plain SLH-DSA-128s (SPX) for fair comparison
+# Every scheme is compared with SLH-DSA-128s
 STD_SCHEME = "SPX"
 STD_SWN    = 0
 
 K_RANGE  = range(GRID['k'][0], GRID['k'][1] + 1)
 A_RANGE  = range(GRID['a'][0], GRID['a'][1] + 1)
-# H_VALUES and D_VALUES come from CLI flags (parsed at top of file)
 
 
 def csv_row(q_s_log2, r):
@@ -179,8 +160,6 @@ std['label'] = 'STANDARD'
 KEYGEN_LIMIT = std['keygen_C'] * MAX_KEYGEN_RATIO
 SIGN_LIMIT   = std['sign_C']   * MAX_SIGN_RATIO
 VERIFY_LIMIT = std['verify_C'] * MAX_VERIFY_RATIO
-# Effective C/byte cap: min of the absolute cap and the ratio cap (relative to
-# the std baseline computed above — avoids hardcoding a stale constant).
 CPB_LIMIT    = min(MAX_C_PER_BYTE, std['c_per_byte'] * MAX_CPB_RATIO)
 
 print("Standard baseline (compressions):", file=sys.stderr)
@@ -253,7 +232,7 @@ def fmt_ratio(r, std_val):
     return "{:.2f}x".format(float(r) / float(std_val))
 
 
-# Use a wider Label column when swn is included; show S_wn column only for W+C
+# Only WOTS+C labels and rows carry S_wn
 label_w = 12 if OTS == "wots+c" else 10
 
 columns = [
@@ -330,7 +309,6 @@ print(" Total: {} configurations passing all filters ({})".format(
     len(all_results), " + ".join(parts)))
 print()
 
-# Filter rejection summary
 print("=" * total_width)
 print("  FILTER REJECTION SUMMARY  ".center(total_width))
 print("=" * total_width)
@@ -341,7 +319,7 @@ def _rej_label(name, ratio):
     return " Rejected ({} > {:g}x std):     ".format(name, ratio)
 
 print(" Considered configurations:        {}".format(considered))
-print(" Rejected (security < 128):        {}".format(rejected['security']))
+print(" Rejected (security < {}):        {}".format(PARAMETERS['security_bits'], rejected['security']))
 print(" Rejected (size >= {} B):         {}".format(MAX_SIZE, rejected['size']))
 print("{}{}".format(_rej_label("keygen", MAX_KEYGEN_RATIO), rejected['keygen']))
 print("{}{}".format(_rej_label("sign",   MAX_SIGN_RATIO),   rejected['sign']))
@@ -353,7 +331,6 @@ else:
 print(" Passed all filters (custom):      {}".format(len(all_results) - 1))
 print()
 
-# Summary
 print("=" * total_width)
 print("  SUMMARY  ".center(total_width))
 print("=" * total_width)
@@ -399,7 +376,7 @@ for w, swn in W_SWN_PAIRS:
     if OTS == "wots-tw" and w == 16:
         note = " (FIPS 205-compatible algorithm structure)"
     elif OTS == "wots-tw":
-        note = " (modified SPHINCS+, NOT FIPS 205)"
+        note = " (modified SPHINCS+, not FIPS 205)"
     else:
         note = ""
     subset = [r for r in all_results if r['label'] == label]
@@ -412,16 +389,13 @@ print("  - All cost metrics in SHA-256 compression-function calls (C).")
 print("  - All ratios (KG/std, SG/std, SV/std) are relative to standard SLH-DSA-128s.")
 print("  - Sec(bits) is capped at 128.0 by the n=128 preimage bound.")
 if OTS == "wots+c":
-    print("  - swn is the WOTS+C target chain sum S_{w,n}; values mirror PARAMETER_SETS in costs.sage.")
+    print("  - swn is the WOTS+C target chain sum S_{w,n}, from parameters.json.")
 print("  - Sweep ranges: h in {}, d in {}, k in [{}, {}], a in [{}, {}], (w,swn) in {}.".format(
     H_VALUES, D_VALUES, K_RANGE.start, K_RANGE.stop - 1, A_RANGE.start, A_RANGE.stop - 1, W_SWN_PAIRS))
-
-import csv
 
 csv_filename = "candidates.csv"
 print("\nSaving candidate configurations to {}...".format(csv_filename))
 
-# Define the exact dictionary keys returned by evaluate()
 fieldnames = [
     'label', 'h', 'd', 'h_prime', 'k', 'a', 'w', 'l',
     'swn', 'mmax', 'security', 'size', 'keygen_C',

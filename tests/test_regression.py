@@ -1,26 +1,13 @@
 #!/usr/bin/env python3
-"""Regression tests for the SPHINCS-Parameters tool chain.
+"""Checks tests/model.py, the generated files (the sweep CSVs and site/data.json),
+the site's JavaScript (under node) and costs.sage (under sage) against
+tests/fixtures.json and against each other.
 
-Diffs three independent implementations against frozen golden fixtures:
-  1. tests/model.py       — stdlib-only reference model (audit port)
-  2. utils/*.csv          — the published sweep data (sage output)
-  3. site/*.html          — the interactive pages' JS (executed under node)
-  4. costs.sage           — exercised directly when `sage` is on PATH
+  python3 tests/test_regression.py      (or pytest)
 
-Run:  python3 tests/test_regression.py        (also works under pytest)
-
-Requires node for the site tests and sage for the sage test; both are
-skipped with a notice when unavailable.
-
-Generated artifacts (the sweep CSVs and site/data.json) are produced by
-`make generate` and are not tracked in git. Tests that validate them skip
-with a notice when the files are absent - set GENERATED_REQUIRED=1 (as the
-CI pipeline does after its generate stage) to turn those skips into
-failures.
-
-These tests would have caught both critical audit findings:
-  C1 (w=32 chain-count floor bug)  -> test_wots_chain_counts, test_csv_*
-  C2 (randomness-size divergence)  -> test_stateful_model, test_site_stateful
+Without node or sage, their tests are skipped. Without the generated files
+(make generate), their tests are skipped too, or fail with GENERATED_REQUIRED=1
+as in CI.
 """
 import csv
 import json
@@ -42,11 +29,8 @@ GENERATED_REQUIRED = bool(os.environ.get('GENERATED_REQUIRED'))
 
 
 def _missing(*relpaths):
-    """True if any generated artifact is absent.
-
-    Under GENERATED_REQUIRED=1 (CI pipeline mode) absence is a failure
-    instead of a skip.
-    """
+    """True if a generated file is absent; under GENERATED_REQUIRED=1 that
+    fails instead."""
     absent = [p for p in relpaths if not os.path.exists(os.path.join(ROOT, p))]
     if not absent:
         return False
@@ -63,12 +47,10 @@ def _tuple_of(key):
     return tuple(int(x) for x in key.split(','))
 
 
-# ---------------------------------------------------------------------------
-# 1. Reference model vs frozen fixtures
-# ---------------------------------------------------------------------------
+# The reference model against the fixtures
 
 def test_wots_chain_counts():
-    """FIPS 205 chain counts — catches the C1 class of bug (w=32 -> 28, not 27)."""
+    """FIPS 205 chain counts, l1 rounded up: 28 chains for w = 32, not 27."""
     for w, l in FIX['wots_len'].items():
         assert M.wots_len(int(w)) == l, (w, M.wots_len(int(w)), l)
     for w, l in FIX['wots_len_wc'].items():
@@ -94,7 +76,7 @@ def test_stateless_fixtures():
 
 
 def test_stateful_model():
-    """UXMSS + XMSS-MT fixtures — catches the C2 class of bug (R_SIZE drift)."""
+    """UXMSS and XMSS-MT against the fixtures."""
     for key, f in FIX['stateful']['uxmss'].items():
         ots, w = key.split(',')
         m = M.uxmss_metrics(ots, int(w))
@@ -105,9 +87,7 @@ def test_stateful_model():
         assert m == f, (key, m, f)
 
 
-# ---------------------------------------------------------------------------
-# 2. Published CSVs vs reference model
-# ---------------------------------------------------------------------------
+# The sweep CSVs against the reference model
 
 def _csv_rows(name):
     with open(os.path.join(ROOT, 'utils', name)) as fh:
@@ -148,9 +128,7 @@ def test_csv_standard_row():
     assert int(std[0]['size']) == FIX['baseline']['size']
 
 
-# ---------------------------------------------------------------------------
-# 3. Site pages (node)
-# ---------------------------------------------------------------------------
+# The site pages, under node
 
 def _page_js(page):
     """The scripts a page loads, in order, as one script to run under node."""
@@ -193,7 +171,7 @@ console.log(JSON.stringify(out));
 def test_site_security_small_trees():
     """The custom-candidate panel accepts any (h, k, a), so the forgery sum
     must stay cheap when the hypertree has few leaves (lambda = q_s / 2^h
-    huge): h = 14 used to take about 11 s per evaluation and froze the page."""
+    huge)."""
     js = _page_js('stateless.html')
     js += """
 const t0 = Date.now();
@@ -216,7 +194,7 @@ console.log(JSON.stringify(out));
     assert 0 <= out['h14'] < 1e-3 and 0 <= out['h7'] < 1e-3, out
     assert abs(out['h14_a40'] - 196) < 1e-3, out
     assert abs(out['h28'] - 9.2530) < 1e-3 and abs(out['h35'] - 94.7784) < 1e-3, out
-    assert out['ms'] < 5000, out     # about 0.1 s; the unbounded sum needed minutes
+    assert out['ms'] < 5000, out     # about 0.1 s
 
 
 def test_site_parameters():
@@ -328,9 +306,7 @@ console.log(JSON.stringify(out));
         assert out['xmssmt'][key] == want, (key, out['xmssmt'][key], want)
 
 
-# ---------------------------------------------------------------------------
-# 4. Canonical site dataset (site/data.json)
-# ---------------------------------------------------------------------------
+# site/data.json
 
 def _site_data():
     return json.load(open(os.path.join(ROOT, 'site', 'data.json')))
@@ -606,9 +582,7 @@ console.log(JSON.stringify({{ok: okCheck && okSlh}}));
         assert out2['ok'], out2
 
 
-# ---------------------------------------------------------------------------
-# 5. Sage (optional)
-# ---------------------------------------------------------------------------
+# Sage, if installed
 
 def test_sage_costs():
     if not shutil.which('sage'):
@@ -623,9 +597,7 @@ def test_sage_costs():
     assert 'C/byte:     0.28  (worst: 0.50)' in p.stdout, p.stdout
 
 
-# ---------------------------------------------------------------------------
-# Plain runner (no pytest required)
-# ---------------------------------------------------------------------------
+# A runner without pytest
 
 if __name__ == '__main__':
     tests = [(n, f) for n, f in sorted(globals().items())

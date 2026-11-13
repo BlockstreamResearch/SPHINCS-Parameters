@@ -1,29 +1,13 @@
 #!/usr/bin/env sage
 """
-Export the canonical dataset consumed by both interactive pages: site/data.json.
+Writes site/data.json for the explorer and the stateful page: the SPX pool from
+utils/all_size_capped_candidates.csv (make sweeps) with the optional w added,
+the W+C, W+C_F+C and W+C_P+FP pools from the sweep of costs.sage, and the
+XMSS-MT and UXMSS rows of stateful.sage. The pages check samples of it against
+their own model.
 
-Single source of truth:
-  - SPX pool        : core rows read from utils/all_size_capped_candidates.csv
-                      (regenerate first if needed:
-                       sage slhdsa-2to40.sage --max-size 7856 &&
-                       mv candidates.csv utils/all_size_capped_candidates.csv),
-                      plus optional-w rows (W_OPTIONAL)
-  - variant pools   : W+C, W+C_F+C, W+C_P+FP swept over the same canonical
-                      grid with (w, swn) in {(16, 240), (256, 2040)}, using
-                      costs.sage / security.sage directly
-  - stateful grid, UXMSS variants, SLH baseline
-                    : computed by loading stateful.sage
-
-The pages load data.json at startup (without it the explorer has no pool and
-the stateful page computes its candidates in the browser) and self-check the
-loaded numbers against their local formulas, logging any divergence to the
-console.
-
-Usage:
-  sage export_site_data.sage                     # all schemes (a few minutes)
-  sage export_site_data.sage --schemes SPX,W+C   # subset (pages adapt)
-Verify:
-  python3 tests/test_regression.py
+  sage export_site_data.sage                     (all schemes, a few minutes)
+  sage export_site_data.sage --schemes SPX,W+C   (a subset; the pages adapt)
 """
 import os
 import sys
@@ -67,9 +51,7 @@ K_VALUES = range(GRID['k'][0], GRID['k'][1] + 1)
 A_VALUES = range(GRID['a'][0], GRID['a'][1] + 1)
 
 
-# ---------------------------------------------------------------------------
-# SPX pool: straight from the canonical sweep CSV
-# ---------------------------------------------------------------------------
+# SPX pool: the rows of the sweep CSV
 csv_path = os.path.join(_dir, 'utils', 'all_size_capped_candidates.csv')
 spx_rows, baseline = [], None
 with open(csv_path) as f:
@@ -86,9 +68,7 @@ with open(csv_path) as f:
             spx_rows.append(rec)
 assert baseline is not None, "STANDARD row missing from %s" % csv_path
 
-# ---------------------------------------------------------------------------
-# Optional w for SPX, and the variant pools: the sweep of costs.sage
-# ---------------------------------------------------------------------------
+# The optional w of SPX and the variant pools: the sweep of costs.sage
 def pool_rows(scheme, w_swn_pairs):
     """Pool rows (POOL_FIELDS) of the grid below max_size, and the number of
     parameter sets considered."""
@@ -128,9 +108,7 @@ for scheme in schemes:
     print("{}: {} rows of {} considered".format(scheme, len(rows), considered),
           file=sys.stderr)
 
-# ---------------------------------------------------------------------------
-# Stateful: XMSS/XMSS-MT grid + UXMSS variants (same functions as the CLI)
-# ---------------------------------------------------------------------------
+# Stateful: XMSS-MT (XMSS is d = 1) and UXMSS, from stateful.sage
 STATEFUL = PARAMETERS['stateful']
 
 xmssmt_rows = []

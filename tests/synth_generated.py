@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""
+"""Writes the generated files, the sweep CSVs and site/data.json, from
+tests/model.py instead of Sage, so the tests of those files run without Sage.
+The security bits come from the stateless page's JavaScript. The PORS+FP pool
+needs Sage and is left out. make check-local runs:
 
-Usage:
   python3 tests/synth_generated.py
   GENERATED_REQUIRED=1 python3 tests/test_regression.py
-(or simply `make check-local`)
 """
 import csv
 import datetime
@@ -82,7 +83,7 @@ def main():
     passing = {t for t, bits in sec.items() if bits >= P['security_bits']}
     pairs = hd_pairs()
 
-    # --- Sweep CSVs (core grid only, like slhdsa-2to40.sage) --------------
+    # The sweep CSVs: the grid's w only, as slhdsa-2to40.sage
     std = spx_csv_row('STANDARD', *BASELINE, std_sec)
     for name, max_size in (('all_size_capped_candidates.csv', GRID['max_size']),
                            ('all_unbound_candidates.csv', 10**8)):
@@ -105,7 +106,7 @@ def main():
             wtr.writerows(rows)
         print('%s: %d rows' % (name, len(rows)))
 
-    # --- data.json: SPX pool (core + optional w) --------------------------
+    # data.json: the SPX pool, with the optional w
     def spx_pool_row(h, d, k, a, w):
         m = M.spx_metrics(h, d, k, a, w)
         return [h, d, k, a, w, 0, 0, m['size'], m['kg'], m['sg'], m['sv'], m['sv_worst']]
@@ -124,7 +125,7 @@ def main():
     pools = {'SPX': {'fields': POOL_FIELDS, 'considered': spx_considered,
                      'count': len(spx_rows), 'rows': spx_rows}}
 
-    # --- Variant pools (FORS-based only; PORS+FP needs sage) --------------
+    # The FORS-based variant pools
     for scheme in ('W+C', 'W+C_F+C'):
         rows, considered = [], 0
         for w, swn in WC_PAIRS:
@@ -143,7 +144,7 @@ def main():
                          'count': len(rows), 'rows': rows}
         print('%s: %d rows' % (scheme, len(rows)))
 
-    # --- Stateful sections -------------------------------------------------
+    # Stateful
     b = M.spx_metrics(*BASELINE)
     baseline = {'params': dict(zip(('h', 'd', 'k', 'a', 'w'), BASELINE)),
                 'size': b['size'], 'kg': b['kg'], 'sg': b['sg'],
@@ -167,7 +168,7 @@ def main():
     data = {
         'meta': {
             'version': 3,
-            'generator': 'tests/synth_generated.py (model.py — NOT sage)',
+            'generator': 'tests/synth_generated.py (tests/model.py, not Sage)',
             'generated': datetime.date.today().isoformat(),
             'commit': 'local-synth',
             'grid': GRID,
