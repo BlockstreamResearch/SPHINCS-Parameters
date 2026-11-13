@@ -65,11 +65,10 @@ POOL_FIELDS = ['h', 'd', 'k', 'a', 'w', 'swn', 'mmax',
                'size', 'kg', 'sg', 'sv', 'sv_worst']
 
 
-def _hd_pairs():
-    return [(h, d)
-            for h in range(GRID['h'][0], GRID['h'][1] + 1)
-            for d in range(GRID['d'][0], GRID['d'][1] + 1)
-            if h % d == 0]
+H_VALUES = range(GRID['h'][0], GRID['h'][1] + 1)
+D_VALUES = range(GRID['d'][0], GRID['d'][1] + 1)
+K_VALUES = range(GRID['k'][0], GRID['k'][1] + 1)
+A_VALUES = range(GRID['a'][0], GRID['a'][1] + 1)
 
 
 # ---------------------------------------------------------------------------
@@ -92,91 +91,33 @@ with open(csv_path) as f:
 assert baseline is not None, "STANDARD row missing from %s" % csv_path
 
 # ---------------------------------------------------------------------------
-# Variant pools: computed with costs.sage functions (security cached)
+# Optional w for SPX, and the variant pools: the sweep of costs.sage
 # ---------------------------------------------------------------------------
-_sec_cache = {}
-
-
-def _security_ok(model, h, k, a):
-    key = (model, int(h), int(k), int(a))
-    if key not in _sec_cache:
-        _sec_cache[key] = float(compute_security(
-            2**GRID['q_s_log2'], h, k, a, model, hashbytes=16)) >= PARAMETERS['security_bits']
-    return _sec_cache[key]
-
-
-def sweep_spx_extra(w_values):
-    """SPX rows for the optional w values (same initial bounds as the CSV)."""
-    rows = []
-    pairs = _hd_pairs()
-    for w in w_values:
-        for pi, (h, d) in enumerate(pairs):
-            print("  SPX extras: w={} {}/{}".format(w, pi + 1, len(pairs)),
-                  file=sys.stderr, end='\r')
-            for k in range(GRID['k'][0], GRID['k'][1] + 1):
-                for a in range(GRID['a'][0], GRID['a'][1] + 1):
-                    if not _security_ok("FORS", h, k, a):
-                        continue
-                    try:
-                        sign = compute_signing_time(h, d, a, k, w, 0, 'SPX')
-                        mmax = sign['mmax']
-                        verify = compute_verification_time(h, d, a, k, w, 0, 'SPX', mmax)
-                        size = compute_size(h, d, a, k, w, 'SPX', mmax)
-                    except Exception:
-                        continue
-                    if size >= GRID['max_size']:
-                        continue
-                    kg = compute_keygen_time(h, d, w, 'SPX')
-                    rows.append([int(h), int(d), int(k), int(a), int(w),
-                                 0, 0, int(size), int(kg),
-                                 int(sign['compressions']),
-                                 int(verify['compressions']),
-                                 int(verify['compressions_worst'])])
-    print(file=sys.stderr)
-    return rows
-
-
-def sweep_scheme(scheme):
-    model = "PORS+FP" if scheme == "W+C_P+FP" else "FORS"
-    rows, considered = [], 0
-    pairs = _hd_pairs()
-    for w, swn in WC_PAIRS:
-        for pi, (h, d) in enumerate(pairs):
-            print("  {}: (w={}, swn={}) {}/{}".format(scheme, w, swn, pi + 1, len(pairs)),
-                  file=sys.stderr, end='\r')
-            for k in range(GRID['k'][0], GRID['k'][1] + 1):
-                for a in range(GRID['a'][0], GRID['a'][1] + 1):
-                    considered += 1
-                    if not _security_ok(model, h, k, a):
-                        continue
-                    try:
-                        sign = compute_signing_time(h, d, a, k, w, swn, scheme)
-                        mmax = sign['mmax']
-                        verify = compute_verification_time(h, d, a, k, w, swn, scheme, mmax)
-                        size = compute_size(h, d, a, k, w, scheme, mmax)
-                    except Exception:
-                        continue
-                    if size >= GRID['max_size']:
-                        continue
-                    kg = compute_keygen_time(h, d, w, scheme)
-                    rows.append([int(h), int(d), int(k), int(a), int(w),
-                                 int(swn), int(mmax), int(size), int(kg),
-                                 int(sign['compressions']),
-                                 int(verify['compressions']),
-                                 int(verify['compressions_worst'])])
+def pool_rows(scheme, w_swn_pairs):
+    """Pool rows (POOL_FIELDS) of the grid below max_size, and the number of
+    parameter sets considered."""
+    rows, considered, at = [], 0, None
+    for (w, swn, h, d, k, a), r in sweep(scheme, w_swn_pairs, H_VALUES, D_VALUES,
+                                          K_VALUES, A_VALUES, GRID['q_s_log2']):
+        considered += 1
+        if (w, h, d) != at:
+            at = (w, h, d)
+            print("  {}: w={}, h={}, d={}".format(scheme, w, h, d), file=sys.stderr, end='\r')
+        if r is None or r['size'] >= GRID['max_size']:
+            continue
+        rows.append([int(r[f]) for f in ('h', 'd', 'k', 'a', 'w', 'swn', 'mmax', 'size',
+                                         'keygen', 'sign', 'verify', 'verify_worst')])
     print(file=sys.stderr)
     return rows, considered
 
 
 pools = {}
 if 'SPX' in schemes:
-    pairs = _hd_pairs()
     # 'considered' counts the core grid only; the page derives the count for
     # whichever w set is active from meta.grid.
-    spx_considered = (len(pairs) * len(GRID['w'])
-                      * (GRID['k'][1] - GRID['k'][0] + 1)
-                      * (GRID['a'][1] - GRID['a'][0] + 1))
-    spx_extra = sweep_spx_extra(W_OPTIONAL)
+    hd_pairs = sum(1 for h in H_VALUES for d in D_VALUES if h % d == 0)
+    spx_considered = hd_pairs * len(GRID['w']) * len(K_VALUES) * len(A_VALUES)
+    spx_extra, _ = pool_rows('SPX', [(w, 0) for w in W_OPTIONAL])
     all_spx = spx_rows + spx_extra
     pools['SPX'] = {'fields': POOL_FIELDS, 'considered': spx_considered,
                     'count': len(all_spx), 'rows': all_spx}
@@ -185,7 +126,7 @@ if 'SPX' in schemes:
 for scheme in schemes:
     if scheme == 'SPX':
         continue
-    rows, considered = sweep_scheme(scheme)
+    rows, considered = pool_rows(scheme, WC_PAIRS)
     pools[scheme] = {'fields': POOL_FIELDS, 'considered': considered,
                      'count': len(rows), 'rows': rows}
     print("{}: {} rows of {} considered".format(scheme, len(rows), considered),

@@ -551,6 +551,65 @@ def compute_verification_time(h, d, a, k, w, swn, scheme, mmax=0):
     }
 
 # =============================================================================
+# Sweep
+# =============================================================================
+
+def security_model(scheme):
+    """The model compute_security uses for scheme."""
+    return "PORS+FP" if scheme == "W+C_P+FP" else "FORS"
+
+
+_security_cache = {}
+
+def cached_security(q_s_log2, h, k, a, model):
+    """compute_security for 2^q_s_log2 signatures, once per (h, k, a): a sweep
+    asks again for every d and w."""
+    key = (int(q_s_log2), int(h), int(k), int(a), model)
+    if key not in _security_cache:
+        _security_cache[key] = compute_security(2**q_s_log2, h, k, a, model, hashbytes=16)
+    return _security_cache[key]
+
+
+def evaluate(q_s_log2, h, d, k, a, w, swn, scheme):
+    """Security (bits), size (bytes) and costs (compressions) of one parameter
+    set for 2^q_s_log2 signatures. None below the security target, and for
+    PORS+FP where the grinding cost table has no entry for mmax."""
+    security = cached_security(q_s_log2, h, k, a, security_model(scheme))
+    if security < PARAMETERS['security_bits']:
+        return None
+    try:
+        sign = compute_signing_time(h, d, a, k, w, swn, scheme)
+    except ValueError:
+        return None
+    mmax = sign['mmax']
+    verify = compute_verification_time(h, d, a, k, w, swn, scheme, mmax)
+    return {
+        'h': h, 'd': d, 'k': k, 'a': a, 'w': w, 'swn': swn, 'mmax': mmax,
+        'l': compute_wots_l(scheme, w),
+        'security': security,
+        'size': compute_size(h, d, a, k, w, scheme, mmax),
+        'keygen': compute_keygen_time(h, d, w, scheme),
+        'sign': sign['compressions'],
+        'verify': verify['compressions'],
+        'verify_worst': verify['compressions_worst'],
+    }
+
+
+def sweep(scheme, w_swn_pairs, h_values, d_values, k_values, a_values, q_s_log2):
+    """evaluate() for every parameter set of a grid, (w, swn) outermost and a
+    innermost, skipping the d that do not divide h. Yields
+    ((w, swn, h, d, k, a), result)."""
+    for w, swn in w_swn_pairs:
+        for h in h_values:
+            for d in d_values:
+                if h % d != 0:
+                    continue
+                for k in k_values:
+                    for a in a_values:
+                        yield ((w, swn, h, d, k, a),
+                               evaluate(q_s_log2, h, d, k, a, w, swn, scheme))
+
+# =============================================================================
 # CSV Output
 # =============================================================================
 
@@ -562,8 +621,7 @@ def compute_all_results():
         l = compute_wots_l(scheme, w)
 
         # Verify security level is at least 128 bits
-        scheme_type = "PORS+FP" if scheme == "W+C_P+FP" else "FORS"
-        security = compute_security(2**q_s, h, k, a, scheme_type)
+        security = compute_security(2**q_s, h, k, a, security_model(scheme))
         assert security >= 128, f"Security {security:.1f} < 128 for {scheme} q_s=2^{q_s} h={h} a={a} k={k}"
 
         sign = compute_signing_time(h, d, a, k, w, swn, scheme)
@@ -689,8 +747,7 @@ def compute_single(scheme, q_s_log2, h, d, a, k, w, swn):
     """Compute and display results for a single parameter set."""
     q_s = 2**q_s_log2
     l = compute_wots_l(scheme, w)
-    scheme_type = "PORS+FP" if scheme == "W+C_P+FP" else "FORS"
-    security = compute_security(q_s, h, k, a, scheme_type)
+    security = compute_security(q_s, h, k, a, security_model(scheme))
     sign = compute_signing_time(h, d, a, k, w, swn, scheme)
     mmax = sign['mmax']
     verify = compute_verification_time(h, d, a, k, w, swn, scheme, mmax)

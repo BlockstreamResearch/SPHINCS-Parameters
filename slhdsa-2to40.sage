@@ -128,14 +128,9 @@ if OTS == "wots-tw":
 else:  # wots+c
     W_SWN_PAIRS = [(w, SWN[w]) for w in PARAMETERS['stateless']['wc_w']]
 
-# Security model: PORS+FP for that FTS, FORS otherwise
-SECURITY_MODEL = "PORS+FP" if FTS == "pors+fp" else "FORS"
-
 # -----------------------------------------------------------------------------
 # Sweep parameters
 # -----------------------------------------------------------------------------
-
-TARGET = PARAMETERS['security_bits']
 
 # Standard baseline is plain SLH-DSA-128s (SPX) for fair comparison
 STD_SCHEME = "SPX"
@@ -146,46 +141,27 @@ A_RANGE  = range(GRID['a'][0], GRID['a'][1] + 1)
 # H_VALUES and D_VALUES come from CLI flags (parsed at top of file)
 
 
-def evaluate(q_s_log2, h, d, k, a, w, swn, scheme, security_model):
-    if h % d != 0:
-        return None
-    q_s = 2**q_s_log2
-    try:
-        security = compute_security(q_s, h, k, a, security_model, hashbytes=16)
-    except Exception:
-        return None
-    if float(security) < TARGET:
-        return None
-
-    try:
-        sign = compute_signing_time(h, d, a, k, w, swn, scheme)
-    except Exception:
-        return None
-    mmax     = sign['mmax']
-    verify   = compute_verification_time(h, d, a, k, w, swn, scheme, mmax)
-    keygen_C = compute_keygen_time(h, d, w, scheme)
-    size     = compute_size(h, d, a, k, w, scheme, mmax)
-    l        = compute_wots_l(scheme, w)
-
+def csv_row(q_s_log2, r):
+    """The CSV fields of an evaluate() result."""
     return {
         'q_s_log2': int(q_s_log2),
-        'h':        int(h),
-        'd':        int(d),
-        'h_prime':  int(h // d),
-        'k':        int(k),
-        'a':        int(a),
-        'w':        int(w),
-        'l':        int(l),
-        'swn':      int(swn),
-        'mmax':     int(mmax),
-        'security': float(security),
-        'size':     int(size),
-        'keygen_C': float(keygen_C),
-        'sign_C':   float(sign['compressions']),
-        'verify_C': float(verify['compressions']),
-        'verify_worst_C': float(verify['compressions_worst']),
-        'c_per_byte': float(verify['compressions']) / float(size),
-        'c_per_byte_worst': float(verify['compressions_worst']) / float(size),
+        'h':        int(r['h']),
+        'd':        int(r['d']),
+        'h_prime':  int(r['h'] // r['d']),
+        'k':        int(r['k']),
+        'a':        int(r['a']),
+        'w':        int(r['w']),
+        'l':        int(r['l']),
+        'swn':      int(r['swn']),
+        'mmax':     int(r['mmax']),
+        'security': float(r['security']),
+        'size':     int(r['size']),
+        'keygen_C': float(r['keygen']),
+        'sign_C':   float(r['sign']),
+        'verify_C': float(r['verify']),
+        'verify_worst_C': float(r['verify_worst']),
+        'c_per_byte': float(r['verify']) / float(r['size']),
+        'c_per_byte_worst': float(r['verify_worst']) / float(r['size']),
         'label':    '',
     }
 
@@ -193,10 +169,11 @@ def evaluate(q_s_log2, h, d, k, a, w, swn, scheme, security_model):
 print("Variant: ots={}, fts={}  -> scheme={}".format(OTS, FTS, SCHEME), file=sys.stderr)
 print("Computing standard SLH-DSA-128s baseline (SPX)...", file=sys.stderr)
 B = PARAMETERS['baseline']
-std = evaluate(B['q_s_log2'], B['h'], B['d'], B['k'], B['a'], B['w'], STD_SWN, STD_SCHEME, "FORS")
+std = evaluate(B['q_s_log2'], B['h'], B['d'], B['k'], B['a'], B['w'], STD_SWN, STD_SCHEME)
 if std is None:
     print("ERROR: failed to compute standard baseline.", file=sys.stderr)
     sys.exit(1)
+std = csv_row(B['q_s_log2'], std)
 std['label'] = 'STANDARD'
 
 KEYGEN_LIMIT = std['keygen_C'] * MAX_KEYGEN_RATIO
@@ -249,18 +226,9 @@ def label_for(w, swn):
     return "w={},swn={}".format(w, swn)
 
 
-for w, swn in W_SWN_PAIRS:
-    label = label_for(w, swn)
-    for h in H_VALUES:
-        for d in D_VALUES:
-            if h % d != 0:
-                continue
-            for k in K_RANGE:
-                for a in A_RANGE:
-                    consider(
-                        evaluate(GRID['q_s_log2'], h, d, k, a, w, swn, SCHEME, SECURITY_MODEL),
-                        label,
-                    )
+for (w, swn, h, d, k, a), r in sweep(SCHEME, W_SWN_PAIRS, H_VALUES, D_VALUES,
+                                      K_RANGE, A_RANGE, GRID['q_s_log2']):
+    consider(None if r is None else csv_row(GRID['q_s_log2'], r), label_for(w, swn))
 
 all_results.sort(key=lambda x: x['size'])
 
