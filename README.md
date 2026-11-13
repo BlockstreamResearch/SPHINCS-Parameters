@@ -6,7 +6,6 @@ Scripts for exploring SPHINCS+ parameter tradeoffs, computing security levels, s
 - [stateful.sage](stateful.sage) evaluates stateful alternatives (XMSS, XMSS-MT, SHRINCS/UXMSS) against the SLH-DSA-128s baseline
 - [octopus_pmf.py](octopus_pmf.py) computes the PMF of the Octopus authentication set size (MIT license, from https://github.com/MehdiAbri/PORS-FP)
 - [slhdsa-2to40.sage](slhdsa-2to40.sage) sweeps SLH-DSA parameter tuples and filters them by security level and signature size
-- [run_experiments.py](run_experiments.py) runs the full parameter sweep and writes results to CSV
 - [export_site_data.sage](export_site_data.sage) exports `site/data.json`, the dataset both site pages load
 - [utils/](utils/) helper scripts for searching and visualising the parameter space
 - [tests/](tests/) regression suite, run `python3 tests/test_regression.py`

@@ -3,7 +3,6 @@
 Sweeps a global uniform filter X across 4 operational metrics.
 Finds the absolute minimum global X required to yield the smallest 
 possible set of valid candidates.
-Aligned with run_experiments.py folder structure and venn_diagram_draw.py keys.
 """
 
 import argparse
@@ -64,7 +63,7 @@ def find_global_x_thresholds(csv_path, output_csv):
 
     results_df = pd.DataFrame(results)
     
-    # 6. Ensure the target directory exists (Matching run_experiments behavior)
+    # 6. Ensure the target directory exists
     out_dir = os.path.dirname(output_csv)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)

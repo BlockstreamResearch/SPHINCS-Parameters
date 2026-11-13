@@ -22,7 +22,6 @@ Notation:
 """
 
 from sage.all import *
-from scipy.stats import binom
 import os
 
 from octopus_pmf import interleave_cost_table
@@ -129,9 +128,6 @@ PARAMETER_SETS = [
 # =============================================================================
 # Helper Functions
 # =============================================================================
-
-# High precision arithmetic
-F = RealField(100)
 
 # -----------------------------------------------------------------------------
 # WOTS helpers
@@ -306,47 +302,6 @@ def exp_work_from_mmax(t, k, mmax):
     """Compute expected work (attempts) for PORS+FP grinding given mmax."""
     return 2.0 ** log2_exp_work_from_mmax(t, k, mmax)
 
-# -----------------------------------------------------------------------------
-# Search/Grinding helpers
-# -----------------------------------------------------------------------------
-
-def worst_case(p, q, d, max_k=10**11):
-    """
-    Find minimum trials k such that P(fewer than d successes in k trials) < q.
-
-    Used to compute worst-case search time: how many attempts until we're
-    confident (with probability 1-q) that we've found d valid encodings.
-
-    P(X < d) = Σ_{i=0}^{d-1} C(k,i) * p^i * (1-p)^(k-i), where X ~ Binomial(k, p)
-
-    Returns smallest k where P(X < d) < q.
-    """
-    # Convert Sage types to Python native types
-    p_float = float(p)
-    q_float = float(q)
-    d_int = int(d)
-
-    def tail_prob(k):
-        if k < d_int:
-            return 1.0
-        # binom.cdf(d-1, k, p) = P(X <= d-1) = P(X < d)
-        return binom.cdf(d_int - 1, int(k), p_float)
-    # Find an upper bound for k
-    k_low = d_int - 1
-    k_high = max(d_int, 1)
-    while tail_prob(k_high) >= q_float:
-        k_high *= 2
-        if k_high > max_k:
-            raise RuntimeError("Could not find k below given max_k; try increasing max_k.")
-    # Binary search between k_low and k_high
-    while k_low + 1 < k_high:
-        k_mid = (k_low + k_high) // 2
-        if tail_prob(k_mid) < q_float:
-            k_high = k_mid
-        else:
-            k_low = k_mid
-    return k_high
-
 # =============================================================================
 # Core Computation Functions
 # =============================================================================
@@ -444,13 +399,10 @@ def compute_keygen_time(h, d, w, scheme):
 
 def compute_signing_time(h, d, a, k, w, swn, scheme):
     """
-    Compute signing time in both hash calls and compression function calls.
+    Compute the expected signing time in compression function calls.
 
     Returns a dict with keys:
-    - 'hashes': expected signing time in hash calls
     - 'compressions': expected signing time in compression calls
-    - 'exp_search': expected search attempts
-    - 'worst_search': worst-case search attempts
     - 'mmax': mmax value for PORS+FP (max authentication set size)
     """
     assert h % d == 0, "h must be divisible by d"
@@ -467,27 +419,21 @@ def compute_signing_time(h, d, a, k, w, swn, scheme):
         # We need d successful searches (one per hypertree layer)
         nu = compute_nu(l, swn, w)
         d_wots_expected_search = d*ceil((w**l) / nu)
-        d_wots_worst_search = worst_case(nu/(w**l), F(2)**(-30), d)
     else:
         d_wots_expected_search = 0
-        d_wots_worst_search = 0
 
-    # Compute times for both hash calls (h_) and compressions (c_)
     # One XMSS tree layer with 2^h' leaves:
     #   - 2^h' WOTS keypairs, each requiring:
     #       - l PRF calls to generate secret keys
     #       - l*(w-1) chain hashes (Th1)
     #       - 1 hash to compress l public key values (Thl)
     #   - 2^h' - 1 internal Merkle tree nodes (Th2, hashing 2 children)
-    h_merkle = 2**h_prime * (l + l*(w-1) + 1) + (2**h_prime - 1)
     c_merkle = 2**h_prime * (l*C_PRF + l*(w-1)*C_Th1 + Thl) + (2**h_prime - 1)*C_Th2
 
     # Full hypertree: d layers + WOTS+C counter search overhead
-    h_hyper_exp = d*h_merkle + d_wots_expected_search
     c_hyper_exp = d*c_merkle + d_wots_expected_search*C_Th1c
 
-    # Message hash cost (2 hash calls: Hmsg + PRFmsg)
-    h_msg = 2
+    # Message hash cost (Hmsg + PRFmsg)
     c_msg = C_Hmsg + C_PRFmsg
 
     mmax = 0
@@ -500,17 +446,11 @@ def compute_signing_time(h, d, a, k, w, swn, scheme):
         # Plus 1 hash to compress k-1 roots
         # Grinding: search for message hash with last a bits = 0, expected 2^a attempts
         Thk1 = compute_Th(k-1)  # k-1 roots to compress
-        h_fors_fixed = (k-1)*(2**a) + (k-1)*(2**a) + (k-1)*(2**a - 1) + 1
         c_fors_fixed = (k-1)*(2**a)*C_PRF + (k-1)*(2**a)*C_Th1 + (k-1)*(2**a - 1)*C_Th2 + Thk1
         fors_exp_search = 2**a
-        fors_worst_search = worst_case(F(1)/F(2**a), F(2)**(-30), 1)
-        h_fors_search = fors_exp_search * h_msg
         c_fors_search = fors_exp_search * c_msg
         return {
-            'hashes': h_hyper_exp + h_fors_fixed + h_fors_search,
             'compressions': c_hyper_exp + c_fors_fixed + c_fors_search,
-            'exp_search': d_wots_expected_search + h_fors_search,
-            'worst_search': d_wots_worst_search + fors_worst_search * h_msg,
             'mmax': mmax,
         }
     elif scheme == "W+C_P+FP":
@@ -519,36 +459,27 @@ def compute_signing_time(h, d, a, k, w, swn, scheme):
         # Grinding: search for message hash where Octopus auth set size <= mmax
         t, subtree_height, extra_leaves = compute_pors_tree_geometry(k, a)
         # t PRF calls + t leaf hashes + internal nodes
-        h_pors_fixed = 2*t + (2**subtree_height - 1) + extra_leaves
         c_pors_fixed = t*C_PRF + t*C_Th1 + ((2**subtree_height - 1) + extra_leaves)*C_Th2
         mmax = compute_mmax(h_prime, l, w, d_wots_expected_search, d, k, a)
         pors_search_attempts = ceil(exp_work_from_mmax(t, k, mmax))
-        h_pors_search = pors_search_attempts * h_msg
         c_pors_search = pors_search_attempts * c_msg
-        pors_worst_search = worst_case(F(1)/pors_search_attempts, F(2)**(-30), 1)
         return {
-            'hashes': h_hyper_exp + h_pors_fixed + h_pors_search,
             'compressions': c_hyper_exp + c_pors_fixed + c_pors_search,
-            'exp_search': d_wots_expected_search + h_pors_search,
-            'worst_search': d_wots_worst_search + pors_worst_search * h_msg,
             'mmax': mmax,
         }
     else:
         # Plain FORS (SPX or W+C): k trees, each with 2^a leaves
         # No grinding, message hash directly selects k leaf indices
-        h_fors_fixed = k*(2**a) + k*(2**a) + k*(2**a - 1) + 1
         c_fors_fixed = k*(2**a)*C_PRF + k*(2**a)*C_Th1 + k*(2**a - 1)*C_Th2 + Thk
         return {
-            'hashes': h_fors_fixed + h_msg + h_hyper_exp,
             'compressions': c_fors_fixed + c_msg + c_hyper_exp,
-            'exp_search': d_wots_expected_search,
-            'worst_search': d_wots_worst_search,
             'mmax': mmax,
         }
 
 def compute_verification_time(h, d, a, k, w, swn, scheme, mmax=0):
     """
-    Compute verification time in both hash calls and compression function calls.
+    Compute the verification time in compression function calls, average and
+    worst case.
 
     Verification involves:
     1. Hash the message (Hmsg)
@@ -564,12 +495,11 @@ def compute_verification_time(h, d, a, k, w, swn, scheme, mmax=0):
     Thk = compute_Th(k)
 
     # WOTS verification: complete each chain from signature value to public key.
-    # h_wots / c_wots are totals over all d hypertree layers.
+    # c_wots is the total over all d hypertree layers.
     if has_wc:
         # WOTS+C: chain positions sum to S_{w,n}, so remaining steps = (w-1)*l - S_{w,n}
         # Plus: verify counter hash (Th1c) and compress public key (Thl)
         # Deterministic: worst case == average case.
-        h_wots = d*((w-1)*l - swn + 2)
         c_wots = d*(((w-1)*l - swn)*C_Th1 + C_Th1c + Thl)
         c_wots_worst = c_wots
     else:  # Plain WOTS
@@ -578,7 +508,6 @@ def compute_verification_time(h, d, a, k, w, swn, scheme, mmax=0):
         # Average case: expected chain steps for a uniformly random digest,
         # see compute_wots_tw_mean_steps.
         avg_steps = compute_wots_tw_mean_steps(l1, l2, w, d)
-        h_wots = avg_steps + d
         c_wots = avg_steps*C_Th1 + d*Thl
         # Worst case (all message digits 0): see compute_wots_tw_worst_steps.
         c_wots_worst = d*(compute_wots_tw_worst_steps(l1, l2, w)*C_Th1 + Thl)
@@ -587,22 +516,18 @@ def compute_verification_time(h, d, a, k, w, swn, scheme, mmax=0):
     if scheme == "W+C_F+C":
         # FORS+C: k-1 leaves to hash, (k-1)*a auth path nodes, 1 root compression
         Thk1 = compute_Th(k-1)  # k-1 roots to compress
-        h_fts = (k-1) + (k-1)*a + 1
         c_fts = (k-1)*C_Th1 + (k-1)*a*C_Th2 + Thk1
     elif scheme == "W+C_P+FP":
         # PORS+FP: k leaves to hash, mmax auth set nodes
-        h_fts = k + mmax
         c_fts = k*C_Th1 + mmax*C_Th2
     else:  # Plain FORS (SPX or W+C)
         # FORS: k leaves, k*a auth path nodes, 1 root compression
-        h_fts = k + k*a + 1
         c_fts = k*C_Th1 + k*a*C_Th2 + Thk
 
     # Total: Hmsg + FTS + d*WOTS + h auth path nodes
     # The FTS and auth-path costs are message-independent, so the worst case
     # differs from the average only in the WOTS-TW chain walks.
     return {
-        'hashes': 1 + h_fts + h_wots + h,
         'compressions': C_Hmsg + c_fts + c_wots + h*C_Th2,
         'compressions_worst': C_Hmsg + c_fts + c_wots_worst + h*C_Th2,
     }
@@ -642,11 +567,7 @@ def compute_all_results():
             'swn': swn,
             'size': size,
             'keygen_compressions': keygen_compressions,
-            'sign_hashes': sign['hashes'],
             'sign_compressions': sign['compressions'],
-            'exp_search': sign['exp_search'],
-            'worst_search': sign['worst_search'],
-            'verify_hashes': verify['hashes'],
             'verify_compressions': verify['compressions'],
             'verify_compressions_worst': verify['compressions_worst'],
             'compressions_per_byte': compressions_per_byte,
@@ -658,11 +579,11 @@ def compute_all_results():
 
 def generate_csv():
     """Generate CSV output for all parameter sets."""
-    print("scheme,q_s,h,d,a,k,w,l,paramsum,size,keygen_compressions,sign_hashes,sign_compressions,exp_search,worst_search,verify_hashes,verify_compressions,verify_compressions_worst,compressions_per_byte,compressions_per_byte_worst,bold")
+    print("scheme,q_s,h,d,a,k,w,l,paramsum,size,keygen_compressions,sign_compressions,verify_compressions,verify_compressions_worst,compressions_per_byte,compressions_per_byte_worst,bold")
 
     for r in compute_all_results():
         bold_str = "True" if r['bold'] else "False"
-        print(f"{r['scheme']},2^{r['q_s']},{r['h']},{r['d']},{r['a']},{r['k']},{r['w']},{r['l']},{r['swn']},{r['size']},{r['keygen_compressions']},{r['sign_hashes']},{r['sign_compressions']},{r['exp_search']},{r['worst_search']},{r['verify_hashes']},{r['verify_compressions']},{r['verify_compressions_worst']},{r['compressions_per_byte']:.2f},{r['compressions_per_byte_worst']:.2f},{bold_str}")
+        print(f"{r['scheme']},2^{r['q_s']},{r['h']},{r['d']},{r['a']},{r['k']},{r['w']},{r['l']},{r['swn']},{r['size']},{r['keygen_compressions']},{r['sign_compressions']},{r['verify_compressions']},{r['verify_compressions_worst']},{r['compressions_per_byte']:.2f},{r['compressions_per_byte_worst']:.2f},{bold_str}")
 
 
 def format_num(n):

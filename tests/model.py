@@ -46,7 +46,7 @@ def wots_len1(w):
 
 
 def wots_len(w, wc=False):
-    """Chain count: l1 + l2 for WOTS-TW/classic, l1 for WOTS+C (FIPS 205 form)."""
+    """Chain count: l1 + l2 for WOTS-TW, l1 for WOTS+C (FIPS 205 form)."""
     l1 = wots_len1(w)
     if wc:
         return l1

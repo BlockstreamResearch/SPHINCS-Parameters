@@ -33,21 +33,18 @@ The same layout is used for every scheme in this file, so sizes compare
 like for like.
 
 OTS variants:
-  WOTS-classic  Original Winternitz OTS; no tweaks; l = l1 + l2 chains.
-                Collision resistance required. No domain separation in chains.
-                PK compression uses plain SHA-256 (1 fewer block than WOTS-TW).
   WOTS-TW       SPHINCS+-style tweakable-hash OTS; l = l1 + l2 chains.
                 Only second-preimage resistance required.
   WOTS+C        Counter-based OTS; no checksum; l = l1 + grinding counter.
                 Verification cost fixed: (w-1)*l - S_wn steps (deterministic).
 
 w values: 16, 32, 64, 128, 256, 65536.
-  w= 16:    l1=32  WOTS-TW/classic l=35  WOTS+C S_wn=240
-  w= 32:    l1=26  WOTS-TW/classic l=28  WOTS+C S_wn=403
-  w= 64:    l1=22  WOTS-TW/classic l=24  WOTS+C S_wn=693
-  w=128:    l1=19  WOTS-TW/classic l=21  WOTS+C S_wn=1206
-  w=256:    l1=16  WOTS-TW/classic l=18  WOTS+C S_wn=2040
-  w=65536:  l1=8  WOTS-TW/classic l=10  WOTS+C S_wn=262140
+  w= 16:    l1=32  WOTS-TW l=35  WOTS+C S_wn=240
+  w= 32:    l1=26  WOTS-TW l=28  WOTS+C S_wn=403
+  w= 64:    l1=22  WOTS-TW l=24  WOTS+C S_wn=693
+  w=128:    l1=19  WOTS-TW l=21  WOTS+C S_wn=1206
+  w=256:    l1=16  WOTS-TW l=18  WOTS+C S_wn=2040
+  w=65536:  l1=8  WOTS-TW l=10  WOTS+C S_wn=262140
 
   Note: l1 = ceil(8n / log2(w)) per FIPS 205. For w=16 and w=256 the
   division is exact; the others need the round-up (w=32: 26 chains for
@@ -55,8 +52,7 @@ w values: 16, 32, 64, 128, 256, 65536.
   full 128-bit message digest.
 
 SHA-256 compression model: from costs.sage (C_Th1 = C_Th1c = C_Th2 = C_PRF = 1,
-C_Hmsg = 4, C_PRFmsg = 3, Thl_tw(l) = ceil((241+128*l)/512));
-Thl_classic(l) = ceil((65+128*l)/512) (plain SHA-256).
+C_Hmsg = 4, C_PRFmsg = 3, Thl(l) = ceil((241+128*l)/512)).
 
 Usage:
   sage stateful.sage                     # Tables for both 2^20 and 2^40
@@ -139,7 +135,6 @@ H_VALS       = [20, 40]      # h=20 -> 2^20 sigs, h=40 -> 2^40 sigs for standard
 UXMSS_H_VALS = [40]          # UXMSS restricted to 2^40 target based on SLH-DSA reference
 
 # OTS type identifiers
-OTS_CLASSIC = "classic"
 OTS_TW      = "tw"
 OTS_WC      = "wc"
 
@@ -155,9 +150,8 @@ WOTS_C_PAIRS = [(16, 240), (32, 403), (64, 693), (128, 1206), (256, 2040),
 WOTS_W_VALS  = [16, 32, 64, 128, 256, 65536]
 
 PARAM_SETS = (
-    [(OTS_WC,      w, swn) for w, swn in WOTS_C_PAIRS] +
-    [(OTS_TW,      w, 0)   for w in WOTS_W_VALS] +
-    [(OTS_CLASSIC, w, 0)   for w in WOTS_W_VALS]
+    [(OTS_WC, w, swn) for w, swn in WOTS_C_PAIRS] +
+    [(OTS_TW, w, 0)   for w in WOTS_W_VALS]
 )
 
 def get_d_vals(h):
@@ -167,15 +161,14 @@ def get_d_vals(h):
 
 def ots_label(ots_type, w, swn):
     if ots_type == OTS_WC:      return "WOTS+C(w={:3d},S={:4d})".format(w, swn)
-    if ots_type == OTS_TW:      return "WOTS-TW(w={:3d})".format(w)
-    return "WOTS-classic(w={:3d})".format(w)
+    return "WOTS-TW(w={:3d})".format(w)
 
 
 def wots_l(w, ots_type):
     """Total Winternitz chain count l, per FIPS 205 §11.
 
     l1 = ceil(8n / log2(w)) — message chains
-    l2 = floor(log2(l1*(w-1)) / log2(w)) + 1 — checksum chains (WOTS-TW/classic only)
+    l2 = floor(log2(l1*(w-1)) / log2(w)) + 1 — checksum chains (WOTS-TW only)
     """
     l1 = int(ceil(N * 8 / log(w, 2)))
     if ots_type == OTS_WC:
@@ -186,8 +179,6 @@ def wots_l(w, ots_type):
 
 def wots_Thl(l, ots_type):
     """Compressions to compress l chain endpoints into the WOTS public key."""
-    if ots_type == OTS_CLASSIC:
-        return int(ceil((128 * l + 65) / 512))   # plain SHA-256
     return int(compute_Th(l))                    # ceil((241+128*l)/512)
 
 
@@ -198,7 +189,7 @@ def wots_pk_C(w, ots_type):
 
 
 def wots_tw_verify_steps(w, count=1):
-    """Mean chain steps to verify `count` WOTS-TW (or classic) signatures on
+    """Mean chain steps to verify `count` WOTS-TW signatures on
     random digests, rounded to the nearest integer; see
     compute_wots_tw_mean_steps in costs.sage."""
     l1 = int(ceil(N * 8 / log(w, 2)))
@@ -207,7 +198,7 @@ def wots_tw_verify_steps(w, count=1):
 
 
 def wots_tw_sign_steps(w):
-    """Mean chain steps to produce one WOTS-TW (or classic) signature: the
+    """Mean chain steps to produce one WOTS-TW signature: the
     signer walks the part of each chain that the verifier does not."""
     l = wots_l(w, OTS_TW)
     return l * (w - 1) - wots_tw_verify_steps(w)
@@ -608,7 +599,7 @@ def print_xmss_table(rows_by_h):
     print()
     print("="*W)
     print(" XMSS — Single-Layer Balanced Tree ".center(W, "="))
-    print(" OTS: WOTS-classic / WOTS-TW / WOTS+C  |  w ∈ {16,32,64,128,256} ".center(W, "="))
+    print(" OTS: WOTS-TW / WOTS+C  |  w ∈ {16,32,64,128,256} ".center(W, "="))
     print(" Auth path = h nodes (fixed per sig); Sign-BDS = bound per sig ".center(W, "="))
     print("="*W)
     print(_hdr(cols)); print(_sep_line(cols))
@@ -635,7 +626,7 @@ def print_xmssmt_table(rows_by_h):
     print()
     print("="*W)
     print(" XMSS-MT — Multi-Tree Hypertree (no FORS needed; stateful) ".center(W, "="))
-    print(" OTS: WOTS-classic / WOTS-TW / WOTS+C  |  w ∈ {16,32,64,128,256} ".center(W, "="))
+    print(" OTS: WOTS-TW / WOTS+C  |  w ∈ {16,32,64,128,256} ".center(W, "="))
     print(" Keygen builds top tree only (2^h' keys); Sign-BDS = bound per sig ".center(W, "="))
     print("="*W)
     print(_hdr(cols)); print(_sep_line(cols))
@@ -667,7 +658,7 @@ def print_uxmss_table(rows_by_h, refs):
     print()
     print("="*W)
     print(" SHRINCS/UXMSS — Left-leaning Stateful Tree ".center(W, "="))
-    print(" OTS: WOTS-classic / WOTS-TW / WOTS+C  |  w ∈ {16,32,64,128,256} ".center(W, "="))
+    print(" OTS: WOTS-TW / WOTS+C  |  w ∈ {16,32,64,128,256} ".center(W, "="))
     print(" max stateful sig must be strictly < Ref ".center(W, "="))
     print("="*W)
     print(_hdr(cols)); print(_sep_line(cols))
