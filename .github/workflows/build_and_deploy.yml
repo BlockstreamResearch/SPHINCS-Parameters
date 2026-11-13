@@ -51,7 +51,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.GENERATED_PATHS }}
-          key: generated-v1-${{ hashFiles('costs.sage', 'security.sage', 'slhdsa-2to40.sage', 'stateful.sage', 'export_site_data.sage', 'octopus_pmf.py', 'utils/*.py', 'Makefile') }}
+          key: generated-v1-${{ hashFiles('costs.sage', 'security.sage', 'slhdsa-2to40.sage', 'stateful.sage', 'export_site_data.sage', 'octopus_pmf.py', 'utils/*.py', 'Makefile', 'parameters.json') }}
 
       - name: Generate (sweeps, derived tables, data.json, figures)
         if: steps.cache.outputs.cache-hit != 'true'
