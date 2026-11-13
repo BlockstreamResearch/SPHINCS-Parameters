@@ -4,11 +4,11 @@
 Searching for the best parameters requires defining the conditions that the chosen parameter set must satisfy. Consequently, those conditions must rely on metrics that depend on the parameters. We use the following:
 
 \begin{itemize}
-    \item \textbf{Signature size}: the size of the signature in bytes;
-    \item \textbf{Key generation cost}: the number of SHA-256 compressions during the key-generation phase;
-    \item \textbf{Signature generation cost}: the number of compressions executed during signing;
-    \item \textbf{Signature verification cost}: the number of compressions during verification;
-    \item \textbf{Compressions per byte}: the ratio of verification cost to signature size.
+    \item \textbf{Size}: the size of the signature in bytes (B);
+    \item \textbf{KeyGen}: the number of SHA-256 compressions ($C$) to generate a key pair;
+    \item \textbf{SigGen}: the number of compressions to sign a message;
+    \item \textbf{SigVer}: the number of compressions to verify a signature;
+    \item \textbf{$\rho$}: SigVer per signature byte, in $C$/B.
 \end{itemize}
 
 We choose SLH-DSA-128s as the baseline for the search; this gives us an intuitive way to compare custom parameter sets against the standardized scheme on equal footing.
@@ -26,11 +26,11 @@ We start by enumerating all parameter tuples $(h, d, k, a, w)$. Applying the ini
 We introduce the following filters\footnote{The coefficient for each filter, except the signature size, may be greater than 1 (meaning we accept some regression on that metric in exchange for gains elsewhere).}:
 
 \begin{itemize}
-    \item \textbf{Bound on signature size}: $\mathsf{target.size} \leq c_{\text{size}} \cdot \mathsf{std.size}$, where $c_{\text{size}}$ is a size coefficient ($0 \leq c_{\text{size}} \leq 1$).
-    \item \textbf{Bound on key-generation cost}: $\mathsf{target.KeyGen} \leq c_{\text{kg}} \cdot \mathsf{std.KeyGen}$, where $c_{\text{kg}} > 0$.
-    \item \textbf{Bound on signature-generation cost}: $\mathsf{target.SigGen} \leq c_{\text{sg}} \cdot \mathsf{std.SigGen}$, where $c_{\text{sg}} > 0$.
-    \item \textbf{Bound on signature-verification cost}: $\mathsf{target.SigVer} \leq c_{\text{sv}} \cdot \mathsf{std.SigVer}$, where $c_{\text{sv}} > 0$.
-    \item \textbf{Bound on the compressions-per-byte ratio}: $\mathsf{target.C/B} \leq c_{\text{cb}} \cdot \mathsf{std.C/B}$, where $c_{\text{cb}} > 0$.
+    \item \textbf{Bound on size}: $\mathsf{target.size} \leq c_{\text{size}} \cdot \mathsf{std.size}$, where $c_{\text{size}}$ is a size coefficient ($0 \leq c_{\text{size}} \leq 1$).
+    \item \textbf{Bound on KeyGen}: $\mathsf{target.KeyGen} \leq c_{\text{kg}} \cdot \mathsf{std.KeyGen}$, where $c_{\text{kg}} > 0$.
+    \item \textbf{Bound on SigGen}: $\mathsf{target.SigGen} \leq c_{\text{sg}} \cdot \mathsf{std.SigGen}$, where $c_{\text{sg}} > 0$.
+    \item \textbf{Bound on SigVer}: $\mathsf{target.SigVer} \leq c_{\text{sv}} \cdot \mathsf{std.SigVer}$, where $c_{\text{sv}} > 0$.
+    \item \textbf{Bound on $\rho$}: $\mathsf{target}.\rho \leq c_{\text{cb}} \cdot \mathsf{std}.\rho$, where $c_{\text{cb}} > 0$.
 \end{itemize}
 
 Verification and signing costs are averages over uniformly random messages; Appendix~\ref{app:average-case} compares them with the worst case.
@@ -56,13 +56,13 @@ In this case, we find the most efficient signature for a single metric at a time
 %---
 Smallest Signature & $(50, 2, 6, 20, 256)$ & \textcolor{green}{$3408$} & \textcolor{green}{$-56.6\%$} & \textcolor{red}{$1.55 \times 10^{11}$} & \textcolor{red}{$5.30 \times 10^5$} & \textcolor{red}{$3.10 \times 10^{11}$} & \textcolor{red}{$1.40 \times 10^5$} & \textcolor{red}{$5022$} & \textcolor{red}{$2.29$} & \textcolor{red}{$1.47$} \\
 %---
-Fastest Keygen & $(40, 8, 7, 20, 16)$ & \textcolor{red}{$7488$} & \textcolor{red}{$-4.7\%$} & \textcolor{green}{$1.83 \times 10^4$} & \textcolor{green}{$0.06$} & \textcolor{red}{$2.22 \times 10^7$} & \textcolor{red}{$9.99$} & \textcolor{orange}{$2411$} & \textcolor{orange}{$1.10$} & \textcolor{orange}{$0.32$} \\
+Fastest KeyGen & $(40, 8, 7, 20, 16)$ & \textcolor{red}{$7488$} & \textcolor{red}{$-4.7\%$} & \textcolor{green}{$1.83 \times 10^4$} & \textcolor{green}{$0.06$} & \textcolor{red}{$2.22 \times 10^7$} & \textcolor{red}{$9.99$} & \textcolor{orange}{$2411$} & \textcolor{orange}{$1.10$} & \textcolor{orange}{$0.32$} \\
 %---
-Fastest Signing & $(42, 7, 20, 8, 16)$ & \textcolor{red}{$7488$} & \textcolor{red}{$-4.7\%$} & \textcolor{green}{$3.65 \times 10^4$} & \textcolor{green}{$0.12$} & \textcolor{green}{$2.71 \times 10^5$} & \textcolor{green}{$0.12$} & \textcolor{orange}{$2172$} & \textcolor{orange}{$0.99$} & \textcolor{orange}{$0.29$} \\
+Fastest SigGen & $(42, 7, 20, 8, 16)$ & \textcolor{red}{$7488$} & \textcolor{red}{$-4.7\%$} & \textcolor{green}{$3.65 \times 10^4$} & \textcolor{green}{$0.12$} & \textcolor{green}{$2.71 \times 10^5$} & \textcolor{green}{$0.12$} & \textcolor{orange}{$2172$} & \textcolor{orange}{$0.99$} & \textcolor{orange}{$0.29$} \\
 %---
-Fastest Verification & $(50, 2, 6, 20, 2)$ & \textcolor{red}{$7184$} & \textcolor{red}{$-8.6\%$} & \textcolor{red}{$1.03 \times 10^{10}$} & \textcolor{red}{$3.54 \times 10^4$} & \textcolor{red}{$2.07 \times 10^{10}$} & \textcolor{red}{$9.33 \times 10^3$} & \textcolor{green}{$389$} & \textcolor{green}{$0.18$} & \textcolor{green}{$0.05$} \\
+Fastest SigVer & $(50, 2, 6, 20, 2)$ & \textcolor{red}{$7184$} & \textcolor{red}{$-8.6\%$} & \textcolor{red}{$1.03 \times 10^{10}$} & \textcolor{red}{$3.54 \times 10^4$} & \textcolor{red}{$2.07 \times 10^{10}$} & \textcolor{red}{$9.33 \times 10^3$} & \textcolor{green}{$389$} & \textcolor{green}{$0.18$} & \textcolor{green}{$0.05$} \\
 %---
-Best Density Ratio (\texorpdfstring{$\rho$}{rho}) & $(50, 2, 6, 20, 2)$ & \textcolor{red}{$7184$} & \textcolor{red}{$-8.6\%$} & \textcolor{red}{$1.03 \times 10^{10}$} & \textcolor{red}{$3.54 \times 10^4$} & \textcolor{red}{$2.07 \times 10^{10}$} & \textcolor{red}{$9.33 \times 10^3$} & \textcolor{green}{$389$} & \textcolor{green}{$0.18$} & \textcolor{green}{$0.05$} \\
+Lowest $\rho$ & $(50, 2, 6, 20, 2)$ & \textcolor{red}{$7184$} & \textcolor{red}{$-8.6\%$} & \textcolor{red}{$1.03 \times 10^{10}$} & \textcolor{red}{$3.54 \times 10^4$} & \textcolor{red}{$2.07 \times 10^{10}$} & \textcolor{red}{$9.33 \times 10^3$} & \textcolor{green}{$389$} & \textcolor{green}{$0.18$} & \textcolor{green}{$0.05$} \\
 \bottomrule
 \end{tabular}%
 }
@@ -92,11 +92,11 @@ Naturally, the smaller the multiplier $X$, the fewer candidates survive the filt
 \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Optimal Candidate} & \textbf{Ratio} \\
 \midrule
         Parameters $(h, d, k, a, w)$ & $(63, 7, 14, 12, 16)$ & $(40, 5, 19, 10, 16)$ & -- \\
-        Signature Size (Bytes) & $7{,}856$ & $6{,}800$ & $0.8656\times$ \\
-        Key Generation Cost & $292{,}351$ & $146{,}175$ & $0.5000\times$ \\
-        Signing Cost & $2{,}218{,}486$ & $789{,}237$ & $0.3558\times$ \\
-        Verification Cost & $2{,}193$ & $1{,}645$ & $0.7501\times$ \\
-        Compression per Byte ($\rho$) & $0.2791$ & $0.2419$ & $0.8666\times$ \\
+        Size (B) & $7{,}856$ & $6{,}800$ & $0.8656\times$ \\
+        KeyGen ($C$) & $292{,}351$ & $146{,}175$ & $0.5000\times$ \\
+        SigGen ($C$) & $2{,}218{,}486$ & $789{,}237$ & $0.3558\times$ \\
+        SigVer ($C$) & $2{,}193$ & $1{,}645$ & $0.7501\times$ \\
+        $\rho$ ($C$/B) & $0.2791$ & $0.2419$ & $0.8666\times$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -119,7 +119,7 @@ To build intuition, suppose we care about only two metrics - signature size and 
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.7\textwidth]{content/images/scatter_plot.png}
-    \caption{Visualization of Candidates with Prioritization of Size and Signing Cost Metrics.}
+    \caption{Visualization of Candidates with Prioritization of Size and SigGen.}
     \label{fig:scatter_plot}
 \end{figure}
 
@@ -149,7 +149,7 @@ The filtering process is shown in Figure~\ref{fig:full_filtering_process}.
     \begin{subfigure}[b]{0.32\textwidth}
         \centering
         \includegraphics[width=\textwidth]{content/images/sieve_step2_size.png}
-        \caption{SigSize}
+        \caption{Size}
         \label{fig:sieve_2}
     \end{subfigure}
     \hfill
@@ -173,14 +173,14 @@ The filtering process is shown in Figure~\ref{fig:full_filtering_process}.
     \begin{subfigure}[b]{0.32\textwidth}
         \centering
         \includegraphics[width=\textwidth]{content/images/sieve_step5_verify.png}
-        \caption{SigVerify}
+        \caption{SigVer}
         \label{fig:sieve_5}
     \end{subfigure}
     \hfill
     \begin{subfigure}[b]{0.32\textwidth}
         \centering
         \includegraphics[width=\textwidth]{content/images/sieve_step6_rho.png}
-        \caption{Comp/Byte}
+        \caption{$\rho$}
         \label{fig:sieve_6}
     \end{subfigure}
     
@@ -202,7 +202,7 @@ and the optimal candidate is the one minimizing $d(P)$.
 This treats every metric as equally important, which is rarely what we actually want. Signature size, for example, usually carries far more weight than key-generation cost in a Bitcoin context. The next subsection addresses this by attaching weights to each axis.
 
 \subsection{Decisional Weights} \label{sec:decisional-weights}
-We can do better by applying the \emph{weighted} Euclidean distance. The motivation is that weights give us a principled way to encode the relative priority of each metric. Let $w_{\text{size}}, w_{\text{kg}}, w_{\text{sg}}, w_{\text{sv}}, w_{\text{cb}} \in \mathbb{R}^+$ denote the raw weight coefficients representing the relative importance of signature size, key generation, signing, verification, and compressions per byte, respectively.
+We can do better by applying the \emph{weighted} Euclidean distance. The motivation is that weights give us a principled way to encode the relative priority of each metric. Let $w_{\text{size}}, w_{\text{kg}}, w_{\text{sg}}, w_{\text{sv}}, w_{\text{cb}} \in \mathbb{R}^+$ denote the raw weight coefficients representing the relative importance of size, KeyGen, SigGen, SigVer and $\rho$, respectively.
 
 To keep the calculation proportionally consistent regardless of the absolute scale of the chosen weights, we normalize them into coefficients $p_i$ (where $i \in \{\text{size}, \text{kg}, \text{sg}, \text{sv}, \text{cb}\}$) such that they sum to $1$:
 \begin{equation}
@@ -246,11 +246,11 @@ The parameters and metric values of the best candidate are shown in Table~\ref{t
         \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Best Candidate} & \textbf{Ratio to Std.} \\
         \midrule
         Parameters $(h, d, k, a, w)$ & $(63, 7, 14, 12, 16)$ & $(40, 5, 19, 9, 16)$ & -- \\
-        Signature Size (Bytes) & $7,856$ & $6,496$ & $0.8269\times$ \\
-        Key Generation Cost & $292,351$ & $146,175$ & $0.5000\times$ \\
-        Signing Cost & $2,218,486$ & $760,053$ & $0.3426\times$ \\
-        Verification Cost & $2,193$ & $1,626$ & $0.7415\times$ \\
-        Compression per Byte ($\rho$) & $0.2791$ & $0.2503$ & $0.8967\times$ \\
+        Size (B) & $7,856$ & $6,496$ & $0.8269\times$ \\
+        KeyGen ($C$) & $292,351$ & $146,175$ & $0.5000\times$ \\
+        SigGen ($C$) & $2,218,486$ & $760,053$ & $0.3426\times$ \\
+        SigVer ($C$) & $2,193$ & $1,626$ & $0.7415\times$ \\
+        $\rho$ ($C$/B) & $0.2791$ & $0.2503$ & $0.8967\times$ \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -278,11 +278,11 @@ The resulting values are shown in Table~\ref{tab:euclidean_candidate_metrics_cas
         \textbf{Metric} & \textbf{Standard Baseline} & \textbf{Best Candidate} & \textbf{Ratio to Std.} \\
         \midrule
         Parameters $(h, d, k, a, w)$ & $(63, 7, 14, 12, 16)$ & $(40, 5, 13, 12, 16)$ & -- \\
-        Signature Size (Bytes) & $7,856$ & $6,160$ & $0.7841\times$ \\
-        Key Generation Cost & $292,351$ & $146,175$ & $0.5000\times$ \\
-        Signing Cost & $2,218,486$ & $890,617$ & $0.4015\times$ \\
-        Verification Cost & $2,193$ & $1,603$ & $0.7310\times$ \\
-        Compression per Byte ($\rho$) & $0.2791$ & $0.2602$ & $0.9322\times$ \\
+        Size (B) & $7,856$ & $6,160$ & $0.7841\times$ \\
+        KeyGen ($C$) & $292,351$ & $146,175$ & $0.5000\times$ \\
+        SigGen ($C$) & $2,218,486$ & $890,617$ & $0.4015\times$ \\
+        SigVer ($C$) & $2,193$ & $1,603$ & $0.7310\times$ \\
+        $\rho$ ($C$/B) & $0.2791$ & $0.2602$ & $0.9322\times$ \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -359,11 +359,11 @@ The resulting best candidates for each method shown in the Table~\ref{tab:distan
 \textbf{Ratio to Std.} \\
 \midrule
 Parameters $(h, d, k, a, w)$  & $(63, 7, 14, 12, 16)$ & $(40, 4, 9, 16, 16)$  & --             & $(45, 5, 12, 11, 16)$ & --             \\
-Signature Size (Bytes)        & $7{,}856$             & $5{,}344$             & $0.6802\times$ & $5{,}840$             & $0.7434\times$ \\
-Key Generation Cost           & $292{,}351$           & $584{,}703$           & $2.0000\times$ & $292{,}351$           & $1.0000\times$ \\
-Signing Cost                  & $2{,}218{,}486$       & $4{,}108{,}285$       & $1.8518\times$ & $1{,}535{,}482$       & $0.6921\times$ \\
-Verification Cost             & $2{,}193$             & $1{,}308$             & $0.5964\times$ & $1{,}583$             & $0.7218\times$ \\
-Compression per Byte ($\rho$) & $0.2791$            & $0.2448$            & $0.8768\times$ & $0.2711$            & $0.9710\times$ \\
+Size (B)        & $7{,}856$             & $5{,}344$             & $0.6802\times$ & $5{,}840$             & $0.7434\times$ \\
+KeyGen ($C$)           & $292{,}351$           & $584{,}703$           & $2.0000\times$ & $292{,}351$           & $1.0000\times$ \\
+SigGen ($C$)                  & $2{,}218{,}486$       & $4{,}108{,}285$       & $1.8518\times$ & $1{,}535{,}482$       & $0.6921\times$ \\
+SigVer ($C$)             & $2{,}193$             & $1{,}308$             & $0.5964\times$ & $1{,}583$             & $0.7218\times$ \\
+$\rho$ ($C$/B) & $0.2791$            & $0.2448$            & $0.8768\times$ & $0.2711$            & $0.9710\times$ \\
 \bottomrule
 \end{tabular}%
 }
