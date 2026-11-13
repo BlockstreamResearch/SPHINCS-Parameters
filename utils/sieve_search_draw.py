@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
+"""Draws the report's sieve figures from a sweep CSV: the candidates filtered
+metric by metric against X times SLH-DSA-128s (--x-*), one image per stage,
+and their weighted distance to the origin (--weights). --figure focus draws
+only the distance view of the survivors, regular or metric-normalised. The
+Makefile's figures target runs it from document/content/images.
 
+  python3 sieve_search_draw.py --input CSV [--x-size X ...] [--weights W,W,W,W,W]
+"""
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
@@ -9,15 +16,9 @@ import os
 import argparse
 from scipy.spatial.distance import pdist, squareform
 
-np.random.seed(42)
+np.random.seed(42)   # the same placement on every run
 
-METRIC_WEIGHTS = {
-    'size': 15.0,
-    'keygen': 0.1,
-    'sign': 0.1,
-    'verify': 15.0,
-    'rho': 0.1
-}
+METRIC_WEIGHTS = None   # from --weights
 
 def load_and_preprocess_data(csv_path):
     if not os.path.exists(csv_path):
@@ -294,9 +295,6 @@ def main():
         print("\n      -> No survivors left to calculate Euclidean optimum.")
 
     if args.figure == "focus":
-        # Single distance view of the final survivors (replaces the manual
-        # site screenshots previously used for the report's comparison and
-        # candidate figures).
         assert args.out, "--figure focus requires --out"
         assert len(final_survivors) > 0, "no survivors under these filters"
         label = "Regular Weighted Distance"

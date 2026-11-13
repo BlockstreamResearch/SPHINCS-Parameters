@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""
-Reads the exact required_global_X multipliers from global_X_thresholds.csv
-and generates a Concentric Euler Diagram strictly mapping the requested bounds:
-[Smallest X, 0.9x, 1.0x, 2.0x, 5.0x, 10.0x, 15.0x]
+"""Draws the report's concentric diagram, euler_custom_minimax.png: how many
+candidates of global_X_thresholds.csv (min_mult_search.py) have all metrics
+within X times SLH-DSA-128s, for the smallest X and for TARGET_MULTIPLIERS.
+
+  cd utils && python3 venn_diagram_draw.py
 """
 
 import os
@@ -11,11 +12,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-# The target bounds you requested
+# The rings after the smallest X
 TARGET_MULTIPLIERS = [0.9, 1.0, 2.0, 5.0, 10.0, 15.0]
 
 def draw_custom_euler(factors, counts):
-    """Renders the Concentric Euler Diagram for the calculated thresholds."""
+    """Draws one ring per factor, the innermost first in factors."""
     fig, ax = plt.subplots(figsize=(12, 10))
     ax.set_aspect('equal')
     
@@ -23,7 +24,7 @@ def draw_custom_euler(factors, counts):
     max_radius = 0.45
     radii = [max_radius * (i + 1) / N for i in range(N)]
     
-    # 7-layer sequential palette (Light Yellow -> Deep Orange/Brown)
+    # Light yellow on the outside to dark brown at the centre
     palette = ['#fff7bc', '#fee391', '#fec44f', '#fe9929', '#ec7014', '#cc4c02', '#8c2d04']
     
     for i in range(N - 1, -1, -1):
@@ -39,7 +40,7 @@ def draw_custom_euler(factors, counts):
         )
         ax.add_patch(circle)
         
-        # Calculate how many NEW candidates were unlocked in this specific ring
+        # Candidates this ring adds
         added = counts[i] if i == 0 else counts[i] - counts[i-1]
         
         txt = f"{factors[i]} Cap | Total: {counts[i]} candidates (+{added} new)"
@@ -47,7 +48,6 @@ def draw_custom_euler(factors, counts):
         x_target = 0.64 if i == 0 else 0.64 + (radii[i] + radii[i-1]) / 6
         y_target = 0.525 if i == 0 else 0.5 + (radii[i] + radii[i-1]) / 2.05
         
-        # Point the arrow slightly inwards to the left
         ax.annotate(
             txt,
             xy=(0.51, y_target),
@@ -61,10 +61,7 @@ def draw_custom_euler(factors, counts):
     ax.set_xlim(0, 1.35)
     ax.set_ylim(0, 1)
     ax.axis('off')
-    
-    #ax.set_title("Global Minimax Expansion: Candidates Unlocked by Uniform Bounding", 
-    #            fontsize=16, fontweight='bold', pad=20)
-    
+
     out_path = "euler_custom_minimax.png"
     plt.savefig(out_path, dpi=300, bbox_inches='tight')
     plt.close()
@@ -79,29 +76,23 @@ def main():
         
     df = pd.read_csv(csv_file)
     
-    # 1. Find the absolute minimum X in the dataset
     min_x = df['required_global_X'].min()
     print(f"[*] Smallest possible X discovered: {min_x:.4f}x")
     
-    # 2. Build our full list of target thresholds
     thresholds = [min_x] + TARGET_MULTIPLIERS
     
     factors = []
     counts = []
     
-    # 3. Calculate how many candidates survive at each expanding threshold
     for target in thresholds:
-        # Count all rows where the required X is less than or equal to our target bound
         surviving_count = len(df[df['required_global_X'] <= target])
         
-        # Format the label nicely
         label = f"{target:.4f}x" if target == min_x else f"{target}x"
         
         factors.append(label)
         counts.append(surviving_count)
         print(f"    -> At <= {label}: {surviving_count} candidates")
         
-    # 4. Draw it!
     draw_custom_euler(factors, counts)
 
 if __name__ == "__main__":
