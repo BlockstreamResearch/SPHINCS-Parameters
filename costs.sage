@@ -22,6 +22,7 @@ Notation:
 """
 
 from sage.all import *
+from functools import lru_cache
 import json
 import os
 
@@ -151,26 +152,19 @@ PARAMETER_SETS = [
 # WOTS helpers
 # -----------------------------------------------------------------------------
 
+@lru_cache(maxsize=None)   # the symbolic logs are slow, and w takes few values
+def wots_lengths(w):
+    """(l1, l2): the message and checksum chains of WOTS-TW (FIPS 205,
+    Section 5). l1 rounds up, so for w = 32 the 26 chains carry 130 bits."""
+    l1 = ceil(hashbytes*8/log(w, 2))
+    l2 = floor(log(l1*(w-1), 2)/log(w, 2)) + 1
+    return l1, l2
+
 def compute_wots_l(scheme, w):
-    """
-    Compute WOTS chain count l based on scheme type.
-
-    For WOTS-TW (plain): l = l1 + l2
-        l1 = ceil(8n / log2(w))              -- message chains (FIPS 205 Sec. 5)
-        l2 = floor(log_w(l1*(w-1))) + 1      -- checksum chains (FIPS 205 Sec. 5)
-
-    For WOTS+C: l = l1 (no checksum chains, replaced by counter)
-
-    Note: l1 must round UP. For w=16 and w=256 the division is exact,
-    but w=32 needs 26 chains (26*5 = 130 >= 128 bits); floor division
-    would give 25 chains, which cannot encode a 128-bit digest.
-    """
-    if scheme == "SPX":
-        l1 = ceil(hashbytes*8/log(w,2))
-        l2 = floor(log(l1*(w-1), 2)/log(w, 2)) + 1
-        return l1 + l2
-    else:
-        return ceil(hashbytes*8/log(w,2))
+    """Number of WOTS chains: l1 + l2 for WOTS-TW (SPX), l1 for WOTS+C,
+    which grinds a counter instead of signing a checksum."""
+    l1, l2 = wots_lengths(w)
+    return l1 + l2 if scheme == "SPX" else l1
 
 def compute_wots_tw_worst_steps(l1, l2, w):
     """
@@ -521,8 +515,7 @@ def compute_verification_time(h, d, a, k, w, swn, scheme, mmax=0):
         c_wots = d*(((w-1)*l - swn)*C_Th1 + C_Th1c + Thl)
         c_wots_worst = c_wots
     else:  # Plain WOTS
-        l1 = ceil(hashbytes*8/log(w,2))
-        l2 = floor(log(l1*(w-1), 2)/log(w, 2)) + 1
+        l1, l2 = wots_lengths(w)
         # Average case: expected chain steps for a uniformly random digest,
         # see compute_wots_tw_mean_steps.
         avg_steps = compute_wots_tw_mean_steps(l1, l2, w, d)

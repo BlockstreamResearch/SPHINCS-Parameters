@@ -32,25 +32,21 @@ import json
 import subprocess
 import datetime
 
+_DOC = __doc__   # loading stateful.sage replaces __doc__
 _dir = os.path.dirname(os.path.abspath(__file__))
-os.environ['STATEFUL_SAGE_NO_MAIN'] = '1'
-os.environ['COSTS_SAGE_NO_MAIN'] = '1'
-
-_saved_argv = sys.argv
-sys.argv = ['export_site_data.sage']
-load(os.path.join(_dir, "stateful.sage"))   # also loads costs.sage + security.sage
-sys.argv = _saved_argv
+os.environ['STATEFUL_SAGE_NO_MAIN'] = '1'   # its functions, without its CLI
+load(os.path.join(_dir, "stateful.sage"))   # and through it costs.sage and security.sage
 
 ALL_SCHEMES = ['SPX', 'W+C', 'W+C_F+C', 'W+C_P+FP']
 schemes = ALL_SCHEMES
-_args = _saved_argv[1:]
+_args = sys.argv[1:]
 i = 0
 while i < len(_args):
     if _args[i] == '--schemes' and i + 1 < len(_args):
         schemes = [s for s in _args[i + 1].split(',') if s]
         i += 2
     elif _args[i] == '--help':
-        print(__doc__)
+        print(_DOC)
         sys.exit(0)
     else:
         print("Unknown argument: {}".format(_args[i]), file=sys.stderr)
