@@ -261,7 +261,7 @@ data = {
         'schemes': [s for s in ALL_SCHEMES if s in pools],
         'uxmss_ref_size': UXMSS_REF,
         'hsf_max': int(HSF_MAX),
-        'cost_convention': HASH_CONVENTION,
+        'cost_convention': 'cached',
     },
     'baseline': baseline,
     'pools': pools,

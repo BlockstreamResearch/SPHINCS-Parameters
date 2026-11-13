@@ -22,26 +22,12 @@ C_SIZE = 4                   # WOTS+C grinding counter of the stateless variants
 R_SIZE = 16                  # message randomness = n bytes
 IND_SIZE = 1                 # SHRINCS indicator byte (first byte of every signature)
 
-# Hash-cost convention, mirroring costs.sage
-CONVENTION = os.environ.get('HASH_CONVENTION', 'cached').lower()
-
-C_TH1 = 1; C_TH1C = 1; C_PRF = 1
-C_TH2 = 1 if CONVENTION == 'cached' else 2
-# 32-byte message, empty context. cached: H_msg is two nested SHA-256 calls
+# Compressions per hash call, with the PK.seed block cached as in costs.sage
+C_TH1 = 1; C_TH1C = 1; C_PRF = 1; C_TH2 = 1
+# 32-byte message, empty context: H_msg is two nested SHA-256 calls
 # (2 + 2 compressions), PRF_msg is HMAC with its key-pad blocks cached (2 + 1).
-# uncached: the original single 2-block hashes.
-C_HMSG = 4 if CONVENTION == 'cached' else 2
-C_PRFMSG = 3 if CONVENTION == 'cached' else 2
-
-
-def set_convention(mode):
-    """Switch the active convention at runtime (used by the tests)."""
-    global CONVENTION, C_TH2, C_HMSG, C_PRFMSG
-    assert mode in ('cached', 'uncached'), mode
-    CONVENTION = mode
-    C_TH2 = 1 if mode == 'cached' else 2
-    C_HMSG = 4 if mode == 'cached' else 2
-    C_PRFMSG = 3 if mode == 'cached' else 2
+C_HMSG = 4
+C_PRFMSG = 3
 
 
 SWN = {16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040,
@@ -52,9 +38,7 @@ HSF_MAX = 255                # FXMSS encodes the node height as a single byte
 
 def compute_th(x):
     """Compressions for a tweakable hash over x hash-sized values (SHA-256)."""
-    if CONVENTION == 'cached':
-        return ceil((22 * 8 + 128 * x + 65) / 512)
-    return ceil((128 + 96 + 128 * x + 65) / 512)
+    return ceil((22 * 8 + 128 * x + 65) / 512)
 
 
 def wots_len1(w):
@@ -120,15 +104,11 @@ def _checksum_digit_sum_total(l1, w):
 
 def wots_tw_mean_steps(w, count=1):
     """Mean chain steps to verify `count` WOTS-TW signatures on random digests,
-    rounded to the nearest integer (ties up).
-
-    cached:   exact expectation  l1*(w-1)/2 + l2*(w-1) - E[checksum digit sum]
-    uncached: the original (w-1)*l/2 approximation, kept verbatim
+    rounded to the nearest integer (ties up): l1*(w-1)/2 + l2*(w-1) minus the
+    mean checksum digit sum.
     """
     l1 = wots_len1(w)
     l2 = wots_len(w) - l1
-    if CONVENTION != 'cached':
-        return count * ((w - 1) * (l1 + l2) // 2)
     mean = (Fraction(l1 * (w - 1), 2) + l2 * (w - 1)
             - Fraction(_checksum_digit_sum_total(l1, w), w**l1))
     return floor(count * mean + Fraction(1, 2))
@@ -323,8 +303,6 @@ def wots_sign_c(w, ots):
         search = -(-(w**l) // nu)          # ceil division, exact integers
         return search * C_TH1C + l * C_PRF + swn * C_TH1
     # WOTS-TW: the signer walks what the verifier does not
-    if CONVENTION != 'cached':
-        return l * C_PRF + l * (w - 1) // 2 * C_TH1
     return l * C_PRF + (l * (w - 1) - wots_tw_mean_steps(w)) * C_TH1
 
 

@@ -40,58 +40,34 @@ counter_size = 4 # 4 bytes = 32 bits
 randomness_size = 16  # 16 bytes = 128 bits
 
 # -----------------------------------------------------------------------------
-# Hash-cost convention
+# Compressions per hash call
 # -----------------------------------------------------------------------------
-# Two SHA-256 compression-counting conventions are supported, selected via the
-# HASH_CONVENTION environment variable ('cached' or 'uncached'):
-#
-#   cached (default): FIPS 205 SHA-2 layout with the PK.seed midstate cached.
-#     This is the instantiation implemented by SHRINCS (github.com/SHRINCS/shrincs-bip),
-#     and the counts below are the ones its reference implementation executes.
-#
-#   uncached: the original convention of this script, kept verbatim so that
-#     earlier numbers stay reproducible: every call pays for its full input
-#     (a node hash costs 2 compressions), the message hashes are single
-#     2-block hashes, and WOTS-TW verification is averaged as (w-1)/2 steps
-#     per chain.
-#
-#     Usage: HASH_CONVENTION=uncached sage costs.sage --params ...
-#
-HASH_CONVENTION = os.environ.get('HASH_CONVENTION', 'cached').lower()
-assert HASH_CONVENTION in ('cached', 'uncached'), (
-    "HASH_CONVENTION must be 'cached' or 'uncached', got %r" % HASH_CONVENTION)
+# The FIPS 205 SHA-2 instantiation as SHRINCS (github.com/SHRINCS/shrincs-bip)
+# runs it: the PK.seed block is compressed once per key and its state reused.
 
-C_Th1 = 1     # Tweakable hash, 1-block: PKseed (128) + Tweak (96) + m1 (128)
-C_Th1c = 1    # Tweakable hash, 1-block + counter: PKseed + Tweak + m1 + counter (32)
-C_Th2 = 1 if HASH_CONVENTION == 'cached' else 2 # Tweakable hash with hash convention
-C_PRF = 1     # PRF: PKseed + SKseed + Tweak
+C_Th1 = 1     # Tweakable hash, 1 value: address (22 B) + m1 (16 B)
+C_Th1c = 1    # Tweakable hash, 1 value + counter
+C_Th2 = 1     # Tweakable hash, 2 values (a tree node)
+C_PRF = 1     # PRF: address + SK.seed
 
 # Message hash and message PRF, for a 32-byte message and an empty context.
 #
-#   cached:
-#     H_msg = MGF1-SHA-256(R || PK.seed || SHA-256(R || PK.seed || PK.root || M), m)
-#       is two nested SHA-256 calls (98- and 68-byte inputs in SHRINCS), 2
-#       compressions each. Its input starts with the randomizer R, so nothing
-#       can be cached.                                                     -> 4
-#     PRF_msg = HMAC-SHA-256(SK.prf, opt_rand || M) is two SHA-256 calls of
-#       3 and 2 compressions. Their first blocks are the fixed HMAC key pads,
-#       cached like the PK.seed block (it would be 5 otherwise).           -> 3
-#   uncached (original model): one 2-block hash each
-#     H_msg:   PKseed + PKroot (128) + R (256) + m (256)                   -> 2
-#     PRF_msg: SKprf (128) + Opt + m (256) + counter                       -> 2
-C_Hmsg = 4 if HASH_CONVENTION == 'cached' else 2
-C_PRFmsg = 3 if HASH_CONVENTION == 'cached' else 2
+#   H_msg = MGF1-SHA-256(R || PK.seed || SHA-256(R || PK.seed || PK.root || M), m)
+#     is two nested SHA-256 calls (98- and 68-byte inputs in SHRINCS), 2
+#     compressions each. Its input starts with the randomizer R, so nothing
+#     can be cached.                                                       -> 4
+#   PRF_msg = HMAC-SHA-256(SK.prf, opt_rand || M) is two SHA-256 calls of
+#     3 and 2 compressions. Their first blocks are the fixed HMAC key pads,
+#     cached like the PK.seed block (it would be 5 otherwise).             -> 3
+C_Hmsg = 4
+C_PRFmsg = 3
 
 def compute_Th(n):
     """
-    Compression calls for a tweakable hash over n hash-sized values, under the active HASH_CONVENTION
-
-    cached:   ceil((22*8 + 128*n + 65) / 512)
-    uncached: ceil((128 + 96 + 128*n + 65) / 512)
+    Compression calls for a tweakable hash over n hash-sized values:
+    ceil((22*8 + 128*n + 65) / 512)
     """
-    if HASH_CONVENTION == 'cached':
-        return ceil((22*8 + 128*n + 65)/512)
-    return ceil((128 + 96 + 128*n + 65)/512)
+    return ceil((22*8 + 128*n + 65)/512)
 
 # =============================================================================
 # Parameter Sets
@@ -258,12 +234,7 @@ def compute_wots_tw_mean_steps(l1, l2, w, count=1):
 
     For w = 16 this is 267.12 steps rather than the 262 that (w-1)*l/2
     gives, and the gap grows with w (2415.03 against 2295 for w = 256).
-
-    Under the original convention (HASH_CONVENTION=uncached) the (w-1)*l/2
-    approximation is kept.
     """
-    if HASH_CONVENTION != 'cached':
-        return count * ((w - 1) * (l1 + l2) // 2)
     W = int(w)**int(l1)
     T = _wots_tw_floor_sum(l1, l2, w)
     # count * (w-1) * (l2 + T/W), rounded to the nearest integer

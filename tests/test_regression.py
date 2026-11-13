@@ -476,26 +476,6 @@ def test_site_js_hazards():
     assert not offenders, f'site-JS hazards: {offenders}'
 
 
-def test_uncached_convention():
-    """The original Th2=2 convention stays available (HASH_CONVENTION=uncached)
-    and still reproduces values frozen from real prior sage runs."""
-    spot = FIX['uncached_spot']
-    M.set_convention('uncached')
-    try:
-        b = M.spx_metrics(63, 7, 14, 12, 16)
-        for k in ('size', 'kg', 'sg', 'sv', 'sv_worst'):
-            assert b[k] == spot['baseline'][k], (k, b[k])
-        v = M.scheme_metrics('W+C', 44, 4, 8, 16, 16, 240)
-        ref = spot['variant|W+C|44,4,8,16,16,240']
-        for k in ('size', 'kg', 'sg', 'sv', 'sv_worst'):
-            assert v[k] == ref[k], (k, v[k])
-        u = M.uxmss_metrics('TW', 16)
-        for k, val in spot['uxmss|TW,16'].items():
-            assert u[k] == val, (k, u[k], val)
-    finally:
-        M.set_convention('cached')
-
-
 def test_variant_fixtures():
     """Frozen values from a real `sage costs.sage` run vs the reference model."""
     for key, f in FIX['variants'].items():
@@ -613,19 +593,12 @@ def test_sage_costs():
         print('  [skip] sage not available')
         return
     args = ['sage', 'costs.sage', '--params', 'SPX', '64', '14', '12', '63', '7', '16', '0']
-    # Default convention (cached)
     p = subprocess.run(args, capture_output=True, text=True, cwd=ROOT, timeout=600)
     assert p.returncode == 0, p.stderr[:2000]
     b = FIX['baseline']
     assert f"Size:       {b['size']} bytes" in p.stdout, p.stdout
     assert 'Security:   128.0 bits' in p.stdout, p.stdout
     assert 'C/byte:     0.28  (worst: 0.50)' in p.stdout, p.stdout
-    # Original convention via the env flag
-    env = dict(os.environ, HASH_CONVENTION='uncached')
-    p2 = subprocess.run(args, capture_output=True, text=True, cwd=ROOT,
-                        timeout=600, env=env)
-    assert p2.returncode == 0, p2.stderr[:2000]
-    assert 'C/byte:     0.30  (worst: 0.52)' in p2.stdout, p2.stdout
 
 
 # ---------------------------------------------------------------------------

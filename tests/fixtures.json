@@ -478,33 +478,6 @@
   "W+C_F+C": 7077,
   "W+C_P+FP": 7746
  },
- "uncached_spot": {
-  "baseline": {
-   "size": 7856,
-   "kg": 292862,
-   "sg": 2279391,
-   "sv": 2387,
-   "sv_worst": 4123
-  },
-  "variant|W+C|44,4,8,16,16,240": {
-   "size": 4960,
-   "kg": 1071102,
-   "sg": 6381815,
-   "sv": 1357,
-   "sv_worst": 1357
-  },
-  "uxmss|TW,16": {
-   "hsf": 255,
-   "sz_q1": 594,
-   "sz_max": 4665,
-   "kg": 146430,
-   "sg": 809,
-   "sg_cold": 146159,
-   "state": 4096,
-   "sv_max": 784,
-   "sv_max_worst": 1032
-  }
- },
  "optional_pool_counts": {
   "32": 2913,
   "64": 3259,

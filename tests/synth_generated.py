@@ -178,7 +178,7 @@ def main():
             'schemes': list(pools.keys()),
             'uxmss_ref_size': 5712,
             'hsf_max': M.HSF_MAX,
-            'cost_convention': M.CONVENTION,
+            'cost_convention': 'cached',
         },
         'baseline': baseline,
         'pools': pools,

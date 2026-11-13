@@ -54,12 +54,9 @@ w values: 16, 32, 64, 128, 256, 65536.
   130 >= 128 bits, w=64: 22 for 132, w=128: 19 for 133) to cover the
   full 128-bit message digest.
 
-SHA-256 compression model: inherited from costs.sage, governed by the
-HASH_CONVENTION env var ('cached' default: PK.seed midstate cached, C_Th2=1,
-C_Hmsg=4, C_PRFmsg=3, Thl_tw(l) = ceil((241+128*l)/512); 'uncached'
-original: C_Th2=2, C_Hmsg=2, C_PRFmsg=2, Thl_tw(l) = ceil((289+128*l)/512)).
-Always: C_Th1=1 C_Th1c=1 C_PRF=1; Thl_classic(l) = ceil((65+128*l)/512)
-(plain SHA-256).
+SHA-256 compression model: from costs.sage (C_Th1 = C_Th1c = C_Th2 = C_PRF = 1,
+C_Hmsg = 4, C_PRFmsg = 3, Thl_tw(l) = ceil((241+128*l)/512));
+Thl_classic(l) = ceil((65+128*l)/512) (plain SHA-256).
 
 Usage:
   sage stateful.sage                     # Tables for both 2^20 and 2^40
@@ -191,7 +188,7 @@ def wots_Thl(l, ots_type):
     """Compressions to compress l chain endpoints into the WOTS public key."""
     if ots_type == OTS_CLASSIC:
         return int(ceil((128 * l + 65) / 512))   # plain SHA-256
-    return int(compute_Th(l))                    # ceil((289+128*l)/512)
+    return int(compute_Th(l))                    # ceil((241+128*l)/512)
 
 
 def wots_pk_C(w, ots_type):
@@ -202,8 +199,7 @@ def wots_pk_C(w, ots_type):
 
 def wots_tw_verify_steps(w, count=1):
     """Mean chain steps to verify `count` WOTS-TW (or classic) signatures on
-    random digests, rounded to the nearest integer. Exact expectation under
-    the default convention, (w-1)*l/2 under the original one; see
+    random digests, rounded to the nearest integer; see
     compute_wots_tw_mean_steps in costs.sage."""
     l1 = int(ceil(N * 8 / log(w, 2)))
     l2 = int(floor(log(l1 * (w - 1), 2) / log(w, 2))) + 1
@@ -214,8 +210,6 @@ def wots_tw_sign_steps(w):
     """Mean chain steps to produce one WOTS-TW (or classic) signature: the
     signer walks the part of each chain that the verifier does not."""
     l = wots_l(w, OTS_TW)
-    if HASH_CONVENTION != 'cached':
-        return l * (w - 1) // 2
     return l * (w - 1) - wots_tw_verify_steps(w)
 
 
