@@ -152,14 +152,11 @@ def test_csv_standard_row():
 # 3. Site pages (node)
 # ---------------------------------------------------------------------------
 
-def _extract_js(page, end_marker):
-    html = open(os.path.join(ROOT, 'site', page)).read()
-    m = re.search(r"'use strict';(.*?)" + re.escape(end_marker), html, re.S)
-    assert m, f'extraction markers not found in {page} — update the test'
-    js = m.group(1)
-    if '<script src="formulas.js">' in html:
-        js = open(os.path.join(ROOT, 'site', 'formulas.js')).read() + '\n' + js
-    return js
+def _page_js(page):
+    """The scripts a page loads, in order, as one script to run under node."""
+    html = open(os.path.join(ROOT, 'site', page), encoding='utf-8').read()
+    srcs = re.findall(r'<script src="([^"]+)"></script>', html)
+    return '\n'.join(open(os.path.join(ROOT, 'site', s), encoding='utf-8').read() for s in srcs)
 
 
 def _run_node(js):
@@ -172,12 +169,12 @@ def _run_node(js):
     return json.loads(p.stdout.strip().splitlines()[-1])
 
 
-def test_site_index():
-    js = _extract_js('stateless.html', '// ---------- State ----------')
+def test_site_explorer():
+    js = _page_js('stateless.html')
     tuples = [list(_tuple_of(k)) for k in FIX['stateless']]
     js += f"""
 const _tuples = {json.dumps(tuples)};
-const out = {{ pool: sweep().filter(passesInitial).length, metrics: {{}} }};
+const out = {{ metrics: {{}} }};
 for (const t of _tuples) {{
   const m = metrics({{h:t[0], d:t[1], k:t[2], a:t[3], w:t[4]}});
   out.metrics[t.join(',')] = [m.size, m.kg, m.sg, m.sv, m.sv_worst];
@@ -187,7 +184,6 @@ console.log(JSON.stringify(out));
     out = _run_node(js)
     if out is None:
         return
-    assert out['pool'] == FIX['site_pool_count'], out['pool']
     for key, f in FIX['stateless'].items():
         got = out['metrics'][key]
         want = [f['size'], f['kg'], f['sg'], f['sv'], f['sv_worst']]
@@ -198,7 +194,7 @@ def test_site_security_small_trees():
     """The custom-candidate panel accepts any (h, k, a), so the forgery sum
     must stay cheap when the hypertree has few leaves (lambda = q_s / 2^h
     huge): h = 14 used to take about 11 s per evaluation and froze the page."""
-    js = _extract_js('stateless.html', '// ---------- State ----------')
+    js = _page_js('stateless.html')
     js += """
 const t0 = Date.now();
 const out = {
@@ -225,7 +221,7 @@ console.log(JSON.stringify(out));
 
 def test_site_main():
     """index.html (SHRINCS main): pinned cards must match the reference model."""
-    js = _extract_js('index.html', '// ---------- Render ----------')
+    js = _page_js('index.html')
     js += """
 const out = {};
 out.pinned = (m => [m.size, m.kg, m.sg, m.sv, m.svWorst])(slhMetrics(PINNED));
@@ -283,7 +279,7 @@ console.log(JSON.stringify(out));
 
 
 def test_site_stateful():
-    js = _extract_js('stateful.html', '// Shared slider/number-input renderer')
+    js = _page_js('stateful.html')
     js += """
 const out = { slh: null, uxmss: {}, xmssmt: {} };
 const s = buildSLH().metrics;
@@ -474,8 +470,9 @@ def test_site_js_hazards():
         html = open(path, encoding='utf-8').read()
         for m in re.finditer(r'<script>(.*?)</script>', html, re.S):
             scan(os.path.basename(path), m.group(1), html[:m.start(1)].count('\n') + 1)
-    for path in sorted(glob.glob(os.path.join(ROOT, 'site', '*.js'))):
-        scan(os.path.basename(path), open(path, encoding='utf-8').read(), 1)
+    for path in sorted(glob.glob(os.path.join(ROOT, 'site', '*.js')) +
+                       glob.glob(os.path.join(ROOT, 'site', 'js', '*.js'))):
+        scan(os.path.relpath(path, os.path.join(ROOT, 'site')), open(path, encoding='utf-8').read(), 1)
     assert not offenders, f'site-JS hazards: {offenders}'
 
 
@@ -568,7 +565,7 @@ def test_site_data_integration():
         return
     data_path = os.path.join(ROOT, 'site', 'data.json')
     # stateless.html: poolFromData must reproduce the pool; STD_M must equal baseline
-    js = _extract_js('stateless.html', '// ---------- State ----------')
+    js = _page_js('stateless.html')
     js += f"""
 const data = JSON.parse(require('fs').readFileSync({json.dumps(data_path)}, 'utf8'));
 const pool = poolFromData(data, 'SPX');
@@ -594,7 +591,7 @@ console.log(JSON.stringify({{ok, n: pool.length}}));
     if out is not None:
         assert out['ok'] and out['n'] == FIX['site_pool_count'], out
     # stateful.html: the page's own self-check must pass on the shipped data
-    js2 = _extract_js('stateful.html', '// Shared slider/number-input renderer')
+    js2 = _page_js('stateful.html')
     js2 += f"""
 SITE_DATA = JSON.parse(require('fs').readFileSync({json.dumps(data_path)}, 'utf8'));
 const okCheck = selfCheckStateful(SITE_DATA);

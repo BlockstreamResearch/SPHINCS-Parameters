@@ -14,9 +14,10 @@ Single source of truth:
   - stateful grid, UXMSS variants, SLH baseline
                     : computed by loading stateful.sage
 
-The pages load data.json at startup and fall back to in-browser computation
-(SPX only) if the file is unavailable; they also self-check the loaded
-numbers against their local formulas and log any divergence to the console.
+The pages load data.json at startup (without it the explorer has no pool and
+the stateful page computes its candidates in the browser) and self-check the
+loaded numbers against their local formulas, logging any divergence to the
+console.
 
 Usage:
   sage export_site_data.sage                     # all schemes (a few minutes)
@@ -58,7 +59,7 @@ for s in schemes:
     assert s in ALL_SCHEMES, "unknown scheme: %s" % s
 
 # Canonical stateless grid (report Sec. 2; must match slhdsa-2to40.sage
-# defaults and the explorer's fallback sweep).
+# defaults).
 GRID = {'h': [40, 50], 'd': [2, 25], 'k': [6, 24], 'a': [8, 20],
         'w': [2, 4, 16, 256], 'q_s_log2': 40, 'max_size': 7856}
 # Optional Winternitz extras for the SPX pool

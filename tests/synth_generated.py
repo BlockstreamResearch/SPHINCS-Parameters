@@ -47,9 +47,8 @@ def security_from_page():
     if not shutil.which('node'):
         sys.exit('node is required (the security analysis runs from the page JS)')
     html = open(os.path.join(ROOT, 'site', 'stateless.html'), encoding='utf-8').read()
-    m = re.search(r"'use strict';(.*?)// ---------- State ----------", html, re.S)
-    assert m, 'stateless.html extraction marker missing'
-    js = m.group(1) + """
+    srcs = re.findall(r'<script src="([^"]+)"></script>', html)
+    js = '\n'.join(open(os.path.join(ROOT, 'site', s), encoding='utf-8').read() for s in srcs) + """
 const out = { grid: {}, std: computeSecurityBits(64, 63, 14, 12) };
 for (let h = %d; h <= %d; h++)
   for (let k = %d; k <= %d; k++)

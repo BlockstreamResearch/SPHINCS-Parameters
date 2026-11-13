@@ -1,0 +1,822 @@
+// The Stateful Comparison: SLH-DSA-128s against XMSS, XMSS-MT and UXMSS
+// candidates, and the list of all stateful candidates within the bounds.
+'use strict';
+
+// A candidate is { id, key, label, scheme, canRemove, metrics }, plus hsf for
+// UXMSS. The key rebuilds it from the address bar.
+let nextId = 1;
+function makeId() { return 'c' + (nextId++); }
+
+function otsShort(ots) { return ots === 'WC' ? 'WOTS+C' : 'WOTS'; }
+
+function xmssLabel(ots, h, d, w) {
+  return d > 1 ? `XMSS-MT (${otsShort(ots)}, w = ${w}, h = ${h}, d = ${d})`
+               : `XMSS (${otsShort(ots)}, w = ${w}, h = ${h})`;
+}
+
+function buildSLH() {
+  const s = SITE_DATA ? SITE_DATA.stateful.slh : null;
+  const m = slhMetrics(SLH);
+  return {
+    id: makeId(),
+    label: 'SLH-DSA-128s',
+    scheme: 'SLH-DSA',
+    canRemove: false,
+    metrics: {
+      size: s ? s.size : m.size,
+      keygen: s ? s.kg : m.kg,
+      siggen: s ? s.sg : m.sg,
+      siggenCold: s ? s.sg : m.sg,
+      sigver: s ? s.sv : m.sv,
+      sigverWorst: s ? s.sv_worst : m.svWorst,
+      qsLog2: s ? s.qs_log2 : 64,
+      qsExact: null,
+    },
+  };
+}
+
+function buildXmssMt(ots, h, d, w) {
+  const swn = (ots === 'WC') ? WOTS_C_SWN[w] : 0;
+  return {
+    id: makeId(),
+    key: `xmssmt-${ots}-${w}-${h}-${d}`,
+    label: xmssLabel(ots, h, d, w),
+    scheme: d > 1 ? 'XMSS-MT' : 'XMSS',
+    canRemove: true,
+    metrics: {
+      size: xmssMtSize(h, d, w, ots),
+      keygen: xmssMtKeygenC(h, d, w, ots),
+      siggen: xmssMtSignBdsC(h, d, w, swn, ots),
+      siggenCold: xmssMtSignColdC(h, d, w, swn, ots),
+      state: xmssMtStateBytes(h, d, w, ots),
+      sigver: xmssMtVerifyC(h, d, w, swn, ots, false),
+      sigverWorst: xmssMtVerifyC(h, d, w, swn, ots, true),
+      qsLog2: h,
+      qsExact: null,
+    },
+  };
+}
+
+function buildUxmss(ots, w) {
+  const swn = (ots === 'WC') ? WOTS_C_SWN[w] : 0;
+  const hsf = findMaxHsf(w, ots, UXMSS_TARGET_SIZE);
+  return {
+    id: makeId(),
+    key: `uxmss-${ots}-${w}`,
+    label: `UXMSS (${otsShort(ots)}, w = ${w})`,
+    scheme: 'UXMSS',
+    canRemove: true,
+    hsf,
+    metrics: {
+      size: uxmssSize(hsf, hsf, w, ots),
+      sizeQ1: uxmssSize(1, hsf, w, ots),
+      keygen: uxmssKeygenC(hsf, w, ots),
+      siggen: uxmssSignC(1, hsf, w, swn, ots),
+      siggenCold: uxmssSignColdC(hsf, w, swn, ots),
+      state: uxmssStateBytes(hsf),
+      sigver: uxmssVerifyC(hsf, hsf, w, swn, ots, false),
+      sigverWorst: uxmssVerifyC(hsf, hsf, w, swn, ots, true),
+      qsLog2: null,
+      qsExact: hsf + 1,
+    },
+  };
+}
+
+// data.json (export_site_data.sage) feeds the candidate list; without it the
+// model computes the list in the browser.
+let SITE_DATA = null;
+
+// 'cached' or 'cold'; changes SigGen only.
+let SIGNER_MODE = 'cached';
+function sigGenOf(m) { return SIGNER_MODE === 'cold' ? m.siggenCold : m.siggen; }
+
+function candFromXmssMtRec(rec, idx) {
+  const [ots, h, d, w] = [rec[idx.ots], rec[idx.h], rec[idx.d], rec[idx.w]];
+  return {
+    id: makeId(),
+    key: `xmssmt-${ots}-${w}-${h}-${d}`,
+    label: xmssLabel(ots, h, d, w),
+    scheme: d > 1 ? 'XMSS-MT' : 'XMSS',
+    canRemove: true,
+    metrics: {
+      size: rec[idx.size], keygen: rec[idx.kg], siggen: rec[idx.sg],
+      siggenCold: rec[idx.sg_cold], state: rec[idx.state],
+      sigver: rec[idx.sv], sigverWorst: rec[idx.sv_worst],
+      qsLog2: h, qsExact: null,
+    },
+  };
+}
+
+function candFromUxmssRec(rec, idx) {
+  const [ots, w, hsf] = [rec[idx.ots], rec[idx.w], rec[idx.hsf]];
+  return {
+    id: makeId(),
+    key: `uxmss-${ots}-${w}`,
+    label: `UXMSS (${otsShort(ots)}, w = ${w})`,
+    scheme: 'UXMSS',
+    canRemove: true,
+    hsf,
+    metrics: {
+      size: rec[idx.sz_max], sizeQ1: rec[idx.sz_q1],
+      keygen: rec[idx.kg], siggen: rec[idx.sg],
+      siggenCold: rec[idx.sg_cold], state: rec[idx.state],
+      sigver: rec[idx.sv_max], sigverWorst: rec[idx.sv_max_worst],
+      qsLog2: null, qsExact: hsf + 1,
+    },
+  };
+}
+
+// Checks data.json against the model on SLH-DSA-128s, a sample of the XMSS-MT
+// rows and every UXMSS row; a mismatch is a bug in one of the two.
+function selfCheckStateful(data) {
+  let bad = 0;
+  const s = data.stateful.slh, m = slhMetrics(SLH);
+  if (s.size !== m.size || s.kg !== m.kg || s.sg !== m.sg ||
+      s.sv !== m.sv || s.sv_worst !== m.svWorst) {
+    bad++; console.error('data.json SLH baseline disagrees with local formulas:', s, m);
+  }
+  const xi = fieldIndex(data.stateful.xmssmt);
+  const xrows = data.stateful.xmssmt.rows;
+  const step = Math.max(1, Math.floor(xrows.length / 20));
+  for (let i = 0; i < xrows.length; i += step) {
+    const r = xrows[i];
+    const c = buildXmssMt(r[xi.ots], r[xi.h], r[xi.d], r[xi.w]).metrics;
+    if (c.size !== r[xi.size] || c.keygen !== r[xi.kg] || c.siggen !== r[xi.sg] ||
+        c.siggenCold !== r[xi.sg_cold] || c.state !== r[xi.state] ||
+        c.sigver !== r[xi.sv] || c.sigverWorst !== r[xi.sv_worst]) {
+      bad++; console.error('data.json XMSS-MT row disagrees with local formulas:', r, c);
+    }
+  }
+  const ui = fieldIndex(data.stateful.uxmss);
+  for (const r of data.stateful.uxmss.rows) {
+    const c = buildUxmss(r[ui.ots], r[ui.w]).metrics;
+    if (c.size !== r[ui.sz_max] || c.sizeQ1 !== r[ui.sz_q1] || c.keygen !== r[ui.kg] ||
+        c.siggen !== r[ui.sg] || c.siggenCold !== r[ui.sg_cold] || c.state !== r[ui.state] ||
+        c.sigver !== r[ui.sv_max] || c.sigverWorst !== r[ui.sv_max_worst]) {
+      bad++; console.error('data.json UXMSS row disagrees with local formulas:', r, c);
+    }
+  }
+  if (bad === 0) console.log('data.json self-check passed (SLH baseline, XMSS-MT sample, UXMSS variants).');
+  return bad === 0;
+}
+
+function defaultCandidates() {
+  return [
+    buildSLH(),
+    buildUxmss('TW', 16),
+    buildUxmss('WC', 16),
+    buildXmssMt('TW', 10, 1, 16),
+    buildXmssMt('WC', 10, 1, 16),
+    buildXmssMt('TW', 20, 1, 16),
+    buildXmssMt('WC', 20, 1, 16),
+  ];
+}
+
+// UXMSS signatures grow with the index: cells show first → last; ratios,
+// bounds and sorting use the last.
+function sizeCell(m) {
+  if (m.sizeQ1 !== undefined && m.sizeQ1 !== m.size) return `${fmtNum(m.sizeQ1)} → ${fmtNum(m.size)}`;
+  return fmtNum(m.size);
+}
+
+function ratioNote(target, std) {
+  if (target === std || !isFinite(target) || !isFinite(std)) return '';
+  return fmtRatio(target / std);
+}
+
+// ρ for SigVer sv, divided by `scale` (1, or the Schnorr ρ) and printed with `fmt`.
+function rhoCell(m, c, sv, scale, fmt) {
+  const cbMax = sv / m.size / scale;
+  if (c && c.hsf !== undefined && m.sizeQ1 !== undefined && m.sizeQ1 !== m.size) {
+    const cb1 = (sv - (c.hsf - 1) * C_Th2) / m.sizeQ1 / scale;
+    return `${fmt(cb1)} → ${fmt(cbMax)}`;
+  }
+  return fmt(cbMax);
+}
+
+function qsCell(c) {
+  return c.qsLog2 !== null ? fmtPow2(c.qsLog2) : fmtNum(c.qsExact);
+}
+
+const RHO = '<span class="keep-case">ρ</span>';
+
+const state = { candidates: [] };   // SLH-DSA-128s first
+
+const METRIC_COLS = [
+  { label: () => 'Size (B)' + infoButton('about-size', 'About the size'),
+                          value: m => sizeCell(m),                                 ratioField: 'size',    lowerIsBetter: true },
+  { label: 'KeyGen (C)',  value: m => fmtNum(m.keygen),                            ratioField: 'keygen',  lowerIsBetter: true },
+  { label: () => `SigGen, ${SIGNER_MODE} (C)` + infoButton('about-siggen', 'About SigGen'),
+                          value: m => fmtNum(sigGenOf(m)),                         ratioFn: m => sigGenOf(m), lowerIsBetter: true },
+  { label: () => 'State (B)' + infoButton('about-state', 'About the state'),
+                          value: m => (SIGNER_MODE === 'cold' || m.state === undefined) ? '—' : fmtNum(m.state) },
+  { label: 'SigVer (C)',  value: m => fmtNum(m.sigver),                            ratioField: 'sigver',  lowerIsBetter: true },
+  { label: `${RHO} (C/B)`, value: (m, c) => rhoCell(m, c, m.sigver, 1, fmtRho),    ratioFn: m => (m.sigver      / m.size),  lowerIsBetter: true },
+  { label: `${RHO}, worst (C/B)`,
+                          value: (m, c) => rhoCell(m, c, m.sigverWorst, 1, fmtRho), ratioFn: m => (m.sigverWorst / m.size),  lowerIsBetter: true },
+  { label: () => `${RHO} ÷ Schnorr` + infoButton('about-schnorr', 'About ρ ÷ Schnorr'),
+                          value: (m, c) => rhoCell(m, c, m.sigver, SCHNORR.cb64, fmtRatio) },
+  { label: 'Max signatures', value: (_, c) => qsCell(c.metrics) },
+];
+
+function ratioClass(ratio, lowerIsBetter) {
+  if (ratio === 1) return '';
+  if (lowerIsBetter) return ratio < 0.95 ? 'gain' : (ratio > 1.05 ? 'regress' : '');
+  return ratio > 1.05 ? 'gain' : (ratio < 0.95 ? 'regress' : '');
+}
+
+function renderComparison() {
+  const std = state.candidates[0].metrics;
+  const table = document.getElementById('compare-table');
+
+  const thead = document.createElement('thead');
+  let hr = '<tr><th class="cand-col">Candidate</th>';
+  for (const col of METRIC_COLS) {
+    const lbl = typeof col.label === 'function' ? col.label() : col.label;
+    hr += `<th>${lbl}</th>`;
+  }
+  hr += '<th class="act-col"></th></tr>';
+  thead.innerHTML = hr;
+
+  const tbody = document.createElement('tbody');
+  for (let i = 0; i < state.candidates.length; i++) {
+    const c = state.candidates[i];
+    const m = c.metrics;
+    const isStd = (i === 0);
+
+    let row = `<tr class="${isStd ? 'baseline' : ''}">`;
+    row += `<td class="cand-col"><span class="cand-title">${c.label}</span></td>`;
+
+    for (const col of METRIC_COLS) {
+      let cell = col.value(m, c);
+      if (!isStd) {
+        let target = null, stdVal = null;
+        if (col.ratioField) {
+          target = m[col.ratioField];
+          stdVal = std[col.ratioField];
+        } else if (col.ratioFn) {
+          target = col.ratioFn(m);
+          stdVal = col.ratioFn(std);
+        }
+        if (target !== null && isFinite(target) && isFinite(stdVal) && stdVal > 0) {
+          const ratio = target / stdVal;
+          const cls = ratioClass(ratio, col.lowerIsBetter);
+          cell += `<span class="ratio ${cls}">${ratioNote(target, stdVal)}</span>`;
+        }
+      }
+      row += `<td>${cell}</td>`;
+    }
+
+    if (c.canRemove) {
+      row += `<td class="act-col"><button class="row-remove" data-id="${c.id}" title="Remove this candidate">×</button></td>`;
+    } else {
+      row += `<td class="act-col"></td>`;
+    }
+    row += '</tr>';
+    tbody.innerHTML += row;
+  }
+
+  table.innerHTML = '';
+  table.appendChild(thead);
+  table.appendChild(tbody);
+
+  table.querySelectorAll('.row-remove').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const id = e.target.dataset.id;
+      state.candidates = state.candidates.filter(c => c.id !== id);
+      render();
+    });
+  });
+}
+
+// The candidate list: every candidate smaller than SLH-DSA-128s, with a
+// factory that adds a fresh copy to the comparison.
+const SWEEP_FACTORIES = [];
+
+function buildSweepPool() {
+  const stdSize = state.candidates[0].metrics.size;
+
+  if (SITE_DATA) {
+    const xi = fieldIndex(SITE_DATA.stateful.xmssmt);
+    for (const rec of SITE_DATA.stateful.xmssmt.rows) {
+      const c = candFromXmssMtRec(rec, xi);
+      if (c.metrics.size >= stdSize) continue;
+      SWEEP_FACTORIES.push({
+        key: `xmssmt-${rec[xi.ots]}-${rec[xi.w]}-${rec[xi.h]}-${rec[xi.d]}`,
+        factory: () => candFromXmssMtRec(rec, xi),
+        cached: c,
+      });
+    }
+    const ui = fieldIndex(SITE_DATA.stateful.uxmss);
+    for (const rec of SITE_DATA.stateful.uxmss.rows) {
+      const c = candFromUxmssRec(rec, ui);
+      if (c.metrics.size <= 0 || c.metrics.size >= stdSize) continue;
+      SWEEP_FACTORIES.push({
+        key: `uxmss-${rec[ui.ots]}-${rec[ui.w]}`,
+        factory: () => candFromUxmssRec(rec, ui),
+        cached: c,
+      });
+    }
+    return;
+  }
+
+  const otsList = ['TW', 'WC'];
+  const wList = [16, 32, 64, 128, 256, 65536];
+
+  for (const ots of otsList) {
+    for (const w of wList) {
+      for (let h = 10; h <= 40; h++) {
+        for (let d = 1; d <= 10; d++) {
+          if (h % d !== 0) continue;
+          const c = buildXmssMt(ots, h, d, w);
+          if (c.metrics.size >= stdSize) continue;
+          SWEEP_FACTORIES.push({
+            key: `xmssmt-${ots}-${w}-${h}-${d}`,
+            factory: () => buildXmssMt(ots, h, d, w),
+            cached: c,
+          });
+        }
+      }
+    }
+  }
+
+  for (const ots of otsList) {
+    for (const w of wList) {
+      const c = buildUxmss(ots, w);
+      if (c.metrics.size <= 0 || c.metrics.size >= stdSize) continue;
+      SWEEP_FACTORIES.push({
+        key: `uxmss-${ots}-${w}`,
+        factory: () => buildUxmss(ots, w),
+        cached: c,
+      });
+    }
+  }
+}
+
+const SWEEP_DEFAULTS_X = { size: 1.00, kg: 20.00, sg: 20.00, sv: 20.00, cb: 20.00, minQs: 0 };
+const SWEEP_DEFAULTS_W = { size: 1.0,  kg: 1.0,   sg: 1.0,   sv: 1.0,   cb: 1.0   };
+const sweepState = {
+  X: { ...SWEEP_DEFAULTS_X },
+  W: { ...SWEEP_DEFAULTS_W },
+  xMax: { kg: 20, sg: 20, sv: 20, cb: 20 },
+  sort: { col: 'distance', dir: 'asc' },
+  lastRanges: Object.fromEntries(['size', 'kg', 'sg', 'sv', 'cb'].map(k => [k, { min: 0, max: 1 }])),
+  lastSurvivors: [],   // in display order, for the CSV
+};
+
+const SWEEP_BOUND_FILTERS = [
+  { key: 'size',  label: 'Size',   min: 0.10, max: 1.00,  step: 0.01, dp: 2 },
+  { key: 'kg',    label: 'KeyGen', min: 0.10, log: true },
+  { key: 'sg',    label: 'SigGen', min: 0.10, log: true },
+  { key: 'sv',    label: 'SigVer', min: 0.10, log: true },
+  { key: 'cb',    label: 'ρ',      min: 0.10, log: true },
+  { key: 'minQs', label: 'Min. sigs (log₂)', min: 0, max: 40, step: 1, dp: 0 },
+];
+const SWEEP_WEIGHT_FILTERS = [
+  { key: 'size', label: 'Size',   min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+  { key: 'kg',   label: 'KeyGen', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+  { key: 'sg',   label: 'SigGen', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+  { key: 'sv',   label: 'SigVer', min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+  { key: 'cb',   label: 'ρ',      min: 0.10, max: 10.00, step: 0.10, dp: 1 },
+];
+
+function sweepRatios(m, std) {
+  return {
+    size: m.size / std.size,
+    kg:   m.keygen / std.keygen,
+    sg:   sigGenOf(m) / sigGenOf(std),
+    sv:   m.sigver / std.sigver,
+    cb:   (m.sigver / m.size) / (std.sigver / std.size),
+  };
+}
+
+function sweepDistance(m, std, W) {
+  return weightedDistance(sweepRatios(m, std), sweepState.lastRanges, W);
+}
+
+// Bound slider caps: the largest ratio of each metric in the list, in both
+// signer modes and verification cases, so every candidate stays reachable.
+function computeSweepXMax() {
+  const std = state.candidates[0].metrics;
+  const maxes = { kg: 0, sg: 0, sv: 0, cb: 0 };
+  for (const f of SWEEP_FACTORIES) {
+    const m = f.cached.metrics;
+    maxes.kg = Math.max(maxes.kg, m.keygen / std.keygen);
+    maxes.sg = Math.max(maxes.sg, m.siggen / std.siggen, m.siggenCold / std.siggenCold);
+    maxes.sv = Math.max(maxes.sv, m.sigver / std.sigver, m.sigverWorst / std.sigverWorst);
+    maxes.cb = Math.max(maxes.cb, (m.sigver / m.size) / (std.sigver / std.size),
+                        (m.sigverWorst / m.size) / (std.sigverWorst / std.size));
+  }
+  sweepState.xMax = { kg: niceCap(maxes.kg), sg: niceCap(maxes.sg),
+                      sv: niceCap(maxes.sv), cb: niceCap(maxes.cb) };
+}
+
+function clampSweepXToMax() {
+  for (const k of ['kg', 'sg', 'sv', 'cb']) {
+    if (sweepState.X[k] > sweepState.xMax[k]) sweepState.X[k] = sweepState.xMax[k];
+  }
+}
+
+function renderSweepFilterGroup(hostId, group, filters) {
+  const host = document.getElementById(hostId);
+  const store = sweepState[group];
+  host.innerHTML = filters.map(f => {
+    const max = f.log ? sweepState.xMax[f.key] : f.max;
+    const numVal = f.log ? fmtX(store[f.key]) : store[f.key].toFixed(f.dp);
+    const sliderAttrs = f.log
+      ? `min="0" max="${SLIDER_STEPS}" step="1"
+             value="${xToPos(store[f.key], f.min, max)}" data-key="${f.key}" data-log="1"`
+      : `min="${f.min}" max="${f.max}" step="${f.step}"
+             value="${store[f.key]}" data-key="${f.key}"`;
+    return `
+    <div class="ctrl">
+      <label>
+        <span class="name">${f.label}</span>
+        <input type="number" class="val-input"
+               id="sw-${group}-${f.key}-val"
+               min="${f.min}" max="${max}" step="${f.log ? 'any' : f.step}"
+               value="${numVal}"
+               data-key="${f.key}"${f.log ? '' : ` data-dp="${f.dp}"`}>
+      </label>
+      <input type="range" aria-label="${f.label} ${group === 'X' ? 'bound' : 'weight'}" ${sliderAttrs}>
+    </div>
+  `;
+  }).join('');
+
+  bindSliderPairs(host, store, requestSweepRender);
+}
+
+function renderSweepFilters() {
+  renderSweepFilterGroup('sweep-bounds',  'X', SWEEP_BOUND_FILTERS);
+  renderSweepFilterGroup('sweep-weights', 'W', SWEEP_WEIGHT_FILTERS);
+}
+
+const SWEEP_COLS = [
+  { field: 'size',     label: 'Size (B)',   value: m => sizeCell(m),                            sortFn: (m) => m.size,                                                  ratioFn: m => m.size,             lowerIsBetter: true },
+  { field: 'keygen',   label: 'KeyGen (C)', value: m => fmtNum(m.keygen),                       sortFn: (m) => m.keygen,                                                ratioFn: m => m.keygen,           lowerIsBetter: true },
+  { field: 'siggen',   label: () => `SigGen, ${SIGNER_MODE} (C)`,
+                                            value: m => fmtNum(sigGenOf(m)),                    sortFn: (m) => sigGenOf(m),                                             ratioFn: m => sigGenOf(m),        lowerIsBetter: true },
+  { field: 'state',    label: 'State (B)',  value: m => (SIGNER_MODE === 'cold' || m.state === undefined) ? '—' : fmtNum(m.state),
+                                                                                                sortFn: (m) => m.state || 0 },
+  { field: 'sigver',   label: 'SigVer (C)', value: m => fmtNum(m.sigver),                       sortFn: (m) => m.sigver,                                                ratioFn: m => m.sigver,           lowerIsBetter: true },
+  { field: 'cb',       label: `${RHO} (C/B)`, value: (m, c) => rhoCell(m, c, m.sigver, 1, fmtRho), sortFn: (m) => m.sigver / m.size,                                   ratioFn: m => m.sigver / m.size,  lowerIsBetter: true },
+  { field: 'cbSchnorr', label: `${RHO} ÷ Schnorr`,
+                                            value: (m, c) => rhoCell(m, c, m.sigver, SCHNORR.cb64, fmtRatio), sortFn: (m) => m.sigver / m.size },
+  { field: 'distance', label: 'Distance',   value: (m, c, std) => sweepDistance(m, std, sweepState.W).toFixed(4),
+                                            sortFn: (m, c, std) => sweepDistance(m, std, sweepState.W) },
+  { field: 'qs',       label: 'Max signatures', value: (_, c) => qsCell(c.metrics),             sortFn: (m) => (m.qsLog2 !== null ? Math.pow(2, m.qsLog2) : m.qsExact) },
+];
+
+function renderSweepTable() {
+  const std = state.candidates[0].metrics;
+  const minQsAbs = Math.pow(2, sweepState.X.minQs);
+  const survivors = [];
+  for (const f of SWEEP_FACTORIES) {
+    const m = f.cached.metrics;
+    if (m.size        >  sweepState.X.size * std.size)        continue;
+    if (m.keygen      >  sweepState.X.kg   * std.keygen)      continue;
+    if (sigGenOf(m)   >  sweepState.X.sg   * sigGenOf(std))   continue;
+    if (m.sigver      >  sweepState.X.sv   * std.sigver)      continue;
+    const cbTarget = m.sigver / m.size;
+    const cbStd    = std.sigver / std.size;
+    if (cbTarget   >  sweepState.X.cb   * cbStd)       continue;
+    const candQs = m.qsLog2 !== null ? Math.pow(2, m.qsLog2) : m.qsExact;
+    if (candQs < minQsAbs) continue;
+    survivors.push(f);
+  }
+  sweepState.lastRanges = ratioRanges(survivors.map(f => sweepRatios(f.cached.metrics, std)));
+  const sortCol = SWEEP_COLS.find(c => c.field === sweepState.sort.col) || SWEEP_COLS[0];
+  const sign = sweepState.sort.dir === 'asc' ? 1 : -1;
+  survivors.sort((a, b) => {
+    const av = sortCol.sortFn(a.cached.metrics, a.cached, std);
+    const bv = sortCol.sortFn(b.cached.metrics, b.cached, std);
+    if (av === bv) return 0;
+    return sign * (av < bv ? -1 : 1);
+  });
+  sweepState.lastSurvivors = survivors;
+  scheduleHashWrite();
+
+  document.getElementById('sweep-info').innerHTML =
+    `<strong>${survivors.length.toLocaleString('en-US')}</strong> of ` +
+    `${SWEEP_FACTORIES.length.toLocaleString('en-US')} candidates within the bounds.`;
+
+  const table = document.getElementById('sweep-table');
+  table.innerHTML = '';
+
+  if (survivors.length === 0) {
+    table.innerHTML = `<thead><tr><th class="cand-col note" colspan="${SWEEP_COLS.length + 2}">No candidate is within all bounds. Relax one.</th></tr></thead>`;
+    return;
+  }
+
+  const thead = document.createElement('thead');
+  let hr = '<tr><th class="cand-col">Candidate</th>';
+  for (const col of SWEEP_COLS) {
+    const isActive = sweepState.sort.col === col.field;
+    const arrow = isActive ? (sweepState.sort.dir === 'asc' ? '▲' : '▼') : '';
+    const lbl = typeof col.label === 'function' ? col.label() : col.label;
+    hr += `<th class="sortable${isActive ? ' active' : ''}" data-sort="${col.field}">${lbl}<span class="sort-arrow">${arrow}</span></th>`;
+  }
+  hr += '<th class="act-col"></th></tr>';
+  thead.innerHTML = hr;
+
+  const inComparison = new Set();
+  for (const c of state.candidates) {
+    inComparison.add(c.label);
+  }
+
+  const tbody = document.createElement('tbody');
+  const MAX_ROWS = 200;
+  const shown = survivors.slice(0, MAX_ROWS);
+  // One innerHTML assignment, so the rows are parsed once.
+  const rowsHtml = [];
+  for (const f of shown) {
+    const c = f.cached;
+    const m = c.metrics;
+    let row = `<tr>`;
+    row += `<td class="cand-col"><span class="cand-title">${c.label}</span></td>`;
+    for (const col of SWEEP_COLS) {
+      let cell = col.value(m, c, std);
+      if (col.ratioFn) {
+        const target = col.ratioFn(m);
+        const stdVal = col.ratioFn(std);
+        if (isFinite(target) && isFinite(stdVal) && stdVal > 0) {
+          const ratio = target / stdVal;
+          const cls = ratioClass(ratio, col.lowerIsBetter);
+          cell += `<span class="ratio ${cls}">${ratioNote(target, stdVal)}</span>`;
+        }
+      }
+      row += `<td>${cell}</td>`;
+    }
+    const disabled = inComparison.has(c.label) ? 'disabled' : '';
+    row += `<td class="act-col"><button class="row-add" data-key="${f.key}" ${disabled} title="${disabled ? 'Already in comparison' : 'Add to comparison'}">+</button></td>`;
+    row += '</tr>';
+    rowsHtml.push(row);
+  }
+  if (survivors.length > MAX_ROWS) {
+    rowsHtml.push(`<tr><td class="cand-col note" colspan="${SWEEP_COLS.length + 2}">… and ${(survivors.length - MAX_ROWS).toLocaleString('en-US')} more; tighten a bound to see them.</td></tr>`);
+  }
+  tbody.innerHTML = rowsHtml.join('');
+
+  table.appendChild(thead);
+  table.appendChild(tbody);
+
+  table.querySelectorAll('.row-add').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const key = e.target.dataset.key;
+      const f = SWEEP_FACTORIES.find(x => x.key === key);
+      if (!f) return;
+      state.candidates.push(f.factory());
+      render();
+      renderSweepTable();   // disables its + button
+    });
+  });
+
+  table.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', e => {
+      if (e.target.closest('.info')) return;
+      const col = th.dataset.sort;
+      if (sweepState.sort.col === col) {
+        sweepState.sort.dir = (sweepState.sort.dir === 'asc') ? 'desc' : 'asc';
+      } else {
+        sweepState.sort.col = col;
+        sweepState.sort.dir = 'asc';
+      }
+      renderSweepTable();
+    });
+  });
+}
+
+const DEFAULT_CAND_KEYS = ['uxmss-TW-16', 'uxmss-WC-16', 'xmssmt-TW-16-10-1',
+  'xmssmt-WC-16-10-1', 'xmssmt-TW-16-20-1', 'xmssmt-WC-16-20-1'];
+const HASH_X_KEYS = ['size', 'kg', 'sg', 'sv', 'cb', 'minQs'];
+const HASH_W_KEYS = ['size', 'kg', 'sg', 'sv', 'cb'];
+
+// The candidate of a key: xmssmt-<OTS>-<w>-<h>-<d> or uxmss-<OTS>-<w>.
+function candidateFromKey(key) {
+  const p = String(key).split('-');
+  if (p[0] === 'uxmss' && p.length === 3) {
+    const ots = p[1], w = parseInt(p[2], 10);
+    if (!['TW', 'WC'].includes(ots) || ![16, 32, 64, 128, 256, 65536].includes(w)) return null;
+    return buildUxmss(ots, w);
+  }
+  if (p[0] === 'xmssmt' && p.length === 5) {
+    const ots = p[1], w = parseInt(p[2], 10);
+    const h = parseInt(p[3], 10), d = parseInt(p[4], 10);
+    if (!['TW', 'WC'].includes(ots) || ![16, 32, 64, 128, 256, 65536].includes(w)) return null;
+    if (!Number.isInteger(h) || h < 2 || h > 60 ||
+        !Number.isInteger(d) || d < 1 || h % d !== 0) return null;
+    return buildXmssMt(ots, h, d, w);
+  }
+  return null;
+}
+
+function writeHash() {
+  const parts = [];
+  const keys = state.candidates.slice(1).map(c => c.key).filter(Boolean);
+  if (keys.join(',') !== DEFAULT_CAND_KEYS.join(',')) parts.push('cand=' + keys.join(','));
+  if (HASH_X_KEYS.some(k => sweepState.X[k] !== SWEEP_DEFAULTS_X[k]))
+    parts.push('b=' + HASH_X_KEYS.map(k => sweepState.X[k]).join(','));
+  if (HASH_W_KEYS.some(k => sweepState.W[k] !== SWEEP_DEFAULTS_W[k]))
+    parts.push('w=' + HASH_W_KEYS.map(k => sweepState.W[k]).join(','));
+  if (sweepState.sort.col !== 'distance' || sweepState.sort.dir !== 'asc')
+    parts.push('sort=' + sweepState.sort.col + '.' + sweepState.sort.dir);
+  if (SIGNER_MODE !== 'cached') parts.push('m=' + SIGNER_MODE);
+  replaceHash(parts);
+}
+
+const scheduleHashWrite = hashWriter(writeHash);
+const requestSweepRender = oncePerFrame(renderSweepTable);
+
+function applyHash() {
+  const params = readHash();
+  if (params.b) {
+    const v = params.b.split(',').map(parseFloat);
+    if (v.length === 6 && v.every(isFinite)) {
+      sweepState.X.size = clamp(v[0], 0.10, 1.00);
+      sweepState.X.kg = clamp(v[1], 0.10, 1e15);
+      sweepState.X.sg = clamp(v[2], 0.10, 1e15);
+      sweepState.X.sv = clamp(v[3], 0.10, 1e15);
+      sweepState.X.cb = clamp(v[4], 0.10, 1e15);
+      sweepState.X.minQs = clamp(Math.round(v[5]), 0, 40);
+    }
+  }
+  if (params.w) {
+    const v = params.w.split(',').map(parseFloat);
+    if (v.length === 5 && v.every(isFinite))
+      HASH_W_KEYS.forEach((k, i) => sweepState.W[k] = clamp(v[i], 0.10, 10.00));
+  }
+  if (params.sort) {
+    const [col, dir] = params.sort.split('.');
+    if (SWEEP_COLS.some(c => c.field === col) && ['asc', 'desc'].includes(dir))
+      sweepState.sort = { col, dir };
+  }
+  if (params.m === 'cold') SIGNER_MODE = 'cold';
+  if (params.cand !== undefined) {
+    const seen = new Set();
+    const cands = [];
+    for (const key of params.cand.split(',').filter(Boolean)) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const c = candidateFromKey(key);
+      if (c) cands.push(c);
+    }
+    state.candidates = [state.candidates[0], ...cands];
+  }
+}
+
+function exportSweepCSV() {
+  const std = state.candidates[0].metrics;
+  const header = ['scheme', 'label', 'max_sigs', 'size_B', 'keygen_C',
+    'siggen_cached_C', 'siggen_cold_C', 'state_B',
+    'sigver_C', 'sigver_worst_C', 'rho', 'rho_worst',
+    'rho_vs_schnorr', 'rho_worst_vs_schnorr', 'schnorr_rho',
+    'signer', 'distance'];
+  const lines = [header.join(',')];
+  for (const f of sweepState.lastSurvivors) {
+    const c = f.cached, m = c.metrics;
+    lines.push([c.scheme, '"' + c.label + '"',
+      m.qsLog2 !== null ? '2^' + m.qsLog2 : m.qsExact,
+      m.size, m.keygen, m.siggen, m.siggenCold, m.state !== undefined ? m.state : '',
+      m.sigver, m.sigverWorst,
+      (m.sigver / m.size).toFixed(6), (m.sigverWorst / m.size).toFixed(6),
+      (m.sigver / m.size / SCHNORR.cb64).toFixed(6),
+      (m.sigverWorst / m.size / SCHNORR.cb64).toFixed(6),
+      SCHNORR.cb64.toFixed(6),
+      SIGNER_MODE,
+      sweepDistance(m, std, sweepState.W).toFixed(6)].join(','));
+  }
+  downloadCSV('stateful_candidates', lines);
+}
+
+function setupAddForm() {
+  const showBtn = document.getElementById('show-add');
+  const form = document.getElementById('add-form');
+  const cancelBtn = document.getElementById('cancel-add');
+  const schemeSel = document.getElementById('f-scheme');
+  const errBox = document.getElementById('f-error');
+
+  showBtn.addEventListener('click', () => {
+    form.hidden = false;
+    showBtn.hidden = true;
+    errBox.hidden = true;
+  });
+  cancelBtn.addEventListener('click', () => {
+    form.hidden = true;
+    showBtn.hidden = false;
+    errBox.hidden = true;
+  });
+
+  function updateVisibility() {
+    const scheme = schemeSel.value;
+    form.querySelectorAll('[data-scheme]').forEach(el => {
+      el.style.display = (el.dataset.scheme === scheme) ? '' : 'none';
+    });
+  }
+  schemeSel.addEventListener('change', updateVisibility);
+  updateVisibility();
+
+  const hInput = document.getElementById('f-h');
+  const dSel   = document.getElementById('f-d');
+  function refreshDOptions() {
+    const h = parseInt(hInput.value, 10);
+    const prev = parseInt(dSel.value, 10);
+    dSel.innerHTML = '';
+    if (!Number.isInteger(h) || h < 2) return;
+    const divisors = [];
+    for (let d = 1; d <= h; d++) if (h % d === 0) divisors.push(d);
+    for (const d of divisors) {
+      const opt = document.createElement('option');
+      opt.value = String(d);
+      opt.textContent = `${d}  (h' = ${h / d})`;
+      dSel.appendChild(opt);
+    }
+    if (divisors.includes(prev)) dSel.value = String(prev);
+    else dSel.value = String(divisors[0] || 1);
+  }
+  hInput.addEventListener('input', refreshDOptions);
+  refreshDOptions();
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    errBox.hidden = true;
+    const scheme = schemeSel.value;
+    const ots = document.getElementById('f-ots').value;
+    const w = parseInt(document.getElementById('f-w').value, 10);
+
+    try {
+      let cand;
+      if (scheme === 'xmssmt') {
+        const h = parseInt(document.getElementById('f-h').value, 10);
+        const d = parseInt(document.getElementById('f-d').value, 10);
+        if (!Number.isInteger(h) || h < 2 || h > 60) throw new Error(`h must be an integer in [2, 60] (got ${h}).`);
+        if (!Number.isInteger(d) || d < 1) throw new Error(`d must be a positive integer (got ${d}).`);
+        if (h % d !== 0) throw new Error(`d (${d}) must divide h (${h}) evenly. Got h/d = ${(h/d).toFixed(3)}.`);
+        cand = buildXmssMt(ots, h, d, w);
+      } else {
+        cand = buildUxmss(ots, w);
+        if (cand.metrics.size <= 0) throw new Error(`UXMSS budget too tight for ${ots}/w=${w}: no signature fits under ${UXMSS_TARGET_SIZE} B.`);
+      }
+      state.candidates.push(cand);
+      render();
+      form.hidden = true;
+      showBtn.hidden = false;
+    } catch (err) {
+      errBox.textContent = err.message;
+      errBox.hidden = false;
+    }
+  });
+
+  document.getElementById('reset-defaults').addEventListener('click', () => {
+    state.candidates = defaultCandidates();
+    render();
+  });
+}
+
+// Called after every change of state.candidates.
+function render() {
+  renderComparison();
+  if (SWEEP_FACTORIES.length > 0) renderSweepTable();
+  else scheduleHashWrite();
+}
+
+function renderSchnorrNote() {
+  const s = SCHNORR;
+  const m = state.candidates[0].metrics;
+  const cb = m.sigver / m.size;
+  const src = s.live
+    ? `kappa.json${s.commit ? ` at secp256k1 ${s.commit}` : ''}${s.run ? `, ${s.run}` : ''}` +
+      `${s.machine ? `, ${s.machine}` : ''}${s.preliminary ? ', preliminary' : ''}`
+    : 'built-in value, the live kappa.json did not load';
+  document.getElementById('about-schnorr').innerHTML =
+    `<p>The average ρ divided by the ρ of a BIP340 Schnorr verification, ${s.cb64.toFixed(2)} C/B ` +
+    `(${s.impl}, one 64-byte signature; ` +
+    `<a href="https://github.com/mjthatch/bip340-vs-sha256">bip340-vs-sha256</a>, ${src}). ` +
+    `SLH-DSA-128s has ρ = ${fmtRho(cb)} C/B, ${fmtRatio(cb / s.cb64)} Schnorr.</p>`;
+}
+
+async function setup() {
+  const [siteData, schnorr] = await Promise.all([loadSiteData(), loadSchnorrRef()]);
+  SITE_DATA = siteData;
+  SCHNORR = schnorr;
+  if (SITE_DATA) selfCheckStateful(SITE_DATA);
+  state.candidates = defaultCandidates();
+  applyHash();
+  document.getElementById('signer-mode').value = SIGNER_MODE;
+  document.getElementById('signer-mode').addEventListener('change', e => {
+    SIGNER_MODE = e.target.value === 'cold' ? 'cold' : 'cached';
+    render();
+  });
+  setupAddForm();
+  render();
+  renderSchnorrNote();
+  buildSweepPool();      // needs the SLH-DSA-128s candidate
+  computeSweepXMax();
+  clampSweepXToMax();
+  renderSweepFilters();
+  renderSweepTable();
+
+  bindShareButton(writeHash);
+  document.getElementById('sweep-export').addEventListener('click', exportSweepCSV);
+}
+// The tests load this file under node, without a document.
+if (typeof document !== 'undefined') setup();
