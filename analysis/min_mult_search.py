@@ -4,7 +4,7 @@ metrics (size, KeyGen, SigGen, SigVer and C/byte) is at most X times that of
 the STANDARD row, and the metric that sets X. Writes the candidates by
 increasing X to global_X_thresholds.csv, which venn_diagram_draw.py reads.
 
-  cd utils && python3 min_mult_search.py [--input CSV] [--output CSV]
+  cd analysis && python3 min_mult_search.py [--input CSV] [--output CSV]
 """
 
 import argparse

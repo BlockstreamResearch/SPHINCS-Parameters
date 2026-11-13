@@ -1,7 +1,7 @@
 {
  "_about": [
   "Search grids and fixed parameters, read by the Sage scripts, tests/model.py and tests/synth_generated.py.",
-  "export_site_data.sage copies the stateless grid and the UXMSS bounds into site/data.json; docs/model.md explains the values."
+  "scripts/export_site_data.sage copies the stateless grid and the UXMSS bounds into site/data.json; docs/model.md explains the values."
  ],
  "baseline": {"h": 63, "d": 7, "k": 14, "a": 12, "w": 16, "q_s_log2": 64},
  "security_bits": 128,

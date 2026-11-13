@@ -5,7 +5,7 @@ The security bits come from the stateless page's JavaScript. The PORS+FP pool
 needs Sage and is left out. make check-local runs:
 
   python3 tests/synth_generated.py
-  GENERATED_REQUIRED=1 python3 tests/test_regression.py
+  GENERATED_REQUIRED=1 python3 tests/run.py
 """
 import csv
 import datetime
@@ -99,7 +99,7 @@ def main():
                             continue
                         rows.append(r)
         rows.sort(key=lambda r: r['size'])
-        path = os.path.join(ROOT, 'utils', name)
+        path = os.path.join(ROOT, 'analysis', name)
         with open(path, 'w', newline='') as f:
             wtr = csv.DictWriter(f, fieldnames=CSV_FIELDS)
             wtr.writeheader()

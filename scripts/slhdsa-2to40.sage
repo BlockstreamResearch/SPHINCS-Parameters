@@ -3,22 +3,23 @@
 Sweeps the stateless grid of parameters.json for one scheme, keeps the parameter
 sets that reach the security target and pass the filters, prints them against
 SLH-DSA-128s, and writes them to candidates.csv, SLH-DSA-128s first as STANDARD.
-make sweeps runs it twice for utils/all_size_capped_candidates.csv and
-utils/all_unbound_candidates.csv.
+make sweeps runs it twice for analysis/all_size_capped_candidates.csv and
+analysis/all_unbound_candidates.csv.
 
-  sage slhdsa-2to40.sage [--ots wots-tw|wots+c] [--fts fors|fors+c|pors+fp] [filters]
-  sage slhdsa-2to40.sage --help
+  sage scripts/slhdsa-2to40.sage [--ots wots-tw|wots+c] [--fts fors|fors+c|pors+fp] [filters]
+  sage scripts/slhdsa-2to40.sage --help
 """
 import csv
 import os
 import sys
 
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # see model/costs.sage
 os.environ['COSTS_SAGE_NO_MAIN'] = '1'   # its functions, without its CLI
-load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "costs.sage"))
+load(os.path.join(ROOT, "model", "costs.sage"))
 
 GRID = PARAMETERS['stateless']['grid']
 
-USAGE = """usage: sage slhdsa-2to40.sage [options]
+USAGE = """usage: sage scripts/slhdsa-2to40.sage [options]
 
   --ots wots-tw|wots+c         the one-time signature (default wots-tw); wots+c
                                sweeps the w of wc_w with their S_wn

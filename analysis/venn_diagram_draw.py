@@ -3,7 +3,7 @@
 candidates of global_X_thresholds.csv (min_mult_search.py) have all metrics
 within X times SLH-DSA-128s, for the smallest X and for TARGET_MULTIPLIERS.
 
-  cd utils && python3 venn_diagram_draw.py
+  cd analysis && python3 venn_diagram_draw.py
 """
 
 import os
