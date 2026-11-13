@@ -1,6 +1,6 @@
 {
  "_about": [
-  "Golden values for tests/test_regression.py; costs in SHA-256 compressions, sizes in bytes.",
+  "Golden values for the tests in tests/test_*.py; costs in SHA-256 compressions, sizes in bytes.",
   "Check with `make fixtures`; after an intended change, update with `make fixtures WRITE=1`."
  ],
  "wots_len": {

@@ -5,7 +5,7 @@ The security bits come from the stateless page's JavaScript. The PORS+FP pool
 needs Sage and is left out. make check-local runs:
 
   python3 tests/synth_generated.py
-  GENERATED_REQUIRED=1 python3 tests/test_regression.py
+  GENERATED_REQUIRED=1 python3 tests/run.py
 """
 import csv
 import datetime

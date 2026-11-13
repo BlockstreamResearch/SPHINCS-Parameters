@@ -67,11 +67,11 @@ figures:
 	    --weights 5,1,1,2,1 --out ideal_candidate_best.png
 
 test:
-	$(PYTHON) tests/test_regression.py
+	$(PYTHON) tests/run.py
 
 check-local:
 	$(PYTHON) tests/synth_generated.py
-	GENERATED_REQUIRED=1 $(PYTHON) tests/test_regression.py
+	GENERATED_REQUIRED=1 $(PYTHON) tests/run.py
 
 fixtures:
 	$(PYTHON) tests/regen_fixtures.py $(if $(WRITE),--write)

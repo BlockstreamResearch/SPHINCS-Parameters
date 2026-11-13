@@ -92,7 +92,7 @@ jobs:
           node-version: '22'
 
       - name: Regression suite (generated artifacts required)
-        run: GENERATED_REQUIRED=1 python3 tests/test_regression.py
+        run: GENERATED_REQUIRED=1 python3 tests/run.py
 
       - name: Compile report
         uses: xu-cheng/latex-action@v3

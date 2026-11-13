@@ -19,4 +19,4 @@ jobs:
       - name: Synthesize generated artifacts from the reference model
         run: python3 tests/synth_generated.py
       - name: Run regression suite
-        run: GENERATED_REQUIRED=1 python3 tests/test_regression.py
+        run: GENERATED_REQUIRED=1 python3 tests/run.py
