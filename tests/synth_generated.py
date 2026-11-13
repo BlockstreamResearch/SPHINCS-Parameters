@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""
+"""Writes the generated files, the sweep CSVs and site/data.json, from
+tests/model.py instead of Sage, so the tests of those files run without Sage.
+The security bits come from the stateless page's JavaScript. The PORS+FP pool
+needs Sage and is left out. make check-local runs:
 
-Usage:
   python3 tests/synth_generated.py
   GENERATED_REQUIRED=1 python3 tests/test_regression.py
-(or simply `make check-local`)
 """
 import csv
 import datetime
@@ -21,12 +22,12 @@ sys.path.insert(0, HERE)
 
 import model as M  # noqa: E402
 
-# --- Canonical grids: keep in sync with export_site_data.sage -------------
-GRID = {'h': (40, 50), 'd': (2, 25), 'k': (6, 24), 'a': (8, 20),
-        'w': [2, 4, 16, 256], 'q_s_log2': 40, 'max_size': 7856}
-W_OPTIONAL = [32, 64, 128]
-WC_PAIRS = [(16, 240), (256, 2040)]
-STATEFUL_W = (16, 32, 64, 128, 256, 65536)
+P = M.PARAMETERS
+GRID = P['stateless']['grid']
+W_OPTIONAL = P['stateless']['w_optional']
+WC_PAIRS = [(w, M.SWN[w]) for w in P['stateless']['wc_w']]
+STATEFUL = P['stateful']
+BASELINE = tuple(P['baseline'][x] for x in ('h', 'd', 'k', 'a', 'w'))
 POOL_FIELDS = ['h', 'd', 'k', 'a', 'w', 'swn', 'mmax',
                'size', 'kg', 'sg', 'sv', 'sv_worst']
 CSV_FIELDS = ['label', 'h', 'd', 'h_prime', 'k', 'a', 'w', 'l',
@@ -49,14 +50,15 @@ def security_from_page():
     html = open(os.path.join(ROOT, 'site', 'stateless.html'), encoding='utf-8').read()
     srcs = re.findall(r'<script src="([^"]+)"></script>', html)
     js = '\n'.join(open(os.path.join(ROOT, 'site', s), encoding='utf-8').read() for s in srcs) + """
-const out = { grid: {}, std: computeSecurityBits(64, 63, 14, 12) };
+const out = { grid: {}, std: computeSecurityBits(%d, %d, %d, %d) };
 for (let h = %d; h <= %d; h++)
   for (let k = %d; k <= %d; k++)
     for (let a = %d; a <= %d; a++)
-      out.grid[[h, k, a].join(',')] = computeSecurityBits(Q_S_LOG2, h, k, a);
+      out.grid[[h, k, a].join(',')] = computeSecurityBits(%d, h, k, a);
 console.log(JSON.stringify(out));
-""" % (GRID['h'][0], GRID['h'][1], GRID['k'][0], GRID['k'][1],
-       GRID['a'][0], GRID['a'][1])
+""" % (P['baseline']['q_s_log2'], P['baseline']['h'], P['baseline']['k'], P['baseline']['a'],
+       GRID['h'][0], GRID['h'][1], GRID['k'][0], GRID['k'][1],
+       GRID['a'][0], GRID['a'][1], GRID['q_s_log2'])
     p = subprocess.run(['node', '-e', js], capture_output=True, text=True, timeout=600)
     assert p.returncode == 0, p.stderr[:2000]
     out = json.loads(p.stdout.strip().splitlines()[-1])
@@ -78,11 +80,11 @@ def spx_csv_row(label, h, d, k, a, w, security):
 
 def main():
     sec, std_sec = security_from_page()
-    passing = {t for t, bits in sec.items() if bits >= 128}
+    passing = {t for t, bits in sec.items() if bits >= P['security_bits']}
     pairs = hd_pairs()
 
-    # --- Sweep CSVs (core grid only, like slhdsa-2to40.sage) --------------
-    std = spx_csv_row('STANDARD', 63, 7, 14, 12, 16, std_sec)
+    # The sweep CSVs: the grid's w only, as slhdsa-2to40.sage
+    std = spx_csv_row('STANDARD', *BASELINE, std_sec)
     for name, max_size in (('all_size_capped_candidates.csv', GRID['max_size']),
                            ('all_unbound_candidates.csv', 10**8)):
         rows = [std]
@@ -104,7 +106,7 @@ def main():
             wtr.writerows(rows)
         print('%s: %d rows' % (name, len(rows)))
 
-    # --- data.json: SPX pool (core + optional w) --------------------------
+    # data.json: the SPX pool, with the optional w
     def spx_pool_row(h, d, k, a, w):
         m = M.spx_metrics(h, d, k, a, w)
         return [h, d, k, a, w, 0, 0, m['size'], m['kg'], m['sg'], m['sv'], m['sv_worst']]
@@ -123,7 +125,7 @@ def main():
     pools = {'SPX': {'fields': POOL_FIELDS, 'considered': spx_considered,
                      'count': len(spx_rows), 'rows': spx_rows}}
 
-    # --- Variant pools (FORS-based only; PORS+FP needs sage) --------------
+    # The FORS-based variant pools
     for scheme in ('W+C', 'W+C_F+C'):
         rows, considered = [], 0
         for w, swn in WC_PAIRS:
@@ -142,16 +144,16 @@ def main():
                          'count': len(rows), 'rows': rows}
         print('%s: %d rows' % (scheme, len(rows)))
 
-    # --- Stateful sections -------------------------------------------------
-    b = M.spx_metrics(63, 7, 14, 12, 16)
-    baseline = {'params': {'h': 63, 'd': 7, 'k': 14, 'a': 12, 'w': 16},
+    # Stateful
+    b = M.spx_metrics(*BASELINE)
+    baseline = {'params': dict(zip(('h', 'd', 'k', 'a', 'w'), BASELINE)),
                 'size': b['size'], 'kg': b['kg'], 'sg': b['sg'],
                 'sv': b['sv'], 'sv_worst': b['sv_worst']}
     xmssmt_rows, uxmss_rows = [], []
     for ots in ('TW', 'WC'):
-        for w in STATEFUL_W:
-            for h in range(10, 41):
-                for d in range(1, 11):
+        for w in STATEFUL['w']:
+            for h in range(STATEFUL['h'][0], STATEFUL['h'][1] + 1):
+                for d in range(STATEFUL['d'][0], STATEFUL['d'][1] + 1):
                     if h % d:
                         continue
                     m = M.xmssmt_metrics(ots, h, d, w)
@@ -166,26 +168,24 @@ def main():
     data = {
         'meta': {
             'version': 3,
-            'generator': 'tests/synth_generated.py (model.py — NOT sage)',
+            'generator': 'tests/synth_generated.py (tests/model.py, not Sage)',
             'generated': datetime.date.today().isoformat(),
             'commit': 'local-synth',
-            'grid': {'h': list(GRID['h']), 'd': list(GRID['d']),
-                     'k': list(GRID['k']), 'a': list(GRID['a']),
-                     'w': GRID['w'], 'q_s_log2': GRID['q_s_log2'],
-                     'max_size': GRID['max_size']},
+            'grid': GRID,
             'w_optional': W_OPTIONAL,
             'wc_pairs': [list(p) for p in WC_PAIRS],
             'schemes': list(pools.keys()),
-            'uxmss_ref_size': 5712,
+            'uxmss_ref_size': STATEFUL['uxmss_ref_size'],
             'hsf_max': M.HSF_MAX,
-            'cost_convention': M.CONVENTION,
+            'cost_convention': 'cached',
         },
         'baseline': baseline,
         'pools': pools,
         'stateful': {
             'slh': {'size': baseline['size'], 'kg': baseline['kg'],
                     'sg': baseline['sg'], 'sv': baseline['sv'],
-                    'sv_worst': baseline['sv_worst'], 'qs_log2': 64},
+                    'sv_worst': baseline['sv_worst'],
+                    'qs_log2': P['baseline']['q_s_log2']},
             'xmssmt': {'fields': ['ots', 'h', 'd', 'w', 'size', 'kg', 'sg',
                                   'sg_cold', 'state', 'sv', 'sv_worst'],
                        'rows': xmssmt_rows},

@@ -3,7 +3,6 @@
 *.sage.py
 
 # Generated artifacts
-utils/outputs_specialized/
 candidates.csv
 utils/all_size_capped_candidates.csv
 utils/all_unbound_candidates.csv

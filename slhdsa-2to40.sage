@@ -1,47 +1,41 @@
 #!/usr/bin/env sage
 """
-Standard SLH-DSA-128s VS custom variants sweeping (h, d, k, a) for various OTS/FTS combinations.
+Sweeps the stateless grid of parameters.json for one scheme, keeps the parameter
+sets that reach the security target and pass the filters, prints them against
+SLH-DSA-128s, and writes them to candidates.csv, SLH-DSA-128s first as STANDARD.
+make sweeps runs it twice for utils/all_size_capped_candidates.csv and
+utils/all_unbound_candidates.csv.
 
-Variant is selected via --ots and --fts flags:
-  --ots {wots-tw, wots+c}        (default: wots-tw)
-  --fts {fors, fors+c, pors+fp}  (default: fors)
-
-Supported (ots, fts) combinations:
-  (wots-tw, fors)    -> SPX        (plain SLH-DSA / SPHINCS+)
-  (wots+c, fors)     -> W+C
-  (wots+c, fors+c)   -> W+C_F+C
-  (wots+c, pors+fp)  -> W+C_P+FP
-
-Sweep behavior per OTS:
-  - wots-tw : w in {2, 4, 16, 256}, swn = 0
-  - wots+c  : (w, swn) in {(16, 240), (256, 2040)}
-
-Filters (defaults; override via CLI):
-  --max-size BYTES         Reject if size >= BYTES                (default: 7856, std SLH-DSA-128s size)
-  --max-keygen-ratio X     Reject if keygen  > X * std keygen     (default: no limit)
-  --max-sign-ratio X       Reject if sign    > X * std sign       (default: no limit)
-  --max-verify-ratio X     Reject if verify  > X * std verify     (default: no limit)
-  --max-c-per-byte X       Reject if verify_C / size > X          (default: no limit)
-  --max-cpb-ratio X        Reject if verify_C / size > X * std C/byte (default: no limit)
-
-Sweep ranges (comma-separated lists):
-  --h N1,N2,...            Hypertree heights to sweep            (default: 40..50 inclusive)
-  --d N1,N2,...            Layer counts to sweep                 (default: 2..25 inclusive)
-                           Combinations where h % d != 0 are auto-skipped.
-
-Usage:
-  sage slhdsa-2to40.sage                                  # default (SPX, h=40)
-  sage slhdsa-2to40.sage --ots wots+c --fts pors+fp       # W+C_P+FP variant
-  sage slhdsa-2to40.sage --ots wots+c --fts fors+c        # W+C_F+C variant
-  sage slhdsa-2to40.sage --max-size 4500 --max-keygen-ratio 10 --max-sign-ratio 10
-  sage slhdsa-2to40.sage --h 40,42,45,48 --d 2,3,4,5,6,8
+  sage slhdsa-2to40.sage [--ots wots-tw|wots+c] [--fts fors|fors+c|pors+fp] [filters]
+  sage slhdsa-2to40.sage --help
 """
+import csv
 import os
 import sys
 
-# -----------------------------------------------------------------------------
-# CLI parsing (parse before loading costs.sage so we can suppress its CSV)
-# -----------------------------------------------------------------------------
+os.environ['COSTS_SAGE_NO_MAIN'] = '1'   # its functions, without its CLI
+load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "costs.sage"))
+
+GRID = PARAMETERS['stateless']['grid']
+
+USAGE = """usage: sage slhdsa-2to40.sage [options]
+
+  --ots wots-tw|wots+c         the one-time signature (default wots-tw); wots+c
+                               sweeps the w of wc_w with their S_wn
+  --fts fors|fors+c|pors+fp    the few-time signature (default fors); wots-tw
+                               goes with fors only
+  --h N1,N2,...                hypertree heights (default: the grid)
+  --d N1,N2,...                layers (default: the grid); d must divide h
+  --max-size BYTES             keep sizes below BYTES (default: the grid's max_size)
+  --max-keygen-ratio X         keep KeyGen up to X times that of SLH-DSA-128s
+  --max-sign-ratio X           the same for SigGen
+  --max-verify-ratio X         the same for SigVer
+  --max-c-per-byte X           keep SigVer compressions per byte up to X
+  --max-cpb-ratio X            keep them up to X times those of SLH-DSA-128s
+
+The filters other than the size have no limit by default.
+"""
+
 
 def _parse_int_list(s):
     return [int(x) for x in s.split(",") if x.strip()]
@@ -49,14 +43,14 @@ def _parse_int_list(s):
 def _parse_args(argv):
     ots = "wots-tw"
     fts = "fors"
-    max_size = 7856      # std SLH-DSA-128s signature size
+    max_size = GRID['max_size']
     kg_ratio = float('inf')
     sg_ratio = float('inf')
     sv_ratio = float('inf')
     cpb_max  = float('inf')
     cpb_ratio = float('inf')
-    h_values = list(range(40, 51))   # 40..50 inclusive
-    d_values = list(range(2, 26))    # 2..25 inclusive
+    h_values = list(range(GRID['h'][0], GRID['h'][1] + 1))
+    d_values = list(range(GRID['d'][0], GRID['d'][1] + 1))
     i = 1
     while i < len(argv):
         a = argv[i]
@@ -91,7 +85,7 @@ def _parse_args(argv):
             d_values = _parse_int_list(argv[i + 1])
             i += 2
         elif a == "--help":
-            print(__doc__)
+            print(USAGE)
             sys.exit(0)
         else:
             print("Unknown argument: {}".format(a), file=sys.stderr)
@@ -115,95 +109,57 @@ if (OTS, FTS) not in SCHEME_MAP:
     sys.exit(2)
 SCHEME = SCHEME_MAP[(OTS, FTS)]
 
-# (w, swn) sweep pairs depend on OTS
 if OTS == "wots-tw":
-    W_SWN_PAIRS = [(2, 0), (4, 0), (16, 0), (256, 0)]
+    W_SWN_PAIRS = [(w, 0) for w in GRID['w']]
 else:  # wots+c
-    W_SWN_PAIRS = [(16, 240), (256, 2040)]
+    W_SWN_PAIRS = [(w, SWN[w]) for w in PARAMETERS['stateless']['wc_w']]
 
-# Security model: PORS+FP for that FTS, FORS otherwise
-SECURITY_MODEL = "PORS+FP" if FTS == "pors+fp" else "FORS"
-
-# -----------------------------------------------------------------------------
-# Load costs.sage (suppress its auto-CSV)
-# -----------------------------------------------------------------------------
-_saved_argv = sys.argv
-sys.argv = ['big_comparison.sage', '--no-auto']
-load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "costs.sage"))
-sys.argv = _saved_argv
-
-# -----------------------------------------------------------------------------
-# Sweep parameters
-# -----------------------------------------------------------------------------
-
-TARGET = 128
-
-# Standard baseline is plain SLH-DSA-128s (SPX) for fair comparison
+# Every scheme is compared with SLH-DSA-128s
 STD_SCHEME = "SPX"
 STD_SWN    = 0
 
-K_RANGE  = range(6, 25)
-A_RANGE  = range(8, 21)
-# H_VALUES and D_VALUES come from CLI flags (parsed at top of file)
+K_RANGE  = range(GRID['k'][0], GRID['k'][1] + 1)
+A_RANGE  = range(GRID['a'][0], GRID['a'][1] + 1)
 
 
-def evaluate(q_s_log2, h, d, k, a, w, swn, scheme, security_model):
-    if h % d != 0:
-        return None
-    q_s = 2**q_s_log2
-    try:
-        security = compute_security(q_s, h, k, a, security_model, hashbytes=16)
-    except Exception:
-        return None
-    if float(security) < TARGET:
-        return None
-
-    try:
-        sign = compute_signing_time(h, d, a, k, w, swn, scheme)
-    except Exception:
-        return None
-    mmax     = sign['mmax']
-    verify   = compute_verification_time(h, d, a, k, w, swn, scheme, mmax)
-    keygen_C = compute_keygen_time(h, d, w, scheme)
-    size     = compute_size(h, d, a, k, w, scheme, mmax)
-    l        = compute_wots_l(scheme, w)
-
+def csv_row(q_s_log2, r):
+    """The CSV fields of an evaluate() result."""
     return {
         'q_s_log2': int(q_s_log2),
-        'h':        int(h),
-        'd':        int(d),
-        'h_prime':  int(h // d),
-        'k':        int(k),
-        'a':        int(a),
-        'w':        int(w),
-        'l':        int(l),
-        'swn':      int(swn),
-        'mmax':     int(mmax),
-        'security': float(security),
-        'size':     int(size),
-        'keygen_C': float(keygen_C),
-        'sign_C':   float(sign['compressions']),
-        'verify_C': float(verify['compressions']),
-        'verify_worst_C': float(verify['compressions_worst']),
-        'c_per_byte': float(verify['compressions']) / float(size),
-        'c_per_byte_worst': float(verify['compressions_worst']) / float(size),
+        'h':        int(r['h']),
+        'd':        int(r['d']),
+        'h_prime':  int(r['h'] // r['d']),
+        'k':        int(r['k']),
+        'a':        int(r['a']),
+        'w':        int(r['w']),
+        'l':        int(r['l']),
+        'swn':      int(r['swn']),
+        'mmax':     int(r['mmax']),
+        'security': float(r['security']),
+        'size':     int(r['size']),
+        'keygen_C': float(r['keygen']),
+        'sign_C':   float(r['sign']),
+        'verify_C': float(r['verify']),
+        'verify_worst_C': float(r['verify_worst']),
+        'c_per_byte': float(r['verify']) / float(r['size']),
+        'c_per_byte_worst': float(r['verify_worst']) / float(r['size']),
         'label':    '',
     }
 
 
 print("Variant: ots={}, fts={}  -> scheme={}".format(OTS, FTS, SCHEME), file=sys.stderr)
 print("Computing standard SLH-DSA-128s baseline (SPX)...", file=sys.stderr)
-std = evaluate(64, 63, 7, 14, 12, 16, STD_SWN, STD_SCHEME, "FORS")
+B = PARAMETERS['baseline']
+std = evaluate(B['q_s_log2'], B['h'], B['d'], B['k'], B['a'], B['w'], STD_SWN, STD_SCHEME)
 if std is None:
     print("ERROR: failed to compute standard baseline.", file=sys.stderr)
     sys.exit(1)
+std = csv_row(B['q_s_log2'], std)
 std['label'] = 'STANDARD'
 
 KEYGEN_LIMIT = std['keygen_C'] * MAX_KEYGEN_RATIO
 SIGN_LIMIT   = std['sign_C']   * MAX_SIGN_RATIO
 VERIFY_LIMIT = std['verify_C'] * MAX_VERIFY_RATIO
-# Effective C/byte cap: min of the absolute cap and the ratio cap (relative to
-# the std baseline computed above — avoids hardcoding a stale constant).
 CPB_LIMIT    = min(MAX_C_PER_BYTE, std['c_per_byte'] * MAX_CPB_RATIO)
 
 print("Standard baseline (compressions):", file=sys.stderr)
@@ -249,18 +205,9 @@ def label_for(w, swn):
     return "w={},swn={}".format(w, swn)
 
 
-for w, swn in W_SWN_PAIRS:
-    label = label_for(w, swn)
-    for h in H_VALUES:
-        for d in D_VALUES:
-            if h % d != 0:
-                continue
-            for k in K_RANGE:
-                for a in A_RANGE:
-                    consider(
-                        evaluate(40, h, d, k, a, w, swn, SCHEME, SECURITY_MODEL),
-                        label,
-                    )
+for (w, swn, h, d, k, a), r in sweep(SCHEME, W_SWN_PAIRS, H_VALUES, D_VALUES,
+                                      K_RANGE, A_RANGE, GRID['q_s_log2']):
+    consider(None if r is None else csv_row(GRID['q_s_log2'], r), label_for(w, swn))
 
 all_results.sort(key=lambda x: x['size'])
 
@@ -285,7 +232,7 @@ def fmt_ratio(r, std_val):
     return "{:.2f}x".format(float(r) / float(std_val))
 
 
-# Use a wider Label column when swn is included; show S_wn column only for W+C
+# Only WOTS+C labels and rows carry S_wn
 label_w = 12 if OTS == "wots+c" else 10
 
 columns = [
@@ -362,7 +309,6 @@ print(" Total: {} configurations passing all filters ({})".format(
     len(all_results), " + ".join(parts)))
 print()
 
-# Filter rejection summary
 print("=" * total_width)
 print("  FILTER REJECTION SUMMARY  ".center(total_width))
 print("=" * total_width)
@@ -373,7 +319,7 @@ def _rej_label(name, ratio):
     return " Rejected ({} > {:g}x std):     ".format(name, ratio)
 
 print(" Considered configurations:        {}".format(considered))
-print(" Rejected (security < 128):        {}".format(rejected['security']))
+print(" Rejected (security < {}):        {}".format(PARAMETERS['security_bits'], rejected['security']))
 print(" Rejected (size >= {} B):         {}".format(MAX_SIZE, rejected['size']))
 print("{}{}".format(_rej_label("keygen", MAX_KEYGEN_RATIO), rejected['keygen']))
 print("{}{}".format(_rej_label("sign",   MAX_SIGN_RATIO),   rejected['sign']))
@@ -385,7 +331,6 @@ else:
 print(" Passed all filters (custom):      {}".format(len(all_results) - 1))
 print()
 
-# Summary
 print("=" * total_width)
 print("  SUMMARY  ".center(total_width))
 print("=" * total_width)
@@ -431,7 +376,7 @@ for w, swn in W_SWN_PAIRS:
     if OTS == "wots-tw" and w == 16:
         note = " (FIPS 205-compatible algorithm structure)"
     elif OTS == "wots-tw":
-        note = " (modified SPHINCS+, NOT FIPS 205)"
+        note = " (modified SPHINCS+, not FIPS 205)"
     else:
         note = ""
     subset = [r for r in all_results if r['label'] == label]
@@ -444,16 +389,13 @@ print("  - All cost metrics in SHA-256 compression-function calls (C).")
 print("  - All ratios (KG/std, SG/std, SV/std) are relative to standard SLH-DSA-128s.")
 print("  - Sec(bits) is capped at 128.0 by the n=128 preimage bound.")
 if OTS == "wots+c":
-    print("  - swn is the WOTS+C target chain sum S_{w,n}; values mirror PARAMETER_SETS in costs.sage.")
+    print("  - swn is the WOTS+C target chain sum S_{w,n}, from parameters.json.")
 print("  - Sweep ranges: h in {}, d in {}, k in [{}, {}], a in [{}, {}], (w,swn) in {}.".format(
     H_VALUES, D_VALUES, K_RANGE.start, K_RANGE.stop - 1, A_RANGE.start, A_RANGE.stop - 1, W_SWN_PAIRS))
-
-import csv
 
 csv_filename = "candidates.csv"
 print("\nSaving candidate configurations to {}...".format(csv_filename))
 
-# Define the exact dictionary keys returned by evaluate()
 fieldnames = [
     'label', 'h', 'd', 'h_prime', 'k', 'a', 'w', 'l',
     'swn', 'mmax', 'security', 'size', 'keygen_C',

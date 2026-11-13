@@ -1,60 +1,42 @@
-"""Independent reference model for the regression tests.
+"""A second implementation of the cost model for the regression tests.
 
-Ports the cost formulas of costs.sage (all schemes) and stateful.sage using
-only the Python standard library (plus the repo's octopus_pmf, itself pure
-Python, for PORS+FP grinding work). Written during the 2026-07-05 audit and
-verified against the sage scripts, both site pages, and the published CSVs.
-
-Deliberately does NOT reuse any sage code: its value is being a second,
-independent implementation that the real code is diffed against.
+Ports costs.sage and stateful.sage to the Python standard library, with
+octopus_pmf.py for the PORS+FP grinding work. It shares no code with them, so
+the tests compare two independent implementations. docs/model.md has the
+model, parameters.json the grids and fixed parameters.
 """
+import json
 import os
 import sys
 from fractions import Fraction
 from functools import lru_cache
 from math import ceil, floor, log2, comb
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+sys.path.insert(0, ROOT)
 from octopus_pmf import interleave_cost_table  # noqa: E402  (pure python, MIT)
 
-N = 16                       # hashbytes (128-bit security level)
-C_SIZE = 4                   # WOTS+C grinding counter of the stateless variants (bytes)
-R_SIZE = 16                  # message randomness = n bytes
-IND_SIZE = 1                 # SHRINCS indicator byte (first byte of every signature)
+with open(os.path.join(ROOT, 'parameters.json')) as _f:
+    PARAMETERS = json.load(_f)
 
-# Hash-cost convention, mirroring costs.sage
-CONVENTION = os.environ.get('HASH_CONVENTION', 'cached').lower()
+# Sizes in bytes
+N = 16                       # n
+C_SIZE = 4                   # the WOTS+C counter of the stateless variants
+R_SIZE = 16                  # the randomizer R
+IND_SIZE = 1                 # the SHRINCS indicator byte that starts every signature
 
-C_TH1 = 1; C_TH1C = 1; C_PRF = 1
-C_TH2 = 1 if CONVENTION == 'cached' else 2
-# 32-byte message, empty context. cached: H_msg is two nested SHA-256 calls
-# (2 + 2 compressions), PRF_msg is HMAC with its key-pad blocks cached (2 + 1).
-# uncached: the original single 2-block hashes.
-C_HMSG = 4 if CONVENTION == 'cached' else 2
-C_PRFMSG = 3 if CONVENTION == 'cached' else 2
+# Compressions per hash call (docs/model.md, Hash calls)
+C_TH1 = 1; C_TH1C = 1; C_PRF = 1; C_TH2 = 1
+C_HMSG = 4
+C_PRFMSG = 3
 
-
-def set_convention(mode):
-    """Switch the active convention at runtime (used by the tests)."""
-    global CONVENTION, C_TH2, C_HMSG, C_PRFMSG
-    assert mode in ('cached', 'uncached'), mode
-    CONVENTION = mode
-    C_TH2 = 1 if mode == 'cached' else 2
-    C_HMSG = 4 if mode == 'cached' else 2
-    C_PRFMSG = 3 if mode == 'cached' else 2
-
-
-SWN = {16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040,
-       65536: 262140}   # WOTS+C target chain sums S_{w,n} = floor(l1*(w-1)/2)
-
-HSF_MAX = 255                # FXMSS encodes the node height as a single byte
+SWN = {int(w): swn for w, swn in PARAMETERS['swn'].items()}   # WOTS+C target digit sums
+HSF_MAX = PARAMETERS['stateful']['hsf_max']
 
 
 def compute_th(x):
     """Compressions for a tweakable hash over x hash-sized values (SHA-256)."""
-    if CONVENTION == 'cached':
-        return ceil((22 * 8 + 128 * x + 65) / 512)
-    return ceil((128 + 96 + 128 * x + 65) / 512)
+    return ceil((22 * 8 + 128 * x + 65) / 512)
 
 
 def wots_len1(w):
@@ -62,7 +44,7 @@ def wots_len1(w):
 
 
 def wots_len(w, wc=False):
-    """Chain count: l1 + l2 for WOTS-TW/classic, l1 for WOTS+C (FIPS 205 form)."""
+    """Chain count: l1 + l2 for WOTS-TW, l1 for WOTS+C (FIPS 205 form)."""
     l1 = wots_len1(w)
     if wc:
         return l1
@@ -71,7 +53,7 @@ def wots_len(w, wc=False):
 
 
 def wots_worst_steps(w):
-    """Worst-case WOTS-TW verification chain steps (all message digits 0)."""
+    """Chain steps to verify one WOTS-TW signature when every message digit is 0."""
     l1 = wots_len1(w)
     l2 = floor(log2(l1 * (w - 1)) / log2(w)) + 1
     c = l1 * (w - 1)
@@ -92,15 +74,13 @@ def _digit_sum(x, w):
 
 @lru_cache(maxsize=None)
 def _checksum_digit_sum_total(l1, w):
-    """Sum, over all w^l1 message digit strings, of the base-w digit sum of the
-    WOTS-TW checksum.
+    """The base-w digit sum of the WOTS-TW checksum, summed over all w^l1
+    message digit strings.
 
-    The checksum l1*(w-1) - S has the same distribution as the digit sum S
-    itself (map every digit m to w-1-m). The number of strings with sum
-    exactly s is counted by inclusion-exclusion and weighted by the digit sum
-    of s. costs.sage and the site never form a digit sum: they use
-    digit_sum(x) = x - (w-1) * sum_j floor(x / w^j) and tail counts
-    P(S >= m*w^j), so the two computations are independent.
+    The checksum l1*(w-1) - S is distributed like S itself, so this weights
+    the digit sum of every s by the number of strings that sum to s. costs.sage
+    and the site take tail counts P(S >= m*w^j) instead, so the two
+    computations are independent.
     """
     top = l1 * (w - 1)
     binom_l = [comb(l1, j) for j in range(l1 + 1)]
@@ -119,24 +99,18 @@ def _checksum_digit_sum_total(l1, w):
 
 
 def wots_tw_mean_steps(w, count=1):
-    """Mean chain steps to verify `count` WOTS-TW signatures on random digests,
-    rounded to the nearest integer (ties up).
-
-    cached:   exact expectation  l1*(w-1)/2 + l2*(w-1) - E[checksum digit sum]
-    uncached: the original (w-1)*l/2 approximation, kept verbatim
+    """Mean chain steps to verify count WOTS-TW signatures of uniform digests,
+    rounded once to the nearest integer (ties up): l1*(w-1)/2 + l2*(w-1) minus
+    the mean checksum digit sum.
     """
     l1 = wots_len1(w)
     l2 = wots_len(w) - l1
-    if CONVENTION != 'cached':
-        return count * ((w - 1) * (l1 + l2) // 2)
     mean = (Fraction(l1 * (w - 1), 2) + l2 * (w - 1)
             - Fraction(_checksum_digit_sum_total(l1, w), w**l1))
     return floor(count * mean + Fraction(1, 2))
 
 
-# ---------------------------------------------------------------------------
-# Stateless: SLH-DSA / SPX (plain WOTS-TW + FORS), matches costs.sage
-# ---------------------------------------------------------------------------
+# SLH-DSA (SPX)
 
 def spx_metrics(h, d, k, a, w):
     assert h % d == 0
@@ -166,9 +140,7 @@ def spx_metrics(h, d, k, a, w):
     }
 
 
-# ---------------------------------------------------------------------------
-# Stateless variants: W+C, W+C_F+C, W+C_P+FP — matches costs.sage
-# ---------------------------------------------------------------------------
+# W+C, W+C_F+C and W+C_P+FP
 
 _INTERLEAVE_CACHE = {}
 
@@ -187,7 +159,8 @@ def _log2_exp_work(t, k, mmax):
     return table[max(lowers)]
 
 
-def _nu_int(l, swn, w):
+def _nu(l, swn, w):
+    """The number of strings of l base-w digits that sum to swn, at least 1."""
     nu = 0
     for j in range(l + 1):
         n_val = (swn + l) - j * w - 1
@@ -203,7 +176,7 @@ def _pors_geometry(k, a):
 
 
 def _compute_mmax(hp, l, w, d_search, d, k, a):
-    """Port of costs.sage compute_mmax (PORS+FP grinding budget)."""
+    """The PORS+FP authentication-set bound, as costs.sage compute_mmax."""
     thl = compute_th(l)
     thk1 = compute_th(k - 1)
     merkle = 2**hp * (l * C_PRF + l * (w - 1) * C_TH1 + thl) + (2**hp - 1) * C_TH2
@@ -225,12 +198,8 @@ def _compute_mmax(hp, l, w, d_search, d, k, a):
 
 
 def scheme_metrics(scheme, h, d, k, a, w, swn=0):
-    """Metrics for any costs.sage scheme: SPX, W+C, W+C_F+C, W+C_P+FP.
-
-    Returns dict with size/kg/sg/sv/sv_worst/mmax. Mirrors costs.sage
-    compute_size / compute_keygen_time / compute_signing_time /
-    compute_verification_time exactly (expected-cost outputs only).
-    """
+    """Size, costs (kg, sg, sv, sv_worst, cpb, cpb_worst) and mmax of one
+    parameter set of SPX, W+C, W+C_F+C or W+C_P+FP."""
     if scheme == 'SPX':
         m = spx_metrics(h, d, k, a, w)
         m['mmax'] = 0
@@ -241,8 +210,8 @@ def scheme_metrics(scheme, h, d, k, a, w, swn=0):
     thl = compute_th(l)
     ctr = C_SIZE
 
-    # WOTS+C grinding: expected search attempts (exact integer ceil)
-    nu = _nu_int(l, swn, w)
+    # WOTS+C grinding: expected attempts, rounded up exactly
+    nu = _nu(l, swn, w)
     d_search = d * (-(-(w**l) // nu))
 
     c_merkle = 2**hp * (l * C_PRF + l * (w - 1) * C_TH1 + thl) + (2**hp - 1) * C_TH2
@@ -282,37 +251,21 @@ def scheme_metrics(scheme, h, d, k, a, w, swn=0):
             'cpb': sv / size, 'cpb_worst': sv / size, 'mmax': mmax}
 
 
-# ---------------------------------------------------------------------------
-# Stateful: XMSS / XMSS-MT / UXMSS, matches stateful.sage (R = n = 16 B)
-# ---------------------------------------------------------------------------
-#
-# Signature layout (SHRINCS stateful path), used for every scheme here:
-#   indicator (1 B) | R (16 B) | leaf index | WOTS signature | auth path
-# A WOTS+C signature starts with its grinding counter.
+# XMSS, XMSS-MT and UXMSS, in the SHRINCS stateful signature layout
+# (docs/model.md, Stateful schemes)
 
 def _wc(ots):
     return ots == 'WC'
 
 
 def counter_bytes(w):
-    """WOTS+C grinding counter: 2 bytes as in SHRINCS; w = 65536 needs more
-    attempts than 2 bytes can count and keeps 4."""
+    """Bytes of the WOTS+C counter: 2 as in SHRINCS, 4 for w = 65536."""
     return 2 if w <= 256 else 4
 
 
 def wots_pk_c(w, ots):
     l = wots_len(w, _wc(ots))
     return l * C_PRF + l * (w - 1) * C_TH1 + compute_th(l)
-
-
-def _nu(l, swn, w):
-    """Number of valid WOTS+C encodings with digit sum exactly swn."""
-    nu = 0
-    for j in range(l + 1):
-        n_val = (swn + l) - j * w - 1
-        b2 = comb(n_val, l - 1) if n_val >= l - 1 else 0
-        nu += (-1)**j * comb(l, j) * b2
-    return nu if nu > 0 else 1
 
 
 def wots_sign_c(w, ots):
@@ -323,8 +276,6 @@ def wots_sign_c(w, ots):
         search = -(-(w**l) // nu)          # ceil division, exact integers
         return search * C_TH1C + l * C_PRF + swn * C_TH1
     # WOTS-TW: the signer walks what the verifier does not
-    if CONVENTION != 'cached':
-        return l * C_PRF + l * (w - 1) // 2 * C_TH1
     return l * C_PRF + (l * (w - 1) - wots_tw_mean_steps(w)) * C_TH1
 
 
@@ -343,7 +294,7 @@ def idx_bytes(h):
     return max(1, ceil(h / 8))
 
 
-# BDS traversal bounds (Buchmann-Dahmen-Schneider 2008) for a tree of height hp
+# BDS traversal bounds for a tree of height hp (docs/model.md, XMSS and XMSS-MT)
 
 def bds_k(hp):
     if hp < 2:
@@ -418,7 +369,7 @@ def uxmss_verify_c(q, hsf, w, ots, worst=False):
     return C_HMSG + wots_verify_c(w, ots, worst) + min(q, hsf) * C_TH2
 
 
-def uxmss_metrics(ots, w, target_size=5712):
+def uxmss_metrics(ots, w, target_size=PARAMETERS['stateful']['uxmss_ref_size']):
     hsf = uxmss_find_hsf(w, ots, target_size)
     sg = uxmss_sign_c(1, hsf, w, ots)                 # first signature: the worst
     return {

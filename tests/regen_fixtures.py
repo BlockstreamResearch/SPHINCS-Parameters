@@ -21,7 +21,7 @@ sys.path.insert(0, HERE)
 import model as M  # noqa: E402
 
 METRICS = ('size', 'kg', 'sg', 'sv', 'sv_worst')
-BASELINE = (63, 7, 14, 12, 16)
+BASELINE = tuple(M.PARAMETERS['baseline'][x] for x in ('h', 'd', 'k', 'a', 'w'))
 MISSING = '(missing)'
 
 
@@ -42,7 +42,6 @@ def replace(entry, values):
 
 
 def model_values(fx):
-    M.set_convention('cached')  # regardless of HASH_CONVENTION
     fx['wots_len'] = {w: M.wots_len(int(w)) for w in fx['wots_len']}
     fx['wots_len_wc'] = {w: M.wots_len(int(w), wc=True) for w in fx['wots_len_wc']}
     fx['swn'] = {w: M.SWN[int(w)] for w in fx['swn']}
@@ -58,22 +57,6 @@ def model_values(fx):
     for key, entry in fx['variants'].items():
         scheme, params = key.split('|')
         update(entry, M.scheme_metrics(scheme, *ints(params)), METRICS)
-
-    M.set_convention('uncached')
-    try:
-        for key, entry in fx['uncached_spot'].items():
-            kind, _, params = key.partition('|')
-            if kind == 'baseline':
-                values = M.spx_metrics(*BASELINE)
-            elif kind == 'variant':
-                scheme, params = params.split('|')
-                values = M.scheme_metrics(scheme, *ints(params))
-            else:
-                ots, w = params.split(',')
-                values = M.uxmss_metrics(ots, int(w))
-            update(entry, values, list(entry))
-    finally:
-        M.set_convention('cached')
 
 
 def pipeline_counts(fx):

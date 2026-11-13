@@ -2,7 +2,8 @@
 
 Sizes are in bytes and costs in SHA-256 compressions (C). The hash output is n = 16 bytes.
 The pages compute the model in `site/js/model.js`, the Sage scripts in `costs.sage`,
-`stateful.sage` and `security.sage`, and `tests/model.py` ports it to check both.
+`stateful.sage` and `security.sage`, and `tests/model.py` ports it to check both. The search grids
+and the fixed parameters are in `parameters.json`.
 
 ## Hash calls
 
@@ -68,6 +69,10 @@ verification cost the same for every message. Of the w^l digit strings,
 have that sum, so signing takes ceil(w^l / ν) attempts of `C_Th1c` on average, then l PRF calls and
 S_wn chain steps. Verification takes l·(w − 1) − S_wn chain steps, one `C_Th1c` and Th(l).
 
+`parameters.json` sets S_wn = floor(l1·(w − 1)/2), the middle of the digit-sum distribution, where
+ν is largest: 240 for w = 16 and 2040 for w = 256. For w = 128 the product is odd, and
+ν(1206) = ν(1207).
+
 SHRINCS stores the counter in 2 bytes: 2^16 counters miss the target sum with probability below
 2^−126 for every w ≤ 256. w = 65536 needs about 137,000 attempts on average and keeps a 4-byte
 counter.
@@ -89,6 +94,26 @@ KeyGen builds the top tree; a signature rebuilds one tree per layer. SigVer take
 [WOTS-TW verification](#wots-tw-verification), SigVer worst its worst case in every layer. A SHRINCS
 stateless signature adds a one-byte indicator.
 
+### W+C, FORS+C and PORS+FP
+
+W+C signs every layer with WOTS+C instead of WOTS-TW: a layer holds l = l1 chain values and a
+4-byte counter, signing adds d counter searches, and verification costs the same for every
+message. W+C_F+C also replaces FORS with FORS+C, and W+C_P+FP with PORS+FP. Both grind the message
+hash, each attempt costing H_msg + PRF_msg; the last attempt is the signature's message hash.
+
+- FORS+C grinds until the index in the last tree is 0, about 2^a attempts, and leaves that tree
+  out: k − 1 trees in the signature, in signing and in verification.
+- PORS+FP builds one tree of t = k·2^a leaves, t·(PRF + Th1) and t − 1 node hashes, opens k of
+  its leaves and grinds until their Octopus authentication set has at most mmax nodes;
+  `octopus_pmf.py` gives the expected attempts. mmax starts at (k − 1)·a − ceil(350/n) and grows by
+  one, at most 19 times, until signing costs less than 1.11 times signing with FORS+C.
+
+For FORS, FORS+C and PORS+FP in turn,
+
+    size   = n·(1 + h + d·l) + 4·d + n·k·(a + 1),  n·(k − 1)·(a + 1)  or  n·(k + mmax)
+    SigVer = H_msg + V + d·(((w − 1)·l − S_wn)·Th1 + Th1c + Th(l)) + h·Th2
+    V      = k·Th1 + k·a·Th2 + Th(k),  (k − 1)·Th1 + (k − 1)·a·Th2 + Th(k − 1)  or  k·Th1 + mmax·Th2
+
 ## FORS security
 
 The stateless schemes are evaluated at q_s = 2^40 signatures. Each signature uses one of 2^h FORS
@@ -100,11 +125,18 @@ needs the leaf it must open revealed in every tree:
     P(forgery)     = Σ_r C(q_s, r)·2^(−h·r)·(1 − 2^−h)^(q_s − r)·P(forgery | r)
     security       = −log2(max(2^(−8n), P(forgery)))
 
-so 128 bits at most. Unlike the SPHINCS+ parameter script, this uses the exact forgery factor
-instead of the bound (r/t)^k, and the maximum of the two attacks instead of their sum, since a
-query cannot serve both. `security.sage` also covers PORS+FP.
+so 128 bits at most. Unlike the parameter script of the SPHINCS+ specification
+(`original-sphincs-parameter-search.sage`), this uses the exact forgery factor instead of the bound
+(r/t)^k, and the maximum of the two attacks instead of their sum: a query cannot serve both, since
+their tweaks differ.
 
-The page sums in log2 to avoid underflow. Only r within 30·sqrt(λ + 1) + 30 of the mean
+PORS+FP signs with k distinct leaves of one tree of t = k·2^a leaves, so r signatures reveal at most
+min(r·k, t) of them:
+
+    P(forgery | r) = C(min(r·k, t), k) / C(t, k)
+
+`security.sage` sums from r = 1 with 100-bit floats and stops past the mean once a term falls below
+2^−1250. The page sums in log2 to avoid underflow. Only r within 30·sqrt(λ + 1) + 30 of the mean
 λ = q_s / 2^h is summed: further out the binomial weight is below e^−450 of its peak. That keeps
 the work at O(sqrt(λ)); when even that exceeds 2^16 terms, the sum takes every s-th term and
 weights it by s. For the parameter grid λ ≤ 1, and every term from r = 1 is summed.
@@ -148,8 +180,9 @@ only the authentication path, so it skips the signing leaf and the h′ nodes on
 
 The SHRINCS unbalanced tree has a spine of height hsf with hsf + 1 leaves. The q-th signature
 (q = 1 is the first) carries min(q, hsf) authentication nodes, so each signature is one node longer
-than the one before. hsf is the largest value up to 255 for which the last signature stays below
-5,712 B, the size of the report's candidate 2, (45, 5, 8, 16, 16).
+than the one before. hsf is the largest value for which the last signature stays below 5,712 B,
+the size of the report's candidate 2, (45, 5, 8, 16, 16), and at most 255: SHRINCS encodes the tree
+height in one byte.
 
     size(q) = 1 + 16 + index + counter + l·n + min(q, hsf)·n
     KeyGen  = (hsf + 1)·pk + hsf·Th2

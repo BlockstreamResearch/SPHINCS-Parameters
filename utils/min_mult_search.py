@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""
-Sweeps a global uniform filter X across 4 operational metrics.
-Finds the absolute minimum global X required to yield the smallest 
-possible set of valid candidates.
-Aligned with run_experiments.py folder structure and venn_diagram_draw.py keys.
+"""For every candidate of a sweep CSV, the smallest X for which each of its
+metrics (size, KeyGen, SigGen, SigVer and C/byte) is at most X times that of
+the STANDARD row, and the metric that sets X. Writes the candidates by
+increasing X to global_X_thresholds.csv, which venn_diagram_draw.py reads.
+
+  cd utils && python3 min_mult_search.py [--input CSV] [--output CSV]
 """
 
 import argparse
@@ -27,26 +28,21 @@ def find_global_x_thresholds(csv_path, output_csv):
     
     candidates = df[df['label'] != 'STANDARD'].copy()
     
-    # 1. Calculate ratios against standard for the 4 metrics
     for col in METRICS:
         candidates[f'{col}_ratio'] = candidates[col] / std_row[col]
 
-    # 2. Determine the minimum global X required for each candidate
     ratio_columns = [f'{col}_ratio' for col in METRICS]
     candidates['required_global_X'] = candidates[ratio_columns].max(axis=1)
     
-    # 3. Identify the specific bottleneck metric that forced X to be this high
     candidates['bottleneck_metric'] = candidates[ratio_columns].idxmax(axis=1).str.replace('_ratio', '')
 
-    # 4. Sort by the required global X to find our expanding thresholds
     candidates = candidates.sort_values(by='required_global_X', ascending=True).reset_index(drop=True)
 
-    # 5. Build the output dataset with the explicit "cumulative_total" key
     results = []
     for i, row in candidates.iterrows():
-        cumulative_total = i + 1  # 1 candidate, 2 candidates, 3 candidates...
+        cumulative_total = i + 1   # candidates with at most this X
         results.append({
-            'cumulative_total': cumulative_total,  # Renamed to match Venn Diagram script
+            'cumulative_total': cumulative_total,
             'required_global_X': round(row['required_global_X'], 4),
             'bottleneck_metric': row['bottleneck_metric'],
             'h': row['h'],
@@ -64,19 +60,16 @@ def find_global_x_thresholds(csv_path, output_csv):
 
     results_df = pd.DataFrame(results)
     
-    # 6. Ensure the target directory exists (Matching run_experiments behavior)
     out_dir = os.path.dirname(output_csv)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
     
-    # 7. Save to CSV
     results_df.to_csv(output_csv, index=False)
     
     print("=========================================================================================")
     print(f" GLOBAL X FILTER THRESHOLDS SAVED TO: {output_csv}")
     print("=========================================================================================\n")
     
-    # Print the first 10 rows to the terminal as a preview
     print(results_df.head(10).to_string(index=False))
 
 if __name__ == "__main__":

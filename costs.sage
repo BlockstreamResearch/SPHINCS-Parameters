@@ -1,107 +1,65 @@
 #!/usr/bin/env sage
 """
-SPHINCS+ Parameter Efficiency and Size Calculator
+Sizes in bytes and costs in SHA-256 compressions of SLH-DSA (SPX) and the
+report's variants W+C, W+C_F+C and W+C_P+FP for (h, d, k, a, w), and the sweep
+that slhdsa-2to40.sage and export_site_data.sage share. docs/model.md has the
+model; PARAMETER_SETS holds the parameter sets of the report's tables.
 
-Computes signature sizes and signing/verification times for SPHINCS+ variants:
-- SPX: Plain SPHINCS+ (WOTS-TW + FORS)
-- W+C: SPHINCS+ with WOTS+C (counter-based WOTS, no checksum chains)
-- W+C_F+C: SPHINCS+ with WOTS+C and FORS+C (grinding to remove last FORS tree)
-- W+C_P+FP: SPHINCS+ with WOTS+C and PORS+FP (single tree with Octopus auth)
-
-Notation:
-- h: hypertree height (total)
-- d: number of layers in the hypertree
-- h' = h/d: height of each XMSS tree layer
-- n: hash output size in bits (fixed at 128 = hashbytes*8)
-- a: log2 of leaves per FORS tree (t = 2^a leaves per tree)
-- k: number of FORS trees (or leaf indices for PORS)
-- w: Winternitz parameter
-- l: number of WOTS chains
-- S_{w,n} (swn): target chain sum for WOTS+C
-- q_s: max number of signatures supported
+  sage costs.sage [--table [log2 q_s]]   (those sets as CSV, or as tables)
+  sage costs.sage --params scheme log2_q_s k a h d w swn
 """
 
 from sage.all import *
-from scipy.stats import binom
+from functools import lru_cache
+import json
 import os
 
 from octopus_pmf import interleave_cost_table
 
-# Load security.sage from the same directory
 _dir = os.path.dirname(os.path.abspath(__file__))
 load(os.path.join(_dir, "security.sage"))
 
-# =============================================================================
-# Constants
-# =============================================================================
+# Search grids and fixed parameters. Integers become Sage Integers, as if they
+# were written in this file.
+def _sage_numbers(x):
+    if isinstance(x, bool):
+        return x
+    if isinstance(x, int):
+        return Integer(x)
+    if isinstance(x, list):
+        return [_sage_numbers(v) for v in x]
+    if isinstance(x, dict):
+        return {key: _sage_numbers(v) for key, v in x.items()}
+    return x
 
-hashbytes = 16  # 16 bytes = 128 bits
-counter_size = 4 # 4 bytes = 32 bits
-randomness_size = 16  # 16 bytes = 128 bits
+with open(os.path.join(_dir, "parameters.json")) as _f:
+    PARAMETERS = _sage_numbers(json.load(_f))
+SWN = {Integer(w): swn for w, swn in PARAMETERS['swn'].items()}   # WOTS+C target digit sum per w
 
-# -----------------------------------------------------------------------------
-# Hash-cost convention
-# -----------------------------------------------------------------------------
-# Two SHA-256 compression-counting conventions are supported, selected via the
-# HASH_CONVENTION environment variable ('cached' or 'uncached'):
-#
-#   cached (default): FIPS 205 SHA-2 layout with the PK.seed midstate cached.
-#     This is the instantiation implemented by SHRINCS (github.com/SHRINCS/shrincs-bip),
-#     and the counts below are the ones its reference implementation executes.
-#
-#   uncached: the original convention of this script, kept verbatim so that
-#     earlier numbers stay reproducible: every call pays for its full input
-#     (a node hash costs 2 compressions), the message hashes are single
-#     2-block hashes, and WOTS-TW verification is averaged as (w-1)/2 steps
-#     per chain.
-#
-#     Usage: HASH_CONVENTION=uncached sage costs.sage --params ...
-#
-HASH_CONVENTION = os.environ.get('HASH_CONVENTION', 'cached').lower()
-assert HASH_CONVENTION in ('cached', 'uncached'), (
-    "HASH_CONVENTION must be 'cached' or 'uncached', got %r" % HASH_CONVENTION)
+# Sizes in bytes
 
-C_Th1 = 1     # Tweakable hash, 1-block: PKseed (128) + Tweak (96) + m1 (128)
-C_Th1c = 1    # Tweakable hash, 1-block + counter: PKseed + Tweak + m1 + counter (32)
-C_Th2 = 1 if HASH_CONVENTION == 'cached' else 2 # Tweakable hash with hash convention
-C_PRF = 1     # PRF: PKseed + SKseed + Tweak
+hashbytes = 16         # n
+counter_size = 4       # the WOTS+C counter of the stateless variants
+randomness_size = 16   # the randomizer R
 
-# Message hash and message PRF, for a 32-byte message and an empty context.
-#
-#   cached:
-#     H_msg = MGF1-SHA-256(R || PK.seed || SHA-256(R || PK.seed || PK.root || M), m)
-#       is two nested SHA-256 calls (98- and 68-byte inputs in SHRINCS), 2
-#       compressions each. Its input starts with the randomizer R, so nothing
-#       can be cached.                                                     -> 4
-#     PRF_msg = HMAC-SHA-256(SK.prf, opt_rand || M) is two SHA-256 calls of
-#       3 and 2 compressions. Their first blocks are the fixed HMAC key pads,
-#       cached like the PK.seed block (it would be 5 otherwise).           -> 3
-#   uncached (original model): one 2-block hash each
-#     H_msg:   PKseed + PKroot (128) + R (256) + m (256)                   -> 2
-#     PRF_msg: SKprf (128) + Opt + m (256) + counter                       -> 2
-C_Hmsg = 4 if HASH_CONVENTION == 'cached' else 2
-C_PRFmsg = 3 if HASH_CONVENTION == 'cached' else 2
+# Compressions per hash call: SHA-256 as SHRINCS (github.com/SHRINCS/shrincs-bip)
+# runs it, with the PK.seed block compressed once per key (docs/model.md, Hash calls)
 
-def compute_Th(n):
-    """
-    Compression calls for a tweakable hash over n hash-sized values, under the active HASH_CONVENTION
+C_Th1 = 1     # tweakable hash of one value: a chain step or a leaf
+C_Th1c = 1    # tweakable hash of one value and the WOTS+C counter
+C_Th2 = 1     # tweakable hash of two values: a tree node
+C_PRF = 1     # PRF of an address with SK.seed
+C_Hmsg = 4    # for a 32-byte message and an empty context
+C_PRFmsg = 3
 
-    cached:   ceil((22*8 + 128*n + 65) / 512)
-    uncached: ceil((128 + 96 + 128*n + 65) / 512)
-    """
-    if HASH_CONVENTION == 'cached':
-        return ceil((22*8 + 128*n + 65)/512)
-    return ceil((128 + 96 + 128*n + 65)/512)
+def compute_Th(m):
+    """Compressions for a tweakable hash of m values: a 22-byte address, the
+    values and the SHA-256 padding."""
+    return ceil((22*8 + 128*m + 65)/512)
 
-# =============================================================================
-# Parameter Sets
-# =============================================================================
-
-# Single consolidated list in table output order
-# Format: (scheme, q_s, h, d, a, k, w, l, swn, bold)
-#   q_s: log2 of max signatures (e.g., 40 means 2^40 signatures)
-#   swn: S_{w,n} target chain sum for WOTS+C
-# bold=True for rows highlighted in the paper tables
+# The parameter sets of the report's tables, in their order:
+# (scheme, log2 q_s, h, d, a, k, w, l, S_wn, bold), bold for the rows the
+# report highlights. The code computes l again from w.
 PARAMETER_SETS = [
     # Table 1: 2^64 signatures (SPX)
     ("SPX", 64, 63, 7, 12, 14, 16, 35, 0, True),
@@ -150,50 +108,25 @@ PARAMETER_SETS = [
     ("W+C_P+FP", 20, 20, 2, 15, 10, 256, 16, 2040, False),
 ]
 
-# =============================================================================
-# Helper Functions
-# =============================================================================
+# WOTS
 
-# High precision arithmetic
-F = RealField(100)
-
-# -----------------------------------------------------------------------------
-# WOTS helpers
-# -----------------------------------------------------------------------------
+@lru_cache(maxsize=None)   # the symbolic logs are slow, and w takes few values
+def wots_lengths(w):
+    """(l1, l2): the message and checksum chains of WOTS-TW (FIPS 205,
+    Section 5). l1 rounds up, so for w = 32 the 26 chains carry 130 bits."""
+    l1 = ceil(hashbytes*8/log(w, 2))
+    l2 = floor(log(l1*(w-1), 2)/log(w, 2)) + 1
+    return l1, l2
 
 def compute_wots_l(scheme, w):
-    """
-    Compute WOTS chain count l based on scheme type.
-
-    For WOTS-TW (plain): l = l1 + l2
-        l1 = ceil(8n / log2(w))              -- message chains (FIPS 205 Sec. 5)
-        l2 = floor(log_w(l1*(w-1))) + 1      -- checksum chains (FIPS 205 Sec. 5)
-
-    For WOTS+C: l = l1 (no checksum chains, replaced by counter)
-
-    Note: l1 must round UP. For w=16 and w=256 the division is exact,
-    but w=32 needs 26 chains (26*5 = 130 >= 128 bits); floor division
-    would give 25 chains, which cannot encode a 128-bit digest.
-    """
-    if scheme == "SPX":
-        l1 = ceil(hashbytes*8/log(w,2))
-        l2 = floor(log(l1*(w-1), 2)/log(w, 2)) + 1
-        return l1 + l2
-    else:
-        return ceil(hashbytes*8/log(w,2))
+    """Number of WOTS chains: l1 + l2 for WOTS-TW (SPX), l1 for WOTS+C,
+    which grinds a counter instead of signing a checksum."""
+    l1, l2 = wots_lengths(w)
+    return l1 + l2 if scheme == "SPX" else l1
 
 def compute_wots_tw_worst_steps(l1, l2, w):
-    """
-    Worst-case WOTS-TW verification steps per hypertree layer.
-
-    Worst case: all l1 message digits = 0, so the verifier traverses w-1
-    steps on every message chain. The checksum C = l1*(w-1) is then encoded
-    in base w as l2 digits c_j; the verifier traverses w-1-c_j steps on each
-    checksum chain. Total = l1*(w-1) + l2*(w-1) - digit_sum(C, w).
-
-    This is the correct model for WOTS-TW. The old average-case formula
-    (w-1)*l/2 was only valid for WOTS+C where chains sum to a constant.
-    """
+    """Chain steps to verify one WOTS-TW signature in the worst case, when
+    every message digit is 0 (docs/model.md, WOTS-TW verification)."""
     C = l1 * (w - 1)
     ds, rem = 0, int(C)
     while rem > 0:
@@ -208,15 +141,8 @@ def _round_div(num, den):
 _wots_tw_floor_cache = {}
 
 def _wots_tw_floor_sum(l1, l2, w):
-    """
-    w^l1 * sum_{j=1}^{l2-1} E[floor(S / w^j)], as an exact integer, where S is
-    the sum of l1 independent uniform base-w digits.
-
-    E[floor(S / w^j)] = sum_{m>=1} P(S >= m*w^j), and the number of digit
-    strings with sum <= t is, by inclusion-exclusion,
-
-        sum_i (-1)^i * C(l1, i) * C(t - i*w + l1, l1).
-    """
+    """w^l1 * sum_{j=1}^{l2-1} E[floor(S / w^j)] as an exact integer, S the sum
+    of l1 uniform base-w digits (docs/model.md, WOTS-TW verification)."""
     l1, l2, w = int(l1), int(l2), int(w)
     key = (l1, l2, w)
     if key in _wots_tw_floor_cache:
@@ -239,47 +165,15 @@ def _wots_tw_floor_sum(l1, l2, w):
     return acc
 
 def compute_wots_tw_mean_steps(l1, l2, w, count=1):
-    """
-    Mean number of chain steps to verify `count` WOTS-TW signatures on
-    uniformly random digests, rounded to the nearest integer.
-
-    A message digit m costs w-1-m steps, so the l1 message chains average
-    (w-1)/2 steps each. The l2 checksum chains do not: the checksum
-    C = l1*(w-1) - S (S = sum of the message digits) is concentrated around
-    l1*(w-1)/2, so its base-w digits are far from uniform (the leading one
-    is almost always 0 or 1) and the verifier walks more of those chains
-    than (w-1)/2. Exactly:
-
-        E[steps] = l1*(w-1)/2 + l2*(w-1) - E[digit_sum(C)]
-                 = (w-1) * (l2 + sum_{j=1}^{l2-1} E[floor(S / w^j)]),
-
-    using that C is distributed like S (map every digit m to w-1-m) and
-    digit_sum(x) = x - (w-1) * sum_{j>=1} floor(x / w^j).
-
-    For w = 16 this is 267.12 steps rather than the 262 that (w-1)*l/2
-    gives, and the gap grows with w (2415.03 against 2295 for w = 256).
-
-    Under the original convention (HASH_CONVENTION=uncached) the (w-1)*l/2
-    approximation is kept.
-    """
-    if HASH_CONVENTION != 'cached':
-        return count * ((w - 1) * (l1 + l2) // 2)
+    """Mean chain steps to verify count WOTS-TW signatures of uniform digests,
+    rounded once to the nearest integer (docs/model.md, WOTS-TW verification)."""
     W = int(w)**int(l1)
     T = _wots_tw_floor_sum(l1, l2, w)
-    # count * (w-1) * (l2 + T/W), rounded to the nearest integer
-    return _round_div(count * (w - 1) * (l2*W + T), W)
+    return _round_div(count * (w - 1) * (l2*W + T), W)   # count*(w-1)*(l2 + T/W)
 
 def compute_nu(l: int, paramsum: int, w: int) -> int:
-    """
-    Compute ν (nu), the number of valid WOTS+C encodings for a given target sum.
-
-    For WOTS+C, we need message digests whose base-w digits sum to exactly S_{w,n}.
-    ν counts how many such encodings exist out of w^l total possibilities.
-
-        ν = Σ_{j=0}^{l} (-1)^j * C(l,j) * C((S_{w,n} + l) - j*w - 1, l-1)
-
-    Returns integer ν. If ν is zero, returns 1 and prints a warning.
-    """
+    """ν, the number of strings of l base-w digits that sum to paramsum
+    (docs/model.md, WOTS+C). 1, with a warning, where there are none."""
     nu = 0
     for j in range(l + 1):
         sign = (-1) ** j
@@ -292,19 +186,12 @@ def compute_nu(l: int, paramsum: int, w: int) -> int:
         nu = 1  # Avoid division by zero
     return nu
 
-# -----------------------------------------------------------------------------
-# PORS helpers
-# -----------------------------------------------------------------------------
+# PORS+FP
 
 def compute_pors_tree_geometry(k, a):
-    """
-    Compute PORS tree geometry.
-
-    Returns (t, subtree_height, extra_leaves) where:
-    - t: total number of PORS leaves (k * 2^a)
-    - subtree_height: height of the largest power-of-2 subtree
-    - extra_leaves: leaves beyond the power-of-2 subtree
-    """
+    """(t, subtree_height, extra_leaves) of the PORS+FP tree: its t = k*2^a
+    leaves, the height of its largest complete subtree, and the leaves
+    outside that subtree."""
     t = k * (2**a)
     subtree_height = floor(log(t, 2))
     extra_leaves = t - 2**subtree_height
@@ -313,12 +200,9 @@ def compute_pors_tree_geometry(k, a):
 _interleave_table_cache = {}
 
 def log2_exp_work_from_mmax(t, k, mmax):
-    """Look up log2 of expected work for PORS+FP grinding given mmax.
-
-    The (t, k) tables are cached: compute_mmax probes several mmax values per
-    parameter set, and sweeps revisit the same (k, a) pairs for every (h, d) —
-    without the cache a full PORS+FP sweep rebuilds each table thousands of times.
-    """
+    """log2 of the expected attempts for PORS+FP grinding to an authentication
+    set of at most mmax nodes. The (t, k) tables are cached: a sweep asks for
+    the same (k, a) at every (h, d), and compute_mmax for several mmax."""
     key = (int(t), int(k))
     table = _interleave_table_cache.get(key)
     if table is None:
@@ -332,105 +216,41 @@ def log2_exp_work_from_mmax(t, k, mmax):
     return table[max(lowers)]
 
 def exp_work_from_mmax(t, k, mmax):
-    """Compute expected work (attempts) for PORS+FP grinding given mmax."""
+    """Expected attempts for PORS+FP grinding to at most mmax nodes."""
     return 2.0 ** log2_exp_work_from_mmax(t, k, mmax)
 
-# -----------------------------------------------------------------------------
-# Search/Grinding helpers
-# -----------------------------------------------------------------------------
-
-def worst_case(p, q, d, max_k=10**11):
-    """
-    Find minimum trials k such that P(fewer than d successes in k trials) < q.
-
-    Used to compute worst-case search time: how many attempts until we're
-    confident (with probability 1-q) that we've found d valid encodings.
-
-    P(X < d) = Σ_{i=0}^{d-1} C(k,i) * p^i * (1-p)^(k-i), where X ~ Binomial(k, p)
-
-    Returns smallest k where P(X < d) < q.
-    """
-    # Convert Sage types to Python native types
-    p_float = float(p)
-    q_float = float(q)
-    d_int = int(d)
-
-    def tail_prob(k):
-        if k < d_int:
-            return 1.0
-        # binom.cdf(d-1, k, p) = P(X <= d-1) = P(X < d)
-        return binom.cdf(d_int - 1, int(k), p_float)
-    # Find an upper bound for k
-    k_low = d_int - 1
-    k_high = max(d_int, 1)
-    while tail_prob(k_high) >= q_float:
-        k_high *= 2
-        if k_high > max_k:
-            raise RuntimeError("Could not find k below given max_k; try increasing max_k.")
-    # Binary search between k_low and k_high
-    while k_low + 1 < k_high:
-        k_mid = (k_low + k_high) // 2
-        if tail_prob(k_mid) < q_float:
-            k_high = k_mid
-        else:
-            k_low = k_mid
-    return k_high
-
-# =============================================================================
-# Core Computation Functions
-# =============================================================================
+# Sizes and costs (docs/model.md, SLH-DSA)
 
 def compute_size(h, d, a, k, w, scheme, mmax=0):
-    """
-    Compute signature size in bytes.
-
-    Signature structure:
-    - Randomness R (randomness_size bytes)
-    - d XMSS layers, each containing:
-        - WOTS signature: l hash values
-        - Auth path: h' = h/d hash values
-        - Counter (for W+C variants): counter_size bytes
-    - Few-time signature (FTS):
-        - FORS: k leaves + k*a auth path nodes
-        - FORS+C: (k-1) leaves + (k-1)*a auth path nodes (last tree omitted)
-        - PORS+FP: k leaves + mmax auth set nodes
-
-    mmax: for PORS+FP, max size of the authentication set
-    """
+    """Signature size in bytes: R, then per layer the authentication path, the
+    WOTS signature and, for WOTS+C, the counter, then the FORS, FORS+C or
+    PORS+FP signature; mmax bounds the PORS+FP authentication set."""
     assert h % d == 0, "h must be divisible by d"
     has_wc = (scheme != "SPX")
     l = compute_wots_l(scheme, w)
     h_prime = h // d
-    # Each XMSS layer: auth path (h') + WOTS sig (l) + optional counter
     hyper_tree_size = d*(h_prime*hashbytes + l*hashbytes + counter_size*int(has_wc))
-    # fts = few-time signature (FORS, FORS+C, or PORS+FP)
     if scheme == "W+C_P+FP":
-        # k revealed leaves + mmax authentication nodes
         fts_size = (k + mmax)*hashbytes
     elif scheme == "W+C_F+C":
-        # k-1 trees (last tree omitted via grinding)
         fts_size = (k-1)*hashbytes + (k-1)*a*hashbytes
-    else:  # Plain FORS (SPX or W+C)
-        # k trees, each with 1 leaf + a auth path nodes
+    else:  # FORS
         fts_size = k*hashbytes + k*a*hashbytes
     return hyper_tree_size + fts_size + randomness_size
 
 
 def compute_mmax(h_prime, l, w, d_wots_expected_search, d, k, a):
-    """Compute mmax for PORS+FP such that signing time is close to FORS+C.
-
-    mmax is the max size of the authentication set.
-    """
+    """The PORS+FP authentication-set bound: from (k-1)*a - ceil(350/n) up,
+    the first for which signing costs less than 1.11 times signing with
+    FORS+C, and at most 19 steps up (docs/model.md, W+C, FORS+C and PORS+FP)."""
     Thl = compute_Th(l)
-    Thk1 = compute_Th(k-1)  # FORS+C has k-1 roots
+    Thk1 = compute_Th(k-1)
     merkle_tree_fixed_part_time = (2**h_prime * (l*C_PRF + l*(w-1)*C_Th1 + Thl)) + (2**h_prime-1)*C_Th2
     hyper_tree_expected_time = d*merkle_tree_fixed_part_time + d_wots_expected_search*C_Th1c
-    # Compute FORS+C time to relate PORS time in compression calls
     fors_c_fixed_part_time = (k-1)*(2**a)*C_PRF + (k-1)*(2**a)*C_Th1 + (k-1)*(2**a-1)*C_Th2 + Thk1
     fors_c_expected_search_time = 2**a*(C_Hmsg + C_PRFmsg)
     fors_c_expected_total_time = fors_c_fixed_part_time + fors_c_expected_search_time
     spx_fc_expected_total_time = hyper_tree_expected_time + fors_c_expected_total_time
-    # Search for mmax such that PORS time is close to FORS+C time
     t, subtree_height, extra_leaves = compute_pors_tree_geometry(k, a)
     pors_fixed_part_time = t*(C_PRF) + t*(C_Th1) + ((2**subtree_height-1) + extra_leaves)*(C_Th2)
     mmax = (k-1)*a - ceil(350/hashbytes)
@@ -447,22 +267,8 @@ def compute_mmax(h_prime, l, w, d_wots_expected_search, d, k, a):
 
 
 def compute_keygen_time(h, d, w, scheme):
-    """
-    Compute keygen time in compression function calls.
-
-    Keygen builds the top-level XMSS tree (height h' = h/d) to derive PK.root.
-    No WOTS+C counter search occurs during keygen: the WOTS keypairs at the
-    leaves of the top tree are used as verification keys, not to sign anything.
-
-    One XMSS tree with 2^h' leaves:
-      - 2^h' WOTS keypairs, each requiring:
-          - l PRF calls to generate secret keys
-          - l*(w-1) chain hashes (Th1) to derive the public chain values
-          - 1 hash to compress l public values into a leaf (Thl)
-      - 2^h' - 1 internal Merkle tree nodes (Th2)
-
-    Returns the keygen time as a number of compression function calls.
-    """
+    """Compressions for KeyGen: the top tree, 2^h' WOTS public keys and
+    2^h' - 1 nodes. Nothing is ground, since KeyGen signs nothing."""
     assert h % d == 0, "h must be divisible by d"
     h_prime = h // d
     l = compute_wots_l(scheme, w)
@@ -472,16 +278,8 @@ def compute_keygen_time(h, d, w, scheme):
 
 
 def compute_signing_time(h, d, a, k, w, swn, scheme):
-    """
-    Compute signing time in both hash calls and compression function calls.
-
-    Returns a dict with keys:
-    - 'hashes': expected signing time in hash calls
-    - 'compressions': expected signing time in compression calls
-    - 'exp_search': expected search attempts
-    - 'worst_search': worst-case search attempts
-    - 'mmax': mmax value for PORS+FP (max authentication set size)
-    """
+    """{'compressions': mean compressions for SigGen, 'mmax': the PORS+FP
+    authentication-set bound, 0 for the other schemes}."""
     assert h % d == 0, "h must be divisible by d"
     has_wc = (scheme != "SPX")
     h_prime = h // d
@@ -490,167 +288,145 @@ def compute_signing_time(h, d, a, k, w, swn, scheme):
     Thk = compute_Th(k)
 
     if has_wc:
-        # WOTS+C search: find counter such that digest sums to S_{w,n}
-        # Success probability p_ν = ν / w^l
-        # By geometric distribution, expected attempts until success = 1/p_ν = w^l / ν
-        # We need d successful searches (one per hypertree layer)
+        # One counter search per layer, w^l / ν attempts each
         nu = compute_nu(l, swn, w)
         d_wots_expected_search = d*ceil((w**l) / nu)
-        d_wots_worst_search = worst_case(nu/(w**l), F(2)**(-30), d)
     else:
         d_wots_expected_search = 0
-        d_wots_worst_search = 0
 
-    # Compute times for both hash calls (h_) and compressions (c_)
-    # One XMSS tree layer with 2^h' leaves:
-    #   - 2^h' WOTS keypairs, each requiring:
-    #       - l PRF calls to generate secret keys
-    #       - l*(w-1) chain hashes (Th1)
-    #       - 1 hash to compress l public key values (Thl)
-    #   - 2^h' - 1 internal Merkle tree nodes (Th2, hashing 2 children)
-    h_merkle = 2**h_prime * (l + l*(w-1) + 1) + (2**h_prime - 1)
+    # One tree per layer: 2^h' WOTS public keys and 2^h' - 1 nodes
     c_merkle = 2**h_prime * (l*C_PRF + l*(w-1)*C_Th1 + Thl) + (2**h_prime - 1)*C_Th2
-
-    # Full hypertree: d layers + WOTS+C counter search overhead
-    h_hyper_exp = d*h_merkle + d_wots_expected_search
     c_hyper_exp = d*c_merkle + d_wots_expected_search*C_Th1c
-
-    # Message hash cost (2 hash calls: Hmsg + PRFmsg)
-    h_msg = 2
     c_msg = C_Hmsg + C_PRFmsg
 
     mmax = 0
     if scheme == "W+C_F+C":
-        # FORS+C: k-1 trees (last tree omitted, grinding ensures first leaf is selected)
-        # Each tree has 2^a leaves:
-        #   - 2^a PRF calls to generate leaves
-        #   - 2^a hashes to compute leaf nodes (Th1)
-        #   - 2^a - 1 internal nodes (Th2)
-        # Plus 1 hash to compress k-1 roots
-        # Grinding: search for message hash with last a bits = 0, expected 2^a attempts
-        Thk1 = compute_Th(k-1)  # k-1 roots to compress
-        h_fors_fixed = (k-1)*(2**a) + (k-1)*(2**a) + (k-1)*(2**a - 1) + 1
+        # k - 1 trees; about 2^a message hashes until the last tree's index is 0
+        Thk1 = compute_Th(k-1)
         c_fors_fixed = (k-1)*(2**a)*C_PRF + (k-1)*(2**a)*C_Th1 + (k-1)*(2**a - 1)*C_Th2 + Thk1
         fors_exp_search = 2**a
-        fors_worst_search = worst_case(F(1)/F(2**a), F(2)**(-30), 1)
-        h_fors_search = fors_exp_search * h_msg
         c_fors_search = fors_exp_search * c_msg
         return {
-            'hashes': h_hyper_exp + h_fors_fixed + h_fors_search,
             'compressions': c_hyper_exp + c_fors_fixed + c_fors_search,
-            'exp_search': d_wots_expected_search + h_fors_search,
-            'worst_search': d_wots_worst_search + fors_worst_search * h_msg,
             'mmax': mmax,
         }
     elif scheme == "W+C_P+FP":
-        # PORS+FP: single tree with t = k * 2^a leaves
-        # Tree structure: largest power-of-2 subtree + extra leaves
-        # Grinding: search for message hash where Octopus auth set size <= mmax
+        # One tree of t leaves; message hashes until the Octopus authentication
+        # set has at most mmax nodes
         t, subtree_height, extra_leaves = compute_pors_tree_geometry(k, a)
-        # t PRF calls + t leaf hashes + internal nodes
-        h_pors_fixed = 2*t + (2**subtree_height - 1) + extra_leaves
         c_pors_fixed = t*C_PRF + t*C_Th1 + ((2**subtree_height - 1) + extra_leaves)*C_Th2
         mmax = compute_mmax(h_prime, l, w, d_wots_expected_search, d, k, a)
         pors_search_attempts = ceil(exp_work_from_mmax(t, k, mmax))
-        h_pors_search = pors_search_attempts * h_msg
         c_pors_search = pors_search_attempts * c_msg
-        pors_worst_search = worst_case(F(1)/pors_search_attempts, F(2)**(-30), 1)
         return {
-            'hashes': h_hyper_exp + h_pors_fixed + h_pors_search,
             'compressions': c_hyper_exp + c_pors_fixed + c_pors_search,
-            'exp_search': d_wots_expected_search + h_pors_search,
-            'worst_search': d_wots_worst_search + pors_worst_search * h_msg,
             'mmax': mmax,
         }
-    else:
-        # Plain FORS (SPX or W+C): k trees, each with 2^a leaves
-        # No grinding, message hash directly selects k leaf indices
-        h_fors_fixed = k*(2**a) + k*(2**a) + k*(2**a - 1) + 1
+    else:  # FORS
         c_fors_fixed = k*(2**a)*C_PRF + k*(2**a)*C_Th1 + k*(2**a - 1)*C_Th2 + Thk
         return {
-            'hashes': h_fors_fixed + h_msg + h_hyper_exp,
             'compressions': c_fors_fixed + c_msg + c_hyper_exp,
-            'exp_search': d_wots_expected_search,
-            'worst_search': d_wots_worst_search,
             'mmax': mmax,
         }
 
 def compute_verification_time(h, d, a, k, w, swn, scheme, mmax=0):
-    """
-    Compute verification time in both hash calls and compression function calls.
-
-    Verification involves:
-    1. Hash the message (Hmsg)
-    2. Verify FTS (FORS/FORS+C/PORS+FP)
-    3. For each of d hypertree layers: verify WOTS signature
-    4. Verify h auth path nodes up the hypertree
-
-    mmax: for PORS+FP, max size of the authentication set
-    """
+    """{'compressions': mean compressions for SigVer, 'compressions_worst':
+    the most for any message}; mmax bounds the PORS+FP authentication set."""
     has_wc = (scheme != "SPX")
     l = compute_wots_l(scheme, w)
     Thl = compute_Th(l)
     Thk = compute_Th(k)
 
-    # WOTS verification: complete each chain from signature value to public key.
-    # h_wots / c_wots are totals over all d hypertree layers.
+    # WOTS over all d layers; WOTS+C costs the same for every message
     if has_wc:
-        # WOTS+C: chain positions sum to S_{w,n}, so remaining steps = (w-1)*l - S_{w,n}
-        # Plus: verify counter hash (Th1c) and compress public key (Thl)
-        # Deterministic: worst case == average case.
-        h_wots = d*((w-1)*l - swn + 2)
         c_wots = d*(((w-1)*l - swn)*C_Th1 + C_Th1c + Thl)
         c_wots_worst = c_wots
-    else:  # Plain WOTS
-        l1 = ceil(hashbytes*8/log(w,2))
-        l2 = floor(log(l1*(w-1), 2)/log(w, 2)) + 1
-        # Average case: expected chain steps for a uniformly random digest,
-        # see compute_wots_tw_mean_steps.
-        avg_steps = compute_wots_tw_mean_steps(l1, l2, w, d)
-        h_wots = avg_steps + d
-        c_wots = avg_steps*C_Th1 + d*Thl
-        # Worst case (all message digits 0): see compute_wots_tw_worst_steps.
+    else:  # WOTS-TW
+        l1, l2 = wots_lengths(w)
+        c_wots = compute_wots_tw_mean_steps(l1, l2, w, d)*C_Th1 + d*Thl
         c_wots_worst = d*(compute_wots_tw_worst_steps(l1, l2, w)*C_Th1 + Thl)
 
-    # FTS verification
     if scheme == "W+C_F+C":
-        # FORS+C: k-1 leaves to hash, (k-1)*a auth path nodes, 1 root compression
-        Thk1 = compute_Th(k-1)  # k-1 roots to compress
-        h_fts = (k-1) + (k-1)*a + 1
+        Thk1 = compute_Th(k-1)
         c_fts = (k-1)*C_Th1 + (k-1)*a*C_Th2 + Thk1
     elif scheme == "W+C_P+FP":
-        # PORS+FP: k leaves to hash, mmax auth set nodes
-        h_fts = k + mmax
         c_fts = k*C_Th1 + mmax*C_Th2
-    else:  # Plain FORS (SPX or W+C)
-        # FORS: k leaves, k*a auth path nodes, 1 root compression
-        h_fts = k + k*a + 1
+    else:  # FORS
         c_fts = k*C_Th1 + k*a*C_Th2 + Thk
 
-    # Total: Hmsg + FTS + d*WOTS + h auth path nodes
-    # The FTS and auth-path costs are message-independent, so the worst case
-    # differs from the average only in the WOTS-TW chain walks.
     return {
-        'hashes': 1 + h_fts + h_wots + h,
         'compressions': C_Hmsg + c_fts + c_wots + h*C_Th2,
         'compressions_worst': C_Hmsg + c_fts + c_wots_worst + h*C_Th2,
     }
 
-# =============================================================================
-# CSV Output
-# =============================================================================
+# Sweep
+
+def security_model(scheme):
+    """The model compute_security uses for scheme."""
+    return "PORS+FP" if scheme == "W+C_P+FP" else "FORS"
+
+
+_security_cache = {}
+
+def cached_security(q_s_log2, h, k, a, model):
+    """compute_security for 2^q_s_log2 signatures, once per (h, k, a): a sweep
+    asks again for every d and w."""
+    key = (int(q_s_log2), int(h), int(k), int(a), model)
+    if key not in _security_cache:
+        _security_cache[key] = compute_security(2**q_s_log2, h, k, a, model, hashbytes)
+    return _security_cache[key]
+
+
+def evaluate(q_s_log2, h, d, k, a, w, swn, scheme):
+    """Security (bits), size (bytes) and costs (compressions) of one parameter
+    set for 2^q_s_log2 signatures. None below the security target, and for
+    PORS+FP where the grinding cost table has no entry for mmax."""
+    security = cached_security(q_s_log2, h, k, a, security_model(scheme))
+    if security < PARAMETERS['security_bits']:
+        return None
+    try:
+        sign = compute_signing_time(h, d, a, k, w, swn, scheme)
+    except ValueError:
+        return None
+    mmax = sign['mmax']
+    verify = compute_verification_time(h, d, a, k, w, swn, scheme, mmax)
+    return {
+        'h': h, 'd': d, 'k': k, 'a': a, 'w': w, 'swn': swn, 'mmax': mmax,
+        'l': compute_wots_l(scheme, w),
+        'security': security,
+        'size': compute_size(h, d, a, k, w, scheme, mmax),
+        'keygen': compute_keygen_time(h, d, w, scheme),
+        'sign': sign['compressions'],
+        'verify': verify['compressions'],
+        'verify_worst': verify['compressions_worst'],
+    }
+
+
+def sweep(scheme, w_swn_pairs, h_values, d_values, k_values, a_values, q_s_log2):
+    """evaluate() for every parameter set of a grid, (w, swn) outermost and a
+    innermost, skipping the d that do not divide h. Yields
+    ((w, swn, h, d, k, a), result)."""
+    for w, swn in w_swn_pairs:
+        for h in h_values:
+            for d in d_values:
+                if h % d != 0:
+                    continue
+                for k in k_values:
+                    for a in a_values:
+                        yield ((w, swn, h, d, k, a),
+                               evaluate(q_s_log2, h, d, k, a, w, swn, scheme))
+
+# The report's parameter sets: CSV and tables
 
 def compute_all_results():
-    """Compute results for all parameter sets. Returns list of dicts."""
+    """A dict of sizes and costs for each of PARAMETER_SETS."""
     results = []
     for scheme, q_s, h, d, a, k, w, _, swn, bold in PARAMETER_SETS:
-        # Compute l dynamically based on scheme
         l = compute_wots_l(scheme, w)
 
-        # Verify security level is at least 128 bits
-        scheme_type = "PORS+FP" if scheme == "W+C_P+FP" else "FORS"
-        security = compute_security(2**q_s, h, k, a, scheme_type)
-        assert security >= 128, f"Security {security:.1f} < 128 for {scheme} q_s=2^{q_s} h={h} a={a} k={k}"
+        security = compute_security(2**q_s, h, k, a, security_model(scheme), hashbytes)
+        target = PARAMETERS['security_bits']
+        assert security >= target, f"Security {security:.1f} < {target} for {scheme} q_s=2^{q_s} h={h} a={a} k={k}"
 
         sign = compute_signing_time(h, d, a, k, w, swn, scheme)
         verify = compute_verification_time(h, d, a, k, w, swn, scheme, sign['mmax'])
@@ -671,11 +447,7 @@ def compute_all_results():
             'swn': swn,
             'size': size,
             'keygen_compressions': keygen_compressions,
-            'sign_hashes': sign['hashes'],
             'sign_compressions': sign['compressions'],
-            'exp_search': sign['exp_search'],
-            'worst_search': sign['worst_search'],
-            'verify_hashes': verify['hashes'],
             'verify_compressions': verify['compressions'],
             'verify_compressions_worst': verify['compressions_worst'],
             'compressions_per_byte': compressions_per_byte,
@@ -686,17 +458,16 @@ def compute_all_results():
 
 
 def generate_csv():
-    """Generate CSV output for all parameter sets."""
-    print("scheme,q_s,h,d,a,k,w,l,paramsum,size,keygen_compressions,sign_hashes,sign_compressions,exp_search,worst_search,verify_hashes,verify_compressions,verify_compressions_worst,compressions_per_byte,compressions_per_byte_worst,bold")
+    print("scheme,q_s,h,d,a,k,w,l,paramsum,size,keygen_compressions,sign_compressions,verify_compressions,verify_compressions_worst,compressions_per_byte,compressions_per_byte_worst,bold")
 
     for r in compute_all_results():
         bold_str = "True" if r['bold'] else "False"
-        print(f"{r['scheme']},2^{r['q_s']},{r['h']},{r['d']},{r['a']},{r['k']},{r['w']},{r['l']},{r['swn']},{r['size']},{r['keygen_compressions']},{r['sign_hashes']},{r['sign_compressions']},{r['exp_search']},{r['worst_search']},{r['verify_hashes']},{r['verify_compressions']},{r['verify_compressions_worst']},{r['compressions_per_byte']:.2f},{r['compressions_per_byte_worst']:.2f},{bold_str}")
+        print(f"{r['scheme']},2^{r['q_s']},{r['h']},{r['d']},{r['a']},{r['k']},{r['w']},{r['l']},{r['swn']},{r['size']},{r['keygen_compressions']},{r['sign_compressions']},{r['verify_compressions']},{r['verify_compressions_worst']},{r['compressions_per_byte']:.2f},{r['compressions_per_byte_worst']:.2f},{bold_str}")
 
 
 def format_num(n):
-    """Format large numbers with K/M suffixes for readability."""
-    n = float(n)  # Convert Sage types to Python float
+    """n with a K or M suffix."""
+    n = float(n)
     if n >= 1_000_000:
         return f"{n/1_000_000:.1f}M"
     elif n >= 1_000:
@@ -706,11 +477,7 @@ def format_num(n):
 
 
 def generate_table(q_s_filter=None):
-    """Generate pretty ASCII table output for parameter sets.
-
-    Args:
-        q_s_filter: If specified, only show rows with this q_s value (e.g., 40 for 2^40 sigs)
-    """
+    """Prints the tables, only for 2^q_s_filter signatures if given."""
     results = compute_all_results()
 
     if q_s_filter is not None:
@@ -771,16 +538,11 @@ def generate_table(q_s_filter=None):
     print("Legend: Size=bytes, Keygen(C)/Sign(C)/Verify(C)=compression calls, C/byte=verify compressions per signature byte")
 
 
-# =============================================================================
-# Main
-# =============================================================================
-
 def compute_single(scheme, q_s_log2, h, d, a, k, w, swn):
-    """Compute and display results for a single parameter set."""
+    """Prints the size, costs and security of one parameter set."""
     q_s = 2**q_s_log2
     l = compute_wots_l(scheme, w)
-    scheme_type = "PORS+FP" if scheme == "W+C_P+FP" else "FORS"
-    security = compute_security(q_s, h, k, a, scheme_type)
+    security = compute_security(q_s, h, k, a, security_model(scheme), hashbytes)
     sign = compute_signing_time(h, d, a, k, w, swn, scheme)
     mmax = sign['mmax']
     verify = compute_verification_time(h, d, a, k, w, swn, scheme, mmax)
@@ -803,9 +565,8 @@ def compute_single(scheme, q_s_log2, h, d, a, k, w, swn):
     print("C/byte:     " + "{:.2f}".format(c_per_byte) + "  (worst: " + "{:.2f}".format(float(verify['compressions_worst'])/float(size)) + ")")
 
 
-# The env flag lets other scripts (stateful.sage, export_site_data.sage) load
-# this file for its functions without triggering the CLI output (sage's
-# load() executes in the caller's namespace, where __name__ is '__main__').
+# Scripts that load this file for its functions set COSTS_SAGE_NO_MAIN: load()
+# runs it in their namespace, where __name__ is '__main__'.
 if __name__ == "__main__" and not os.environ.get("COSTS_SAGE_NO_MAIN"):
     import sys
 

@@ -25,7 +25,7 @@ CSV_UNBOUND := $(UTILS)/all_unbound_candidates.csv
 generate: sweeps derived data figures test
 
 sweeps:
-	$(SAGE) slhdsa-2to40.sage --max-size 7856 > /dev/null
+	$(SAGE) slhdsa-2to40.sage > /dev/null
 	mv candidates.csv $(CSV_CAPPED)
 	$(SAGE) slhdsa-2to40.sage --max-size 99999999 > /dev/null
 	mv candidates.csv $(CSV_UNBOUND)

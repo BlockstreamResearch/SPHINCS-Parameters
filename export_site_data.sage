@@ -1,29 +1,13 @@
 #!/usr/bin/env sage
 """
-Export the canonical dataset consumed by both interactive pages: site/data.json.
+Writes site/data.json for the explorer and the stateful page: the SPX pool from
+utils/all_size_capped_candidates.csv (make sweeps) with the optional w added,
+the W+C, W+C_F+C and W+C_P+FP pools from the sweep of costs.sage, and the
+XMSS-MT and UXMSS rows of stateful.sage. The pages check samples of it against
+their own model.
 
-Single source of truth:
-  - SPX pool        : core rows read from utils/all_size_capped_candidates.csv
-                      (regenerate first if needed:
-                       sage slhdsa-2to40.sage --max-size 7856 &&
-                       mv candidates.csv utils/all_size_capped_candidates.csv),
-                      plus optional-w rows (W_OPTIONAL)
-  - variant pools   : W+C, W+C_F+C, W+C_P+FP swept over the same canonical
-                      grid with (w, swn) in {(16, 240), (256, 2040)}, using
-                      costs.sage / security.sage directly
-  - stateful grid, UXMSS variants, SLH baseline
-                    : computed by loading stateful.sage
-
-The pages load data.json at startup (without it the explorer has no pool and
-the stateful page computes its candidates in the browser) and self-check the
-loaded numbers against their local formulas, logging any divergence to the
-console.
-
-Usage:
-  sage export_site_data.sage                     # all schemes (a few minutes)
-  sage export_site_data.sage --schemes SPX,W+C   # subset (pages adapt)
-Verify:
-  python3 tests/test_regression.py
+  sage export_site_data.sage                     (all schemes, a few minutes)
+  sage export_site_data.sage --schemes SPX,W+C   (a subset; the pages adapt)
 """
 import os
 import sys
@@ -32,25 +16,21 @@ import json
 import subprocess
 import datetime
 
+_DOC = __doc__   # loading stateful.sage replaces __doc__
 _dir = os.path.dirname(os.path.abspath(__file__))
-os.environ['STATEFUL_SAGE_NO_MAIN'] = '1'
-os.environ['COSTS_SAGE_NO_MAIN'] = '1'
-
-_saved_argv = sys.argv
-sys.argv = ['export_site_data.sage']
-load(os.path.join(_dir, "stateful.sage"))   # also loads costs.sage + security.sage
-sys.argv = _saved_argv
+os.environ['STATEFUL_SAGE_NO_MAIN'] = '1'   # its functions, without its CLI
+load(os.path.join(_dir, "stateful.sage"))   # and through it costs.sage and security.sage
 
 ALL_SCHEMES = ['SPX', 'W+C', 'W+C_F+C', 'W+C_P+FP']
 schemes = ALL_SCHEMES
-_args = _saved_argv[1:]
+_args = sys.argv[1:]
 i = 0
 while i < len(_args):
     if _args[i] == '--schemes' and i + 1 < len(_args):
         schemes = [s for s in _args[i + 1].split(',') if s]
         i += 2
     elif _args[i] == '--help':
-        print(__doc__)
+        print(_DOC)
         sys.exit(0)
     else:
         print("Unknown argument: {}".format(_args[i]), file=sys.stderr)
@@ -58,27 +38,20 @@ while i < len(_args):
 for s in schemes:
     assert s in ALL_SCHEMES, "unknown scheme: %s" % s
 
-# Canonical stateless grid (report Sec. 2; must match slhdsa-2to40.sage
-# defaults).
-GRID = {'h': [40, 50], 'd': [2, 25], 'k': [6, 24], 'a': [8, 20],
-        'w': [2, 4, 16, 256], 'q_s_log2': 40, 'max_size': 7856}
-# Optional Winternitz extras for the SPX pool
-W_OPTIONAL = [32, 64, 128]
-WC_PAIRS = [(16, 240), (256, 2040)]   # (w, swn) for WOTS+C schemes
+GRID = PARAMETERS['stateless']['grid']
+W_OPTIONAL = PARAMETERS['stateless']['w_optional']   # SPX only
+WC_PAIRS = [(w, SWN[w]) for w in PARAMETERS['stateless']['wc_w']]
 POOL_FIELDS = ['h', 'd', 'k', 'a', 'w', 'swn', 'mmax',
                'size', 'kg', 'sg', 'sv', 'sv_worst']
 
 
-def _hd_pairs():
-    return [(h, d)
-            for h in range(GRID['h'][0], GRID['h'][1] + 1)
-            for d in range(GRID['d'][0], GRID['d'][1] + 1)
-            if h % d == 0]
+H_VALUES = range(GRID['h'][0], GRID['h'][1] + 1)
+D_VALUES = range(GRID['d'][0], GRID['d'][1] + 1)
+K_VALUES = range(GRID['k'][0], GRID['k'][1] + 1)
+A_VALUES = range(GRID['a'][0], GRID['a'][1] + 1)
 
 
-# ---------------------------------------------------------------------------
-# SPX pool: straight from the canonical sweep CSV
-# ---------------------------------------------------------------------------
+# SPX pool: the rows of the sweep CSV
 csv_path = os.path.join(_dir, 'utils', 'all_size_capped_candidates.csv')
 spx_rows, baseline = [], None
 with open(csv_path) as f:
@@ -88,99 +61,39 @@ with open(csv_path) as f:
                int(r['size']), int(float(r['keygen_C'])), int(float(r['sign_C'])),
                int(float(r['verify_C'])), int(float(r['verify_worst_C']))]
         if r['label'] == 'STANDARD':
-            baseline = {'params': {'h': 63, 'd': 7, 'k': 14, 'a': 12, 'w': 16},
+            baseline = {'params': {x: PARAMETERS['baseline'][x] for x in ('h', 'd', 'k', 'a', 'w')},
                         'size': rec[7], 'kg': rec[8], 'sg': rec[9],
                         'sv': rec[10], 'sv_worst': rec[11]}
         else:
             spx_rows.append(rec)
 assert baseline is not None, "STANDARD row missing from %s" % csv_path
 
-# ---------------------------------------------------------------------------
-# Variant pools: computed with costs.sage functions (security cached)
-# ---------------------------------------------------------------------------
-_sec_cache = {}
-
-
-def _security_ok(model, h, k, a):
-    key = (model, int(h), int(k), int(a))
-    if key not in _sec_cache:
-        _sec_cache[key] = float(compute_security(
-            2**GRID['q_s_log2'], h, k, a, model, hashbytes=16)) >= 128.0
-    return _sec_cache[key]
-
-
-def sweep_spx_extra(w_values):
-    """SPX rows for the optional w values (same initial bounds as the CSV)."""
-    rows = []
-    pairs = _hd_pairs()
-    for w in w_values:
-        for pi, (h, d) in enumerate(pairs):
-            print("  SPX extras: w={} {}/{}".format(w, pi + 1, len(pairs)),
-                  file=sys.stderr, end='\r')
-            for k in range(GRID['k'][0], GRID['k'][1] + 1):
-                for a in range(GRID['a'][0], GRID['a'][1] + 1):
-                    if not _security_ok("FORS", h, k, a):
-                        continue
-                    try:
-                        sign = compute_signing_time(h, d, a, k, w, 0, 'SPX')
-                        mmax = sign['mmax']
-                        verify = compute_verification_time(h, d, a, k, w, 0, 'SPX', mmax)
-                        size = compute_size(h, d, a, k, w, 'SPX', mmax)
-                    except Exception:
-                        continue
-                    if size >= GRID['max_size']:
-                        continue
-                    kg = compute_keygen_time(h, d, w, 'SPX')
-                    rows.append([int(h), int(d), int(k), int(a), int(w),
-                                 0, 0, int(size), int(kg),
-                                 int(sign['compressions']),
-                                 int(verify['compressions']),
-                                 int(verify['compressions_worst'])])
-    print(file=sys.stderr)
-    return rows
-
-
-def sweep_scheme(scheme):
-    model = "PORS+FP" if scheme == "W+C_P+FP" else "FORS"
-    rows, considered = [], 0
-    pairs = _hd_pairs()
-    for w, swn in WC_PAIRS:
-        for pi, (h, d) in enumerate(pairs):
-            print("  {}: (w={}, swn={}) {}/{}".format(scheme, w, swn, pi + 1, len(pairs)),
-                  file=sys.stderr, end='\r')
-            for k in range(GRID['k'][0], GRID['k'][1] + 1):
-                for a in range(GRID['a'][0], GRID['a'][1] + 1):
-                    considered += 1
-                    if not _security_ok(model, h, k, a):
-                        continue
-                    try:
-                        sign = compute_signing_time(h, d, a, k, w, swn, scheme)
-                        mmax = sign['mmax']
-                        verify = compute_verification_time(h, d, a, k, w, swn, scheme, mmax)
-                        size = compute_size(h, d, a, k, w, scheme, mmax)
-                    except Exception:
-                        continue
-                    if size >= GRID['max_size']:
-                        continue
-                    kg = compute_keygen_time(h, d, w, scheme)
-                    rows.append([int(h), int(d), int(k), int(a), int(w),
-                                 int(swn), int(mmax), int(size), int(kg),
-                                 int(sign['compressions']),
-                                 int(verify['compressions']),
-                                 int(verify['compressions_worst'])])
+# The optional w of SPX and the variant pools: the sweep of costs.sage
+def pool_rows(scheme, w_swn_pairs):
+    """Pool rows (POOL_FIELDS) of the grid below max_size, and the number of
+    parameter sets considered."""
+    rows, considered, at = [], 0, None
+    for (w, swn, h, d, k, a), r in sweep(scheme, w_swn_pairs, H_VALUES, D_VALUES,
+                                          K_VALUES, A_VALUES, GRID['q_s_log2']):
+        considered += 1
+        if (w, h, d) != at:
+            at = (w, h, d)
+            print("  {}: w={}, h={}, d={}".format(scheme, w, h, d), file=sys.stderr, end='\r')
+        if r is None or r['size'] >= GRID['max_size']:
+            continue
+        rows.append([int(r[f]) for f in ('h', 'd', 'k', 'a', 'w', 'swn', 'mmax', 'size',
+                                         'keygen', 'sign', 'verify', 'verify_worst')])
     print(file=sys.stderr)
     return rows, considered
 
 
 pools = {}
 if 'SPX' in schemes:
-    pairs = _hd_pairs()
     # 'considered' counts the core grid only; the page derives the count for
     # whichever w set is active from meta.grid.
-    spx_considered = (len(pairs) * len(GRID['w'])
-                      * (GRID['k'][1] - GRID['k'][0] + 1)
-                      * (GRID['a'][1] - GRID['a'][0] + 1))
-    spx_extra = sweep_spx_extra(W_OPTIONAL)
+    hd_pairs = sum(1 for h in H_VALUES for d in D_VALUES if h % d == 0)
+    spx_considered = hd_pairs * len(GRID['w']) * len(K_VALUES) * len(A_VALUES)
+    spx_extra, _ = pool_rows('SPX', [(w, 0) for w in W_OPTIONAL])
     all_spx = spx_rows + spx_extra
     pools['SPX'] = {'fields': POOL_FIELDS, 'considered': spx_considered,
                     'count': len(all_spx), 'rows': all_spx}
@@ -189,25 +102,21 @@ if 'SPX' in schemes:
 for scheme in schemes:
     if scheme == 'SPX':
         continue
-    rows, considered = sweep_scheme(scheme)
+    rows, considered = pool_rows(scheme, WC_PAIRS)
     pools[scheme] = {'fields': POOL_FIELDS, 'considered': considered,
                      'count': len(rows), 'rows': rows}
     print("{}: {} rows of {} considered".format(scheme, len(rows), considered),
           file=sys.stderr)
 
-# ---------------------------------------------------------------------------
-# Stateful: XMSS/XMSS-MT grid + UXMSS variants (same functions as the CLI)
-# ---------------------------------------------------------------------------
-_SWN = {16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040, 65536: 262140}
-STATEFUL_W = (16, 32, 64, 128, 256, 65536)
-UXMSS_REF = 5712   # Report Candidate 2 — reference bound for max stateful size
+# Stateful: XMSS-MT (XMSS is d = 1) and UXMSS, from stateful.sage
+STATEFUL = PARAMETERS['stateful']
 
 xmssmt_rows = []
 for ots_label, ots_type in (('TW', OTS_TW), ('WC', OTS_WC)):
-    for w in STATEFUL_W:
-        swn = _SWN[w] if ots_type == OTS_WC else 0
-        for h in range(10, 41):
-            for d in range(1, 11):
+    for w in STATEFUL['w']:
+        swn = SWN[w] if ots_type == OTS_WC else 0
+        for h in range(STATEFUL['h'][0], STATEFUL['h'][1] + 1):
+            for d in range(STATEFUL['d'][0], STATEFUL['d'][1] + 1):
                 if h % d != 0:
                     continue
                 xmssmt_rows.append([
@@ -223,9 +132,9 @@ for ots_label, ots_type in (('TW', OTS_TW), ('WC', OTS_WC)):
 
 uxmss_rows = []
 for ots_label, ots_type in (('TW', OTS_TW), ('WC', OTS_WC)):
-    for w in STATEFUL_W:
-        swn = _SWN[w] if ots_type == OTS_WC else 0
-        hsf = find_max_hsf(w, ots_type, UXMSS_REF)
+    for w in STATEFUL['w']:
+        swn = SWN[w] if ots_type == OTS_WC else 0
+        hsf = find_max_hsf(w, ots_type, STATEFUL['uxmss_ref_size'])
         uxmss_rows.append([
             ots_label, w, int(hsf),
             int(uxmss_size(1, hsf, w, ots_type)),
@@ -259,16 +168,17 @@ data = {
         'w_optional': W_OPTIONAL,
         'wc_pairs': WC_PAIRS,
         'schemes': [s for s in ALL_SCHEMES if s in pools],
-        'uxmss_ref_size': UXMSS_REF,
+        'uxmss_ref_size': STATEFUL['uxmss_ref_size'],
         'hsf_max': int(HSF_MAX),
-        'cost_convention': HASH_CONVENTION,
+        'cost_convention': 'cached',
     },
     'baseline': baseline,
     'pools': pools,
     'stateful': {
         'slh': {'size': baseline['size'], 'kg': baseline['kg'],
                 'sg': baseline['sg'], 'sv': baseline['sv'],
-                'sv_worst': baseline['sv_worst'], 'qs_log2': 64},
+                'sv_worst': baseline['sv_worst'],
+                'qs_log2': PARAMETERS['baseline']['q_s_log2']},
         'xmssmt': {
             'fields': ['ots', 'h', 'd', 'w', 'size', 'kg', 'sg', 'sg_cold',
                        'state', 'sv', 'sv_worst'],
