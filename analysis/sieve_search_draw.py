@@ -128,13 +128,13 @@ def apply_sequential_filters(df, minimax_val, X):
 def draw_sieve_stage(stage_index, pts, survived_indices, newly_killed_indices_list, filenames, winner_idx, df, euclidean_winner_idx,
                      label_override=None, annotate_indices=None):
     stages_meta = [
-        {"title": "Image 1: Initial Pool (128-bit Secure)", "color": "white", "label": "Security", "filter_txt": "Initial Data"},
-        {"title": r"Image 2: Filter Size", "color": "#a0c4ff", "label": "Size Sieve", "filter_txt": "Signature Size Sieve"},       
-        {"title": r"Image 3: Filter KeyGen", "color": "#bdb2ff", "label": "KG Sieve", "filter_txt": "Key Generation Sieve"},     
-        {"title": r"Image 4: Filter SigGen", "color": "#ffadad", "label": "SG Sieve", "filter_txt": "Signature Generation Sieve"},     
-        {"title": r"Image 5: Filter Verification", "color": "#b9fbc0", "label": "VF Sieve", "filter_txt": "Signature Verification Sieve"}, 
-        {"title": "Image 6: Filter Compression per Byte", "color": "#ffd6a5", "label": "C/B Sieve", "filter_txt": "Compression per Byte Sieve"},
-        {"title": "Image 7: Weighted Euclidean Distance", "color": "#e2e2e2", "label": "Dist Sieve", "filter_txt": "Distance to Ideal Origin (0,0,0,0,0)"} 
+        {"color": "white", "label": "Security", "filter_txt": "Initial Data"},
+        {"color": "#a0c4ff", "label": "Size Sieve", "filter_txt": "Size Sieve"},
+        {"color": "#bdb2ff", "label": "KeyGen Sieve", "filter_txt": "KeyGen Sieve"},
+        {"color": "#ffadad", "label": "SigGen Sieve", "filter_txt": "SigGen Sieve"},
+        {"color": "#b9fbc0", "label": "SigVer Sieve", "filter_txt": "SigVer Sieve"},
+        {"color": "#ffd6a5", "label": "ρ Sieve", "filter_txt": "ρ Sieve"},
+        {"color": "#e2e2e2", "label": "Dist Sieve", "filter_txt": "Distance to Ideal Origin (0,0,0,0,0)"}
     ]
 
     sns.set_theme(style="white", context="paper")
@@ -299,7 +299,7 @@ def main():
         assert len(final_survivors) > 0, "no survivors under these filters"
         label = "Regular Weighted Distance"
         if args.distance == "normalized":
-            label = "Metric-Normalised Weighted Distance"
+            label = "Metric-Normalized Weighted Distance"
             sub = df.loc[final_survivors]
             acc = np.zeros(len(sub))
             for col, wkey in (('size_X', 'size'), ('keygen_X', 'keygen'),

@@ -97,10 +97,10 @@ def generate_bounded_plot():
         ax.scatter(closest_x, closest_y, color='#5cb85c', s=100, edgecolor='black', 
                    linewidth=1.5, zorder=7, label=f"Optimal Point (Closest to Origin)")
 
-    ax.set_title("Signature Size vs Signing Cost\n(Showing Vector to Globally Optimal Candidate)", 
+    ax.set_title("Size vs SigGen\n(Showing Vector to Globally Optimal Candidate)", 
                  fontsize=14, pad=15)
-    ax.set_xlabel(r" Signature Size ($X \cdot$ Std)", fontsize=12, fontweight='bold')
-    ax.set_ylabel(r" Signing Cost ($X \cdot$ Std)", fontsize=12, fontweight='bold')
+    ax.set_xlabel(r" Size ($X \cdot$ Std)", fontsize=12, fontweight='bold')
+    ax.set_ylabel(r" SigGen ($X \cdot$ Std)", fontsize=12, fontweight='bold')
     
     ax.set_xlim(0, max_val)
     ax.set_ylim(0, max_val)
