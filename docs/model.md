@@ -2,7 +2,8 @@
 
 Sizes are in bytes and costs in SHA-256 compressions (C). The hash output is n = 16 bytes.
 The pages compute the model in `site/js/model.js`, the Sage scripts in `costs.sage`,
-`stateful.sage` and `security.sage`, and `tests/model.py` ports it to check both.
+`stateful.sage` and `security.sage`, and `tests/model.py` ports it to check both. The search grids
+and the fixed parameters are in `parameters.json`.
 
 ## Hash calls
 
@@ -67,6 +68,10 @@ verification cost the same for every message. Of the w^l digit strings,
 
 have that sum, so signing takes ceil(w^l / ν) attempts of `C_Th1c` on average, then l PRF calls and
 S_wn chain steps. Verification takes l·(w − 1) − S_wn chain steps, one `C_Th1c` and Th(l).
+
+`parameters.json` sets S_wn = floor(l1·(w − 1)/2), the middle of the digit-sum distribution, where
+ν is largest: 240 for w = 16 and 2040 for w = 256. For w = 128 the product is odd, and
+ν(1206) = ν(1207).
 
 SHRINCS stores the counter in 2 bytes: 2^16 counters miss the target sum with probability below
 2^−126 for every w ≤ 256. w = 65536 needs about 137,000 attempts on average and keeps a 4-byte

@@ -12,12 +12,12 @@ Supported (ots, fts) combinations:
   (wots+c, fors+c)   -> W+C_F+C
   (wots+c, pors+fp)  -> W+C_P+FP
 
-Sweep behavior per OTS:
-  - wots-tw : w in {2, 4, 16, 256}, swn = 0
-  - wots+c  : (w, swn) in {(16, 240), (256, 2040)}
+Sweep behavior per OTS (values from parameters.json):
+  - wots-tw : w from the stateless grid, swn = 0
+  - wots+c  : w from stateless.wc_w with its S_wn
 
 Filters (defaults; override via CLI):
-  --max-size BYTES         Reject if size >= BYTES                (default: 7856, std SLH-DSA-128s size)
+  --max-size BYTES         Reject if size >= BYTES                (default: max_size, the SLH-DSA-128s size)
   --max-keygen-ratio X     Reject if keygen  > X * std keygen     (default: no limit)
   --max-sign-ratio X       Reject if sign    > X * std sign       (default: no limit)
   --max-verify-ratio X     Reject if verify  > X * std verify     (default: no limit)
@@ -25,8 +25,8 @@ Filters (defaults; override via CLI):
   --max-cpb-ratio X        Reject if verify_C / size > X * std C/byte (default: no limit)
 
 Sweep ranges (comma-separated lists):
-  --h N1,N2,...            Hypertree heights to sweep            (default: 40..50 inclusive)
-  --d N1,N2,...            Layer counts to sweep                 (default: 2..25 inclusive)
+  --h N1,N2,...            Hypertree heights to sweep            (default: the grid's h range)
+  --d N1,N2,...            Layer counts to sweep                 (default: the grid's d range)
                            Combinations where h % d != 0 are auto-skipped.
 
 Usage:
@@ -39,6 +39,13 @@ Usage:
 import os
 import sys
 
+_DOC = __doc__   # loading costs.sage replaces __doc__
+
+os.environ['COSTS_SAGE_NO_MAIN'] = '1'   # its functions, without its CLI
+load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "costs.sage"))
+
+GRID = PARAMETERS['stateless']['grid']
+
 # -----------------------------------------------------------------------------
 # CLI parsing
 # -----------------------------------------------------------------------------
@@ -49,14 +56,14 @@ def _parse_int_list(s):
 def _parse_args(argv):
     ots = "wots-tw"
     fts = "fors"
-    max_size = 7856      # std SLH-DSA-128s signature size
+    max_size = GRID['max_size']
     kg_ratio = float('inf')
     sg_ratio = float('inf')
     sv_ratio = float('inf')
     cpb_max  = float('inf')
     cpb_ratio = float('inf')
-    h_values = list(range(40, 51))   # 40..50 inclusive
-    d_values = list(range(2, 26))    # 2..25 inclusive
+    h_values = list(range(GRID['h'][0], GRID['h'][1] + 1))
+    d_values = list(range(GRID['d'][0], GRID['d'][1] + 1))
     i = 1
     while i < len(argv):
         a = argv[i]
@@ -91,7 +98,7 @@ def _parse_args(argv):
             d_values = _parse_int_list(argv[i + 1])
             i += 2
         elif a == "--help":
-            print(__doc__)
+            print(_DOC)
             sys.exit(0)
         else:
             print("Unknown argument: {}".format(a), file=sys.stderr)
@@ -117,31 +124,25 @@ SCHEME = SCHEME_MAP[(OTS, FTS)]
 
 # (w, swn) sweep pairs depend on OTS
 if OTS == "wots-tw":
-    W_SWN_PAIRS = [(2, 0), (4, 0), (16, 0), (256, 0)]
+    W_SWN_PAIRS = [(w, 0) for w in GRID['w']]
 else:  # wots+c
-    W_SWN_PAIRS = [(16, 240), (256, 2040)]
+    W_SWN_PAIRS = [(w, SWN[w]) for w in PARAMETERS['stateless']['wc_w']]
 
 # Security model: PORS+FP for that FTS, FORS otherwise
 SECURITY_MODEL = "PORS+FP" if FTS == "pors+fp" else "FORS"
 
 # -----------------------------------------------------------------------------
-# Load the functions of costs.sage without running its CLI
-# -----------------------------------------------------------------------------
-os.environ['COSTS_SAGE_NO_MAIN'] = '1'
-load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "costs.sage"))
-
-# -----------------------------------------------------------------------------
 # Sweep parameters
 # -----------------------------------------------------------------------------
 
-TARGET = 128
+TARGET = PARAMETERS['security_bits']
 
 # Standard baseline is plain SLH-DSA-128s (SPX) for fair comparison
 STD_SCHEME = "SPX"
 STD_SWN    = 0
 
-K_RANGE  = range(6, 25)
-A_RANGE  = range(8, 21)
+K_RANGE  = range(GRID['k'][0], GRID['k'][1] + 1)
+A_RANGE  = range(GRID['a'][0], GRID['a'][1] + 1)
 # H_VALUES and D_VALUES come from CLI flags (parsed at top of file)
 
 
@@ -191,7 +192,8 @@ def evaluate(q_s_log2, h, d, k, a, w, swn, scheme, security_model):
 
 print("Variant: ots={}, fts={}  -> scheme={}".format(OTS, FTS, SCHEME), file=sys.stderr)
 print("Computing standard SLH-DSA-128s baseline (SPX)...", file=sys.stderr)
-std = evaluate(64, 63, 7, 14, 12, 16, STD_SWN, STD_SCHEME, "FORS")
+B = PARAMETERS['baseline']
+std = evaluate(B['q_s_log2'], B['h'], B['d'], B['k'], B['a'], B['w'], STD_SWN, STD_SCHEME, "FORS")
 if std is None:
     print("ERROR: failed to compute standard baseline.", file=sys.stderr)
     sys.exit(1)
@@ -256,7 +258,7 @@ for w, swn in W_SWN_PAIRS:
             for k in K_RANGE:
                 for a in A_RANGE:
                     consider(
-                        evaluate(40, h, d, k, a, w, swn, SCHEME, SECURITY_MODEL),
+                        evaluate(GRID['q_s_log2'], h, d, k, a, w, swn, SCHEME, SECURITY_MODEL),
                         label,
                     )
 

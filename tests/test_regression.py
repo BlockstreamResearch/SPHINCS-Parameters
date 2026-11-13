@@ -219,6 +219,26 @@ console.log(JSON.stringify(out));
     assert out['ms'] < 5000, out     # about 0.1 s; the unbounded sum needed minutes
 
 
+def test_site_parameters():
+    """The JavaScript model's copies of parameters.json, kept so the pages also
+    work without data.json."""
+    js = _page_js('stateless.html') + """
+console.log(JSON.stringify({ w: ALLOWED_W, w_optional: OPTIONAL_W, swn: WOTS_C_SWN,
+  uxmss_ref_size: UXMSS_TARGET_SIZE, hsf_max: HSF_MAX, slh: SLH, q_s_log2: Q_S_LOG2 }));
+"""
+    out = _run_node(js)
+    if out is None:
+        return
+    P = M.PARAMETERS
+    assert out['w'] == P['stateless']['grid']['w'], out['w']
+    assert out['w_optional'] == P['stateless']['w_optional'], out['w_optional']
+    assert out['swn'] == P['swn'], out['swn']
+    assert out['uxmss_ref_size'] == P['stateful']['uxmss_ref_size']
+    assert out['hsf_max'] == P['stateful']['hsf_max']
+    assert out['slh'] == {x: P['baseline'][x] for x in ('h', 'd', 'k', 'a', 'w')}, out['slh']
+    assert out['q_s_log2'] == P['stateless']['grid']['q_s_log2']
+
+
 def test_site_main():
     """index.html (SHRINCS main): pinned cards must match the reference model."""
     js = _page_js('index.html')
@@ -324,10 +344,12 @@ def test_data_json_meta():
         assert key in d['meta'], key
     assert d['meta']['version'] == 3
     assert d['meta']['cost_convention'].startswith('cached')
-    assert d['meta']['grid']['h'] == [40, 50]
-    assert d['meta']['grid']['k'] == [6, 24]
-    assert d['meta']['grid']['w'] == [2, 4, 16, 256]
-    assert d['meta']['w_optional'] == [32, 64, 128]
+    P = M.PARAMETERS
+    assert d['meta']['grid'] == P['stateless']['grid']
+    assert d['meta']['w_optional'] == P['stateless']['w_optional']
+    assert d['meta']['wc_pairs'] == [[w, M.SWN[w]] for w in P['stateless']['wc_w']]
+    assert d['meta']['uxmss_ref_size'] == P['stateful']['uxmss_ref_size']
+    assert d['meta']['hsf_max'] == P['stateful']['hsf_max']
     assert 'SPX' in d['meta']['schemes']
     for s in d['meta']['schemes']:
         p = d['pools'][s]

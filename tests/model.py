@@ -8,14 +8,19 @@ verified against the sage scripts, both site pages, and the published CSVs.
 Deliberately does NOT reuse any sage code: its value is being a second,
 independent implementation that the real code is diffed against.
 """
+import json
 import os
 import sys
 from fractions import Fraction
 from functools import lru_cache
 from math import ceil, floor, log2, comb
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+sys.path.insert(0, ROOT)
 from octopus_pmf import interleave_cost_table  # noqa: E402  (pure python, MIT)
+
+with open(os.path.join(ROOT, 'parameters.json')) as _f:
+    PARAMETERS = json.load(_f)
 
 N = 16                       # hashbytes (128-bit security level)
 C_SIZE = 4                   # WOTS+C grinding counter of the stateless variants (bytes)
@@ -30,10 +35,9 @@ C_HMSG = 4
 C_PRFMSG = 3
 
 
-SWN = {16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040,
-       65536: 262140}   # WOTS+C target chain sums S_{w,n} = floor(l1*(w-1)/2)
+SWN = {int(w): swn for w, swn in PARAMETERS['swn'].items()}   # WOTS+C target digit sums
 
-HSF_MAX = 255                # FXMSS encodes the node height as a single byte
+HSF_MAX = PARAMETERS['stateful']['hsf_max']   # FXMSS encodes the node height as a single byte
 
 
 def compute_th(x):
@@ -396,7 +400,7 @@ def uxmss_verify_c(q, hsf, w, ots, worst=False):
     return C_HMSG + wots_verify_c(w, ots, worst) + min(q, hsf) * C_TH2
 
 
-def uxmss_metrics(ots, w, target_size=5712):
+def uxmss_metrics(ots, w, target_size=PARAMETERS['stateful']['uxmss_ref_size']):
     hsf = uxmss_find_hsf(w, ots, target_size)
     sg = uxmss_sign_c(1, hsf, w, ots)                 # first signature: the worst
     return {

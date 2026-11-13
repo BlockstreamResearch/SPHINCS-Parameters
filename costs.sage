@@ -22,6 +22,7 @@ Notation:
 """
 
 from sage.all import *
+import json
 import os
 
 from octopus_pmf import interleave_cost_table
@@ -29,6 +30,23 @@ from octopus_pmf import interleave_cost_table
 # Load security.sage from the same directory
 _dir = os.path.dirname(os.path.abspath(__file__))
 load(os.path.join(_dir, "security.sage"))
+
+# Search grids and fixed parameters. Integers become Sage Integers, as if they
+# were written in this file.
+def _sage_numbers(x):
+    if isinstance(x, bool):
+        return x
+    if isinstance(x, int):
+        return Integer(x)
+    if isinstance(x, list):
+        return [_sage_numbers(v) for v in x]
+    if isinstance(x, dict):
+        return {key: _sage_numbers(v) for key, v in x.items()}
+    return x
+
+with open(os.path.join(_dir, "parameters.json")) as _f:
+    PARAMETERS = _sage_numbers(json.load(_f))
+SWN = {Integer(w): swn for w, swn in PARAMETERS['swn'].items()}   # WOTS+C target digit sum per w
 
 # =============================================================================
 # Constants

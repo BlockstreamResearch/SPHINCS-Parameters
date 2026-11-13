@@ -58,13 +58,9 @@ while i < len(_args):
 for s in schemes:
     assert s in ALL_SCHEMES, "unknown scheme: %s" % s
 
-# Canonical stateless grid (report Sec. 2; must match slhdsa-2to40.sage
-# defaults).
-GRID = {'h': [40, 50], 'd': [2, 25], 'k': [6, 24], 'a': [8, 20],
-        'w': [2, 4, 16, 256], 'q_s_log2': 40, 'max_size': 7856}
-# Optional Winternitz extras for the SPX pool
-W_OPTIONAL = [32, 64, 128]
-WC_PAIRS = [(16, 240), (256, 2040)]   # (w, swn) for WOTS+C schemes
+GRID = PARAMETERS['stateless']['grid']
+W_OPTIONAL = PARAMETERS['stateless']['w_optional']   # SPX only
+WC_PAIRS = [(w, SWN[w]) for w in PARAMETERS['stateless']['wc_w']]
 POOL_FIELDS = ['h', 'd', 'k', 'a', 'w', 'swn', 'mmax',
                'size', 'kg', 'sg', 'sv', 'sv_worst']
 
@@ -88,7 +84,7 @@ with open(csv_path) as f:
                int(r['size']), int(float(r['keygen_C'])), int(float(r['sign_C'])),
                int(float(r['verify_C'])), int(float(r['verify_worst_C']))]
         if r['label'] == 'STANDARD':
-            baseline = {'params': {'h': 63, 'd': 7, 'k': 14, 'a': 12, 'w': 16},
+            baseline = {'params': {x: PARAMETERS['baseline'][x] for x in ('h', 'd', 'k', 'a', 'w')},
                         'size': rec[7], 'kg': rec[8], 'sg': rec[9],
                         'sv': rec[10], 'sv_worst': rec[11]}
         else:
@@ -105,7 +101,7 @@ def _security_ok(model, h, k, a):
     key = (model, int(h), int(k), int(a))
     if key not in _sec_cache:
         _sec_cache[key] = float(compute_security(
-            2**GRID['q_s_log2'], h, k, a, model, hashbytes=16)) >= 128.0
+            2**GRID['q_s_log2'], h, k, a, model, hashbytes=16)) >= PARAMETERS['security_bits']
     return _sec_cache[key]
 
 
@@ -198,16 +194,14 @@ for scheme in schemes:
 # ---------------------------------------------------------------------------
 # Stateful: XMSS/XMSS-MT grid + UXMSS variants (same functions as the CLI)
 # ---------------------------------------------------------------------------
-_SWN = {16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040, 65536: 262140}
-STATEFUL_W = (16, 32, 64, 128, 256, 65536)
-UXMSS_REF = 5712   # Report Candidate 2 — reference bound for max stateful size
+STATEFUL = PARAMETERS['stateful']
 
 xmssmt_rows = []
 for ots_label, ots_type in (('TW', OTS_TW), ('WC', OTS_WC)):
-    for w in STATEFUL_W:
-        swn = _SWN[w] if ots_type == OTS_WC else 0
-        for h in range(10, 41):
-            for d in range(1, 11):
+    for w in STATEFUL['w']:
+        swn = SWN[w] if ots_type == OTS_WC else 0
+        for h in range(STATEFUL['h'][0], STATEFUL['h'][1] + 1):
+            for d in range(STATEFUL['d'][0], STATEFUL['d'][1] + 1):
                 if h % d != 0:
                     continue
                 xmssmt_rows.append([
@@ -223,9 +217,9 @@ for ots_label, ots_type in (('TW', OTS_TW), ('WC', OTS_WC)):
 
 uxmss_rows = []
 for ots_label, ots_type in (('TW', OTS_TW), ('WC', OTS_WC)):
-    for w in STATEFUL_W:
-        swn = _SWN[w] if ots_type == OTS_WC else 0
-        hsf = find_max_hsf(w, ots_type, UXMSS_REF)
+    for w in STATEFUL['w']:
+        swn = SWN[w] if ots_type == OTS_WC else 0
+        hsf = find_max_hsf(w, ots_type, STATEFUL['uxmss_ref_size'])
         uxmss_rows.append([
             ots_label, w, int(hsf),
             int(uxmss_size(1, hsf, w, ots_type)),
@@ -259,7 +253,7 @@ data = {
         'w_optional': W_OPTIONAL,
         'wc_pairs': WC_PAIRS,
         'schemes': [s for s in ALL_SCHEMES if s in pools],
-        'uxmss_ref_size': UXMSS_REF,
+        'uxmss_ref_size': STATEFUL['uxmss_ref_size'],
         'hsf_max': int(HSF_MAX),
         'cost_convention': 'cached',
     },
@@ -268,7 +262,8 @@ data = {
     'stateful': {
         'slh': {'size': baseline['size'], 'kg': baseline['kg'],
                 'sg': baseline['sg'], 'sv': baseline['sv'],
-                'sv_worst': baseline['sv_worst'], 'qs_log2': 64},
+                'sv_worst': baseline['sv_worst'],
+                'qs_log2': PARAMETERS['baseline']['q_s_log2']},
         'xmssmt': {
             'fields': ['ots', 'h', 'd', 'w', 'size', 'kg', 'sg', 'sg_cold',
                        'state', 'sv', 'sv_worst'],

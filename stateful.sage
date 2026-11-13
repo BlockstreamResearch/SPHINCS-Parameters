@@ -108,7 +108,6 @@ def _parse_args(argv):
 N          = hashbytes       # 16 bytes = 128-bit hash output
 R_SIZE     = randomness_size # 16 bytes = n (message randomness, from costs.sage)
 IND_SIZE   = 1               # SHRINCS indicator byte (leaf height on the stateful path)
-TARGET_SEC = 128             # Minimum security level (bits)
 
 
 def counter_bytes(w):
@@ -138,16 +137,8 @@ UXMSS_H_VALS = [40]          # UXMSS restricted to 2^40 target based on SLH-DSA 
 OTS_TW      = "tw"
 OTS_WC      = "wc"
 
-# WOTS+C target digit sums S_wn = floor(l1*(w-1)/2), where l1 = ceil(8n/log2(w))
-# w=16:  l1=32, S_wn = 32*15/2 = 240
-# w=32:  l1=26, S_wn = 26*31/2 = 403
-# w=64:  l1=22, S_wn = 22*63/2 = 693
-# w=128: l1=19, S_wn = floor(19*127/2) = 1206  (odd product; ν(1206) = ν(1207))
-# w=256: l1=16, S_wn = 16*255/2 = 2040
-# w=65536: l1=8, S_wn = 8*65535/2 = 262140
-WOTS_C_PAIRS = [(16, 240), (32, 403), (64, 693), (128, 1206), (256, 2040),
-                (65536, 262140)]
-WOTS_W_VALS  = [16, 32, 64, 128, 256, 65536]
+WOTS_W_VALS  = PARAMETERS['stateful']['w']
+WOTS_C_PAIRS = [(w, SWN[w]) for w in WOTS_W_VALS]
 
 PARAM_SETS = (
     [(OTS_WC, w, swn) for w, swn in WOTS_C_PAIRS] +
@@ -407,7 +398,7 @@ def _uxmss_idx_bytes(depth):
     return max(1, (min(int(depth), 64) + 7) // 8)
 
 
-HSF_MAX = 255   # FXMSS encodes the node height as a single byte
+HSF_MAX = PARAMETERS['stateful']['hsf_max']   # FXMSS encodes the node height as a single byte
 
 def uxmss_size(q, hsf, w, ots_type):
     """Size of the q-th UXMSS signature (q = 1 is the first)."""
@@ -419,7 +410,7 @@ def uxmss_size(q, hsf, w, ots_type):
 
 def find_max_hsf(w, ots_type, target_size):
     """Largest hsf with the max UXMSS signature strictly < target_size,
-    capped at HSF_MAX = 255."""
+    capped at HSF_MAX."""
     for hsf in range(HSF_MAX, 0, -1):
         if uxmss_size(hsf, hsf, w, ots_type) < target_size:
             return hsf
@@ -709,9 +700,10 @@ def print_uxmss_detail(uxmss_by_h):
 if __name__ == "__main__" and not os.environ.get("STATEFUL_SAGE_NO_MAIN"):
     refs = {}
     for h in UXMSS_H_VALS:
-        print("Applying Candidate 2 as hardcoded reference (5,712 B) for target 2^{}.".format(h),
+        ref_size = PARAMETERS['stateful']['uxmss_ref_size']
+        print("Applying Candidate 2 as the reference ({:,} B) for target 2^{}.".format(ref_size, h),
               file=sys.stderr)
-        refs[h] = dict(h=45, d=5, k=8, a=16, w=16, size=5712, security=128.0)
+        refs[h] = dict(h=45, d=5, k=8, a=16, w=16, size=ref_size, security=128.0)
 
     xmss_by_h   = {h: compute_xmss_rows(h)             for h in H_VALS}
     xmssmt_by_h = {h: compute_xmssmt_rows(h)             for h in H_VALS}

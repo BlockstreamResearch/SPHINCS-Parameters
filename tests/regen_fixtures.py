@@ -21,7 +21,7 @@ sys.path.insert(0, HERE)
 import model as M  # noqa: E402
 
 METRICS = ('size', 'kg', 'sg', 'sv', 'sv_worst')
-BASELINE = (63, 7, 14, 12, 16)
+BASELINE = tuple(M.PARAMETERS['baseline'][x] for x in ('h', 'd', 'k', 'a', 'w'))
 MISSING = '(missing)'
 
 
