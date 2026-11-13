@@ -40,7 +40,7 @@ import os
 import sys
 
 # -----------------------------------------------------------------------------
-# CLI parsing (parse before loading costs.sage so we can suppress its CSV)
+# CLI parsing
 # -----------------------------------------------------------------------------
 
 def _parse_int_list(s):
@@ -125,12 +125,10 @@ else:  # wots+c
 SECURITY_MODEL = "PORS+FP" if FTS == "pors+fp" else "FORS"
 
 # -----------------------------------------------------------------------------
-# Load costs.sage (suppress its auto-CSV)
+# Load the functions of costs.sage without running its CLI
 # -----------------------------------------------------------------------------
-_saved_argv = sys.argv
-sys.argv = ['big_comparison.sage', '--no-auto']
+os.environ['COSTS_SAGE_NO_MAIN'] = '1'
 load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "costs.sage"))
-sys.argv = _saved_argv
 
 # -----------------------------------------------------------------------------
 # Sweep parameters
