@@ -43,6 +43,6 @@ We sweep the ranges as follows:
     (h, d, k, a, w) \in \{40, \dots, 50\} \times \{2, \dots, 25\} \times \{6, \dots, 24\} \times \{8, \dots, 20\} \times \{2, 4, 16, 256\}.
 \end{equation*}
 
-The lower bound $k \geq 6$ discards only insecure configurations: with $a \leq 20$ and $h \leq 50$, any $k \leq 5$ falls short of the 128-bit security floor at $q_s = 2^{40}$, so smaller values of $k$ never survive the security filter. The same grid is used by the sweep script (\texttt{slhdsa-2to40.sage}) and the interactive explorer, so the counts reported below are reproducible in both.
+The lower bound $k \geq 6$ discards only insecure configurations: with $a \leq 20$ and $h \leq 50$, any $k \leq 5$ falls short of the 128-bit security floor at $q_s = 2^{40}$, so smaller values of $k$ never survive the security filter. The same grid is used by the sweep script (\texttt{scripts/slhdsa-2to40.sage}) and the interactive explorer, so the counts reported below are reproducible in both.
 
 \textit{The SLH-DSA-128s baseline tuple (63, 7, 14, 12, 16) sits outside this range and is included for comparison}

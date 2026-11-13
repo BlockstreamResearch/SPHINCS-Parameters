@@ -23,10 +23,10 @@ concurrency:
 
 env:
   GENERATED_PATHS: |
-    utils/all_size_capped_candidates.csv
-    utils/all_unbound_candidates.csv
-    utils/global_X_thresholds.csv
-    utils/master_extremes_summary.csv
+    analysis/all_size_capped_candidates.csv
+    analysis/all_unbound_candidates.csv
+    analysis/global_X_thresholds.csv
+    analysis/master_extremes_summary.csv
     site/data.json
     document/content/images/sieve_step*.png
     document/content/images/concentric_diagram.png
@@ -51,7 +51,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.GENERATED_PATHS }}
-          key: generated-v1-${{ hashFiles('costs.sage', 'security.sage', 'slhdsa-2to40.sage', 'stateful.sage', 'export_site_data.sage', 'octopus_pmf.py', 'utils/*.py', 'Makefile', 'parameters.json') }}
+          key: generated-v1-${{ hashFiles('model/*.sage', 'scripts/*.sage', 'third_party/*.py', 'analysis/*.py', 'Makefile', 'parameters.json') }}
 
       - name: Generate (sweeps, derived tables, data.json, figures)
         if: steps.cache.outputs.cache-hit != 'true'
@@ -119,5 +119,5 @@ jobs:
           files: |
             site/report.pdf
             site/data.json
-            utils/all_size_capped_candidates.csv
-            utils/all_unbound_candidates.csv
+            analysis/all_size_capped_candidates.csv
+            analysis/all_unbound_candidates.csv

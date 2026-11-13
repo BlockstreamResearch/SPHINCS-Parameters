@@ -39,7 +39,7 @@ def _missing(*relpaths):
     return True
 
 
-CSVS = ('utils/all_size_capped_candidates.csv', 'utils/all_unbound_candidates.csv')
+CSVS = ('analysis/all_size_capped_candidates.csv', 'analysis/all_unbound_candidates.csv')
 DATA_JSON = 'site/data.json'
 
 
@@ -90,7 +90,7 @@ def test_stateful_model():
 # The sweep CSVs against the reference model
 
 def _csv_rows(name):
-    with open(os.path.join(ROOT, 'utils', name)) as fh:
+    with open(os.path.join(ROOT, 'analysis', name)) as fh:
         return list(csv.DictReader(fh))
 
 
@@ -384,7 +384,7 @@ def test_sage_preparser_hazards():
     import io
     import tokenize
     offenders = []
-    for path in sorted(glob.glob(os.path.join(ROOT, '*.sage'))):
+    for path in sorted(glob.glob(os.path.join(ROOT, '*', '*.sage'))):
         name = os.path.basename(path)
         src = open(path, encoding='utf-8').read()
         for lineno, line in enumerate(src.splitlines(), 1):
@@ -588,7 +588,7 @@ def test_sage_costs():
     if not shutil.which('sage'):
         print('  [skip] sage not available')
         return
-    args = ['sage', 'costs.sage', '--params', 'SPX', '64', '14', '12', '63', '7', '16', '0']
+    args = ['sage', 'model/costs.sage', '--params', 'SPX', '64', '14', '12', '63', '7', '16', '0']
     p = subprocess.run(args, capture_output=True, text=True, cwd=ROOT, timeout=600)
     assert p.returncode == 0, p.stderr[:2000]
     b = FIX['baseline']

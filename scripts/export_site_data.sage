@@ -1,13 +1,13 @@
 #!/usr/bin/env sage
 """
 Writes site/data.json for the explorer and the stateful page: the SPX pool from
-utils/all_size_capped_candidates.csv (make sweeps) with the optional w added,
+analysis/all_size_capped_candidates.csv (make sweeps) with the optional w added,
 the W+C, W+C_F+C and W+C_P+FP pools from the sweep of costs.sage, and the
 XMSS-MT and UXMSS rows of stateful.sage. The pages check samples of it against
 their own model.
 
-  sage export_site_data.sage                     (all schemes, a few minutes)
-  sage export_site_data.sage --schemes SPX,W+C   (a subset; the pages adapt)
+  sage scripts/export_site_data.sage                     (all schemes, a few minutes)
+  sage scripts/export_site_data.sage --schemes SPX,W+C   (a subset; the pages adapt)
 """
 import os
 import sys
@@ -17,9 +17,9 @@ import subprocess
 import datetime
 
 _DOC = __doc__   # loading stateful.sage replaces __doc__
-_dir = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # see model/costs.sage
 os.environ['STATEFUL_SAGE_NO_MAIN'] = '1'   # its functions, without its CLI
-load(os.path.join(_dir, "stateful.sage"))   # and through it costs.sage and security.sage
+load(os.path.join(ROOT, "model", "stateful.sage"))   # and through it costs.sage and security.sage
 
 ALL_SCHEMES = ['SPX', 'W+C', 'W+C_F+C', 'W+C_P+FP']
 schemes = ALL_SCHEMES
@@ -52,7 +52,7 @@ A_VALUES = range(GRID['a'][0], GRID['a'][1] + 1)
 
 
 # SPX pool: the rows of the sweep CSV
-csv_path = os.path.join(_dir, 'utils', 'all_size_capped_candidates.csv')
+csv_path = os.path.join(ROOT, 'analysis', 'all_size_capped_candidates.csv')
 spx_rows, baseline = [], None
 with open(csv_path) as f:
     for r in _csvmod.DictReader(f):
@@ -152,7 +152,7 @@ def _commit():
     try:
         return subprocess.check_output(
             ['git', 'rev-parse', '--short', 'HEAD'],
-            cwd=_dir, stderr=subprocess.DEVNULL).decode().strip()
+            cwd=ROOT, stderr=subprocess.DEVNULL).decode().strip()
     except Exception:
         sha = os.environ.get('GITHUB_SHA', '')
         return sha[:7] if sha else 'unknown'
@@ -192,7 +192,7 @@ data = {
     },
 }
 
-out_path = os.path.join(_dir, 'site', 'data.json')
+out_path = os.path.join(ROOT, 'site', 'data.json')
 with open(out_path, 'w') as f:
     # default=int: the sage preparser turns integer literals into sage
     # Integers, which the json module cannot serialize directly.

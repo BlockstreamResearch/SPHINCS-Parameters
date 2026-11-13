@@ -2,11 +2,11 @@
 XMSS and XMSS-MT for 2^20 and 2^40 signatures and UXMSS, the SHRINCS stateful
 tree, with WOTS-TW and WOTS+C: sizes in bytes, costs in SHA-256 compressions and
 signer state. docs/model.md has the model, parameters.json the w set, S_wn and
-the UXMSS bounds. export_site_data.sage loads this file for site/data.json.
+the UXMSS bounds. scripts/export_site_data.sage loads it for site/data.json.
 
-  sage stateful.sage [--xmss-only | --xmssmt-only | --uxmss-only] [--detail]
-  sage stateful.sage --csv                (the CSV instead of the tables)
-  sage stateful.sage --output FILE.csv    (the tables, and the CSV in FILE.csv)
+  sage model/stateful.sage [--xmss-only | --xmssmt-only | --uxmss-only] [--detail]
+  sage model/stateful.sage --csv                (the CSV instead of the tables)
+  sage model/stateful.sage --output FILE.csv    (the tables, and the CSV in FILE.csv)
 """
 import csv
 import math
@@ -14,8 +14,9 @@ import os
 import sys
 
 _DOC = __doc__   # loading costs.sage replaces __doc__
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # see model/costs.sage
 os.environ['COSTS_SAGE_NO_MAIN'] = '1'   # its functions, without its CLI
-load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "costs.sage"))
+load(os.path.join(ROOT, "model", "costs.sage"))
 
 
 def _parse_args(argv):

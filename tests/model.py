@@ -1,7 +1,7 @@
 """A second implementation of the cost model for the regression tests.
 
-Ports costs.sage and stateful.sage to the Python standard library, with
-octopus_pmf.py for the PORS+FP grinding work. It shares no code with them, so
+Ports model/costs.sage and model/stateful.sage to the Python standard library,
+with third_party/octopus_pmf.py for the PORS+FP grinding work. It shares no code with them, so
 the tests compare two independent implementations. docs/model.md has the
 model, parameters.json the grids and fixed parameters.
 """
@@ -13,7 +13,7 @@ from functools import lru_cache
 from math import ceil, floor, log2, comb
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, 'third_party'))
 from octopus_pmf import interleave_cost_table  # noqa: E402  (pure python, MIT)
 
 with open(os.path.join(ROOT, 'parameters.json')) as _f:

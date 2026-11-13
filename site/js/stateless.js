@@ -672,7 +672,7 @@ function renderInfoStrip() {
     `<strong>${pool.length.toLocaleString('en-US')}</strong> pass the initial bounds`;
   const source = `<p>Pool: <code>data.json</code>, generated ${d.meta.generated} from commit ${d.meta.commit}. ` +
     `Security from the FORS and PORS+FP subset-forgery analysis in ` +
-    `<a href="https://github.com/BlockstreamResearch/SPHINCS-Parameters/blob/main/security.sage">security.sage</a>.</p>`;
+    `<a href="https://github.com/BlockstreamResearch/SPHINCS-Parameters/blob/main/model/security.sage">security.sage</a>.</p>`;
   document.getElementById('about-pool').innerHTML =
     `<p>Initial bounds: at least 128-bit security at q<sub>s</sub> = 2<sup>40</sup>, ` +
     `size below ${fmtNum(STD_M.size)} B, ${wtxt}.</p>` + source + schnorrNote();

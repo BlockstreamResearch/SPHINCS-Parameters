@@ -1,8 +1,8 @@
 # Cost and security model
 
 Sizes are in bytes and costs in SHA-256 compressions (C). The hash output is n = 16 bytes.
-The pages compute the model in `site/js/model.js`, the Sage scripts in `costs.sage`,
-`stateful.sage` and `security.sage`, and `tests/model.py` ports it to check both. The search grids
+The pages compute the model in `site/js/model.js`, the Sage scripts in `model/costs.sage`,
+`model/stateful.sage` and `model/security.sage`, and `tests/model.py` ports it to check both. The search grids
 and the fixed parameters are in `parameters.json`.
 
 ## Hash calls
@@ -105,7 +105,7 @@ hash, each attempt costing H_msg + PRF_msg; the last attempt is the signature's 
   out: k − 1 trees in the signature, in signing and in verification.
 - PORS+FP builds one tree of t = k·2^a leaves, t·(PRF + Th1) and t − 1 node hashes, opens k of
   its leaves and grinds until their Octopus authentication set has at most mmax nodes;
-  `octopus_pmf.py` gives the expected attempts. mmax starts at (k − 1)·a − ceil(350/n) and grows by
+  `third_party/octopus_pmf.py` gives the expected attempts. mmax starts at (k − 1)·a − ceil(350/n) and grows by
   one, at most 19 times, until signing costs less than 1.11 times signing with FORS+C.
 
 For FORS, FORS+C and PORS+FP in turn,
@@ -126,7 +126,7 @@ needs the leaf it must open revealed in every tree:
     security       = −log2(max(2^(−8n), P(forgery)))
 
 so 128 bits at most. Unlike the parameter script of the SPHINCS+ specification
-(`original-sphincs-parameter-search.sage`), this uses the exact forgery factor instead of the bound
+(`reference/original-sphincs-parameter-search.sage`), this uses the exact forgery factor instead of the bound
 (r/t)^k, and the maximum of the two attacks instead of their sum: a query cannot serve both, since
 their tweaks differ.
 
@@ -135,7 +135,7 @@ min(r·k, t) of them:
 
     P(forgery | r) = C(min(r·k, t), k) / C(t, k)
 
-`security.sage` sums from r = 1 with 100-bit floats and stops past the mean once a term falls below
+`model/security.sage` sums from r = 1 with 100-bit floats and stops past the mean once a term falls below
 2^−1250. The page sums in log2 to avoid underflow. Only r within 30·sqrt(λ + 1) + 30 of the mean
 λ = q_s / 2^h is summed: further out the binomial weight is below e^−450 of its peak. That keeps
 the work at O(sqrt(λ)); when even that exceeds 2^16 terms, the sum takes every s-th term and

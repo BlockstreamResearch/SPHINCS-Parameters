@@ -5,7 +5,7 @@ probability summed over how often the attacked instance was used, capped by
 the 8n-bit preimage bound (docs/model.md, FORS security). costs.sage loads
 this file; run alone, it prints the security of SLH-DSA-128s at 2^64 signatures.
 
-  sage security.sage
+  sage model/security.sage
 """
 from sage.all import *
 import sys

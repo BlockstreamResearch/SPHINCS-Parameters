@@ -99,7 +99,7 @@ def main():
                             continue
                         rows.append(r)
         rows.sort(key=lambda r: r['size'])
-        path = os.path.join(ROOT, 'utils', name)
+        path = os.path.join(ROOT, 'analysis', name)
         with open(path, 'w', newline='') as f:
             wtr = csv.DictWriter(f, fieldnames=CSV_FIELDS)
             wtr.writeheader()

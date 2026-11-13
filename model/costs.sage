@@ -5,19 +5,23 @@ report's variants W+C, W+C_F+C and W+C_P+FP for (h, d, k, a, w), and the sweep
 that slhdsa-2to40.sage and export_site_data.sage share. docs/model.md has the
 model; PARAMETER_SETS holds the parameter sets of the report's tables.
 
-  sage costs.sage [--table [log2 q_s]]   (those sets as CSV, or as tables)
-  sage costs.sage --params scheme log2_q_s k a h d w swn
+  sage model/costs.sage [--table [log2 q_s]]   (those sets as CSV, or as tables)
+  sage model/costs.sage --params scheme log2_q_s k a h d w swn
 """
 
 from sage.all import *
 from functools import lru_cache
 import json
 import os
+import sys
 
+# Every script sits one folder below the repository root, and load() keeps the
+# __file__ of the script that was started, so this holds in every script.
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "third_party"))
 from octopus_pmf import interleave_cost_table
 
-_dir = os.path.dirname(os.path.abspath(__file__))
-load(os.path.join(_dir, "security.sage"))
+load(os.path.join(ROOT, "model", "security.sage"))
 
 # Search grids and fixed parameters. Integers become Sage Integers, as if they
 # were written in this file.
@@ -32,7 +36,7 @@ def _sage_numbers(x):
         return {key: _sage_numbers(v) for key, v in x.items()}
     return x
 
-with open(os.path.join(_dir, "parameters.json")) as _f:
+with open(os.path.join(ROOT, "parameters.json")) as _f:
     PARAMETERS = _sage_numbers(json.load(_f))
 SWN = {Integer(w): swn for w, swn in PARAMETERS['swn'].items()}   # WOTS+C target digit sum per w
 
@@ -575,12 +579,12 @@ if __name__ == "__main__" and not os.environ.get("COSTS_SAGE_NO_MAIN"):
         q_s_filter = int(sys.argv[2]) if len(sys.argv) > 2 else None
         generate_table(q_s_filter)
     elif len(sys.argv) > 1 and sys.argv[1] == "--params":
-        # Usage: sage costs.sage --params scheme q_s k a h d w swn
+        # Usage: sage model/costs.sage --params scheme q_s k a h d w swn
         if len(sys.argv) != 10:
-            print("Usage: sage costs.sage --params scheme q_s k a h d w swn")
+            print("Usage: sage model/costs.sage --params scheme q_s k a h d w swn")
             print("  scheme: SPX, W+C, W+C_F+C, W+C_P+FP")
             print("  q_s: log2 of max signatures (e.g., 10 for 2^10)")
-            print("Example: sage costs.sage --params W+C_P+FP 10 8 17 12 1 16 240")
+            print("Example: sage model/costs.sage --params W+C_P+FP 10 8 17 12 1 16 240")
             sys.exit(1)
         scheme = sys.argv[2]
         q_s_log2 = int(sys.argv[3])
@@ -592,7 +596,7 @@ if __name__ == "__main__" and not os.environ.get("COSTS_SAGE_NO_MAIN"):
         swn = int(sys.argv[9])
         compute_single(scheme, q_s_log2, h, d, a, k, w, swn)
     elif len(sys.argv) > 1 and sys.argv[1] == "--help":
-        print("Usage: sage costs.sage [OPTIONS]")
+        print("Usage: sage model/costs.sage [OPTIONS]")
         print()
         print("Options:")
         print("  (no args)                                  Output CSV format")
@@ -601,6 +605,6 @@ if __name__ == "__main__" and not os.environ.get("COSTS_SAGE_NO_MAIN"):
         print("  --help                                     Show this help message")
         print()
         print("Example:")
-        print("  sage costs.sage --params W+C_P+FP 10 8 17 12 1 16 240")
+        print("  sage model/costs.sage --params W+C_P+FP 10 8 17 12 1 16 240")
     else:
         generate_csv()

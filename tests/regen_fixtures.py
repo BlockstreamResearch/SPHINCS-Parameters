@@ -2,7 +2,7 @@
 """Compare tests/fixtures.json with the values the code produces now.
 
 Model values come from tests/model.py. Row and pool counts come from the
-generated files (utils/*.csv and site/data.json) and are skipped without them.
+generated files (analysis/*.csv and site/data.json) and are skipped without them.
 
     python3 tests/regen_fixtures.py           # list the values that differ
     python3 tests/regen_fixtures.py --write   # write them into tests/fixtures.json
@@ -61,7 +61,7 @@ def model_values(fx):
 
 def pipeline_counts(fx):
     """Read the row and pool counts from the generated files. False if they are missing."""
-    csvs = {name: os.path.join(ROOT, 'utils', name) for name in fx['csv_rows']}
+    csvs = {name: os.path.join(ROOT, 'analysis', name) for name in fx['csv_rows']}
     data_json = os.path.join(ROOT, 'site', 'data.json')
     if not all(os.path.exists(p) for p in [*csvs.values(), data_json]):
         return False
