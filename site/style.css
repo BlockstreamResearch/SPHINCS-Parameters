@@ -57,8 +57,6 @@ h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
 /* Names whose case matters, inside uppercase headings */
 .keep-case { text-transform: none; }
 
-.nowrap { white-space: nowrap; }
-
 /* Info button */
 .info {
   display: inline-grid; place-items: center;
@@ -129,7 +127,7 @@ h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
   margin-bottom: 2px;
 }
 .control label .name, .h-control label .name { color: var(--text); }
-input[type="range"] { width: 100%; accent-color: var(--accent); }
+input[type="range"] { width: 100%; margin-inline: 0; accent-color: var(--accent); }
 .val-input {
   padding: 2px 6px;
   border: 1px solid transparent;
@@ -170,7 +168,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .card td:first-child { color: var(--text-soft); }
 .card td:nth-child(2) { text-align: right; font-weight: 500; white-space: nowrap; }
 
-.h-control { margin: 0 0 10px; max-width: 420px; }
+.h-control { margin: 0 0 10px; }
 .h-control .val-input { width: 56px; }
 
 .card-link {
@@ -181,7 +179,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 }
 
 
-/* Parameter Explorer (stateless.html) */
+/* Stateless Path Explorer (stateless.html) */
 
 .layout {
   display: grid;
@@ -406,6 +404,10 @@ td.ratio.bad { color: var(--bad); }
   font-style: italic;
 }
 
+/* The scheme buttons of the custom candidate keep their natural width */
+.custom-scheme { display: inline-flex; margin-bottom: 12px; }
+.custom-scheme button { flex: 0 0 auto; padding: 5px 12px; }
+
 .custom-inputs {
   display: flex;
   gap: 12px;
@@ -441,12 +443,6 @@ td.ratio.bad { color: var(--bad); }
 .custom-status.invalid { background: var(--bad-soft); color: var(--bad); }
 .custom-status ul { margin: 4px 0 0 18px; padding: 0; font-size: 12px; }
 
-.custom-notes { margin-top: 10px; font-size: 12px; color: var(--text-soft); }
-.custom-notes div { margin: 2px 0; }
-.custom-notes .sec-ok { color: var(--good); }
-.custom-notes .sec-low { color: var(--bad); }
-.custom-notes .sec-detail { color: var(--text-mute); font-size: 11px; }
-
 .info-strip {
   background: var(--accent-soft);
   color: var(--accent);
@@ -462,7 +458,7 @@ td.ratio.bad { color: var(--bad); }
 }
 
 
-/* Stateful Comparison (stateful.html) */
+/* Stateful Path Explorer (stateful.html) */
 
 /* Comparison table */
 .compare-wrap { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }

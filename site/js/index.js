@@ -26,7 +26,7 @@ function renderStateless() {
   const size = shrincsStatelessSize(PINNED);
   const cb = m.sv / size, cbW = m.svWorst / size;
   document.getElementById('stateless-table').innerHTML = [
-    row('Max signatures', fmtPow2(40)),
+    row('Budget', fmtPow2(40)),
     row('Size (B)', fmtNum(size)),
     row('KeyGen (C)', fmtNum(m.kg)),
     row('SigGen (C)', fmtNum(m.sg)),
@@ -50,7 +50,7 @@ function renderXmss() {
   const cb = sv / size;
   document.getElementById('xmss-tuple').textContent = `WOTS+C, w = ${XMSS_W}, h = ${h}`;
   document.getElementById('xmss-table').innerHTML = [
-    row('Max signatures', fmtPow2(h)),
+    row('Budget', fmtPow2(h)),
     row('Size (B)', fmtNum(size)),
     row('KeyGen (C)', fmtNum(kg)),
     row('SigGen, cached (C)', fmtNum(sg)),
@@ -77,7 +77,7 @@ function renderUxmss() {
   const svMax = uxmssVerifyC(hsf, hsf, XMSS_W, swn, 'WC');
   const cb1 = sv1 / sz1, cbMax = svMax / szMax;
   document.getElementById('uxmss-table').innerHTML = [
-    row('Max signatures', fmtNum(hsf + 1)),
+    row('Budget', fmtNum(hsf + 1)),
     row('Size (B)', `${fmtNum(sz1)} → ${fmtNum(szMax)}`),
     row('KeyGen (C)', fmtNum(kg)),
     row('SigGen, cached (C)', `${fmtNum(sg1)} → ${fmtNum(sgLast)}`),

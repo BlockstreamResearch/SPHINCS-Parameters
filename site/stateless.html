@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SHRINCS Parameter Explorer</title>
+  <title>SHRINCS Explorer (stateless)</title>
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦐</text></svg>">
   <link rel="stylesheet" href="style.css">
@@ -13,11 +13,11 @@
 <body>
 
   <header>
-    <nav class="crumbs"><a href="index.html">SHRINCS pinned parameters</a> › Parameter Explorer · <a href="stateful.html">Stateful Comparison</a></nav>
-    <h1>SHRINCS Parameter Explorer</h1>
+    <nav class="crumbs"><a href="index.html">SHRINCS pinned parameters:</a> Stateless Path Explorer | <a href="stateful.html">Stateful Path Explorer</a></nav>
+    <h1>SHRINCS Explorer (stateless)</h1>
     <p class="tagline">
       Search SLH-DSA-compatible parameter sets as in the
-      <a href="report.pdf" target="_blank">SHRINCS Parameter Search</a> report.
+      <a href="report.pdf" target="_blank">report</a>.
     </p>
     <button type="button" class="glossary-btn" popovertarget="glossary">Glossary</button>
   </header>
@@ -27,27 +27,22 @@
     <aside class="panel sidebar">
       <h2>Scheme <button type="button" class="info" popovertarget="about-scheme" aria-label="About the schemes">i</button></h2>
       <div class="pop" id="about-scheme" popover>
-        <p>The stateless schemes of the report:</p>
         <ul>
-          <li><strong>SPX</strong>: SLH-DSA, with WOTS and FORS.</li>
-          <li><strong>W+C</strong>: WOTS+C instead of WOTS.</li>
-          <li><strong>FORS+C</strong>: WOTS+C, and FORS+C, which grinds away the last FORS tree.</li>
-          <li><strong>PORS+FP</strong>: WOTS+C, and PORS+FP, a single tree with Octopus authentication.</li>
+          <li><strong>SPX</strong>: SLH-DSA-compatible (WOTS + FORS).</li>
+          <li><strong>W+C</strong>: SPX with WOTS+C instead of WOTS.</li>
+          <li><strong>FORS+C</strong>: SPX with WOTS+C and FORS+C.</li>
+          <li><strong>PORS+FP</strong>: SPX with WOTS+C and PORS+FP.</li>
         </ul>
       </div>
       <div class="seg" id="scheme-controls"></div>
 
-      <h2 class="section-title">Winternitz parameter <button type="button" class="info" popovertarget="about-w" aria-label="About the Winternitz parameter">i</button></h2>
-      <div class="pop" id="about-w" popover>
-        <p>The pool always includes w = 2, 4, 16 and 256, whose digits fit whole bytes as SLH-DSA requires.
-          w = 32, 64 and 128 do not, so they are exploratory and extend only the SPX pool.</p>
-      </div>
+      <h2 class="section-title">Winternitz parameter</h2>
       <label class="mode-toggle">
-        <input type="checkbox" id="optw-toggle"> <span>include w = 32, 64, 128 <span class="nowrap">(non-aligned)</span></span>
+        <input type="checkbox" id="optw-toggle"> <span>include non-standard (w = 32/64/128)</span>
       </label>
 
       <h2 class="section-title">Bounds</h2>
-      <p class="hint">Keep candidates within these multiples of SLH-DSA-128s.</p>
+      <p class="hint">func_cost = SLH-DSA.func_cost * multiplier </p>
       <div id="filter-controls"></div>
       <div class="mode-row">
         <label class="mode-toggle"><input type="checkbox" id="worst-toggle"> use worst-case SigVer and ρ</label>
@@ -55,8 +50,7 @@
       </div>
       <div class="pop" id="about-worst" popover>
         <p>Filter and rank on worst-case SigVer and ρ, against the worst case of SLH-DSA-128s
-          (<span data-std="sv_worst"></span> C instead of <span data-std="sv"></span> C). WOTS+C verification costs
-          the same for every message, so candidates with WOTS+C keep their values and gain headroom.</p>
+          (<span data-std="sv_worst"></span> C instead of <span data-std="sv"></span> C).</p>
       </div>
 
       <h2 class="section-title">Weights <button type="button" class="info" popovertarget="about-weights" aria-label="About the weights">i</button></h2>
@@ -64,7 +58,7 @@
         <p>The best candidate has the smallest distance: the weighted root mean square of its five ratios to
           SLH-DSA-128s, each rescaled to 0–1 across the candidates within the bounds.</p>
       </div>
-      <p class="hint">A higher weight gives a metric more say in the ranking.</p>
+      <p class="hint">A higher weight makes a metric more important.</p>
       <div id="weight-controls"></div>
 
       <button class="reset-btn" id="reset-btn">Reset to defaults</button>
@@ -84,7 +78,7 @@
         <h2>Candidate sieve <button type="button" class="info" popovertarget="about-sieve" aria-label="About the candidate sieve">i</button></h2>
         <div class="pop" id="about-sieve" popover>
           <p>Each dot is one parameter set, placed at random. Candidates within the bounds are coloured by distance,
-            from blue (closest to ideal) to red; the others are grey and the winner is ringed. Hover a dot for its numbers.</p>
+            from blue (closest to ideal) to red; the others are grey. The winner is ringed.</p>
         </div>
         <div class="scatter-wrap">
           <canvas id="scatter" width="800" height="500" role="img" aria-label="Candidate sieve"></canvas>
@@ -101,11 +95,9 @@
       </div>
 
       <div class="panel">
-        <h2>Compare your own candidate <button type="button" class="info" popovertarget="about-custom" aria-label="About your own candidate">i</button></h2>
-        <div class="pop" id="about-custom" popover>
-          <p>This panel always uses the SPX model (WOTS and FORS), whichever scheme is selected.</p>
-        </div>
-        <p class="hint">Enter any (h, d, k, a, w) to compare it with SLH-DSA-128s.</p>
+        <h2>Compare your own candidate</h2>
+        <p class="hint">Select a scheme and enter parameters to compare it with SLH-DSA-128s.</p>
+        <div class="seg custom-scheme" id="custom-scheme" role="group" aria-label="Scheme of your candidate"></div>
         <div class="custom-inputs" id="custom-inputs">
           <div class="field"><label for="cust-h">h</label><input type="number" id="cust-h" value="63" min="1" step="1"></div>
           <div class="field"><label for="cust-d">d</label><input type="number" id="cust-d" value="7" min="1" step="1"></div>
@@ -133,6 +125,7 @@
   </main>
 
   <script src="js/ui.js"></script>
+  <script src="js/octopus_pmf.js"></script>
   <script src="js/model.js"></script>
   <script src="js/stateless.js"></script>
 

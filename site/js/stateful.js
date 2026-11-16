@@ -1,4 +1,4 @@
-// The Stateful Comparison: SLH-DSA-128s against XMSS, XMSS-MT and UXMSS
+// The Stateful Path Explorer: SLH-DSA-128s against XMSS, XMSS-MT and UXMSS
 // candidates, and the list of all stateful candidates within the bounds.
 'use strict';
 
@@ -216,7 +216,7 @@ const METRIC_COLS = [
                           value: (m, c) => rhoCell(m, c, m.sigverWorst, 1, fmtRho), ratioFn: m => (m.sigverWorst / m.size),  lowerIsBetter: true },
   { label: () => `${RHO} ÷ Schnorr` + infoButton('about-schnorr', 'About ρ ÷ Schnorr'),
                           value: (m, c) => rhoCell(m, c, m.sigver, SCHNORR.cb64, fmtRatio) },
-  { label: 'Max signatures', value: (_, c) => qsCell(c.metrics) },
+  { label: 'Budget', value: (_, c) => qsCell(c.metrics) },
 ];
 
 function ratioClass(ratio, lowerIsBetter) {
@@ -370,7 +370,7 @@ const SWEEP_BOUND_FILTERS = [
   { key: 'sg',    label: 'SigGen', min: 0.10, log: true },
   { key: 'sv',    label: 'SigVer', min: 0.10, log: true },
   { key: 'cb',    label: 'ρ',      min: 0.10, log: true },
-  { key: 'minQs', label: 'Min. sigs (log₂)', min: 0, max: 40, step: 1, dp: 0 },
+  { key: 'minQs', label: 'Min. budget (log₂)', min: 0, max: 40, step: 1, dp: 0 },
 ];
 const SWEEP_WEIGHT_FILTERS = [
   { key: 'size', label: 'Size',   min: 0.10, max: 10.00, step: 0.10, dp: 1 },
@@ -464,7 +464,7 @@ const SWEEP_COLS = [
                                             value: (m, c) => rhoCell(m, c, m.sigver, SCHNORR.cb64, fmtRatio), sortFn: (m) => m.sigver / m.size },
   { field: 'distance', label: 'Distance',   value: (m, c, std) => sweepDistance(m, std, sweepState.W).toFixed(4),
                                             sortFn: (m, c, std) => sweepDistance(m, std, sweepState.W) },
-  { field: 'qs',       label: 'Max signatures', value: (_, c) => qsCell(c.metrics),             sortFn: (m) => (m.qsLog2 !== null ? Math.pow(2, m.qsLog2) : m.qsExact) },
+  { field: 'qs',       label: 'Budget', value: (_, c) => qsCell(c.metrics),             sortFn: (m) => (m.qsLog2 !== null ? Math.pow(2, m.qsLog2) : m.qsExact) },
 ];
 
 function renderSweepTable() {
