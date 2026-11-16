@@ -112,7 +112,7 @@
     table.metrics td.ratio.good { color: var(--good); }
     table.metrics td.ratio.bad { color: var(--bad); }
 
-    .h-control { margin: 0 0 10px; max-width: 420px; }
+    .h-control { margin: 0 0 10px; }
     .h-control label {
       display: flex;
       justify-content: space-between;
@@ -122,7 +122,7 @@
       margin-bottom: 2px;
     }
     .h-control label .name { color: var(--text); }
-    .h-control input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .h-control input[type="range"] { width: 100%; margin-inline: 0; accent-color: var(--accent); }
     .h-control input.val-input {
       width: 56px;
       text-align: right;
@@ -160,10 +160,6 @@
 
   <header>
     <h1>SHRINCS pinned parameters</h1>
-    <p class="tagline">
-      Compare alternatives in the
-      <a href="stateless.html">Parameter Explorer</a> and the <a href="stateful.html">Stateful Comparison</a>.
-    </p>
     <button type="button" class="glossary-btn" popovertarget="glossary">Glossary</button>
   </header>
 
@@ -171,22 +167,16 @@
     <div class="cards">
 
       <div class="card">
-        <h2>Stateless <button type="button" class="info" popovertarget="about-stateless" aria-label="About the stateless parameters">i</button></h2>
-        <div class="pop" id="about-stateless" popover>
-          <p>Candidate 1 of the report. The size includes the one-byte SHRINCS indicator.</p>
-        </div>
+        <h2>Stateless path</h2>
         <p class="tuple">(h, d, k, a, w) = (45, 5, 10, 13, 16)</p>
         <table class="metrics" id="stateless-table"></table>
         <div class="card-link">
-          <a id="stateless-link" href="stateless.html#c=45,5,10,13,16">Open in the Parameter Explorer</a>
+          <a id="stateless-link" href="stateless.html#c=45,5,10,13,16">Open in the explorer</a>
         </div>
       </div>
 
       <div class="card">
-        <h2>Stateful, XMSS <button type="button" class="info" popovertarget="about-xmss" aria-label="About the XMSS parameters">i</button></h2>
-        <div class="pop" id="about-xmss" popover>
-          <p>The cached SigGen and the state are BDS upper bounds per signature.</p>
-        </div>
+        <h2>Stateful path, BXMSS</h2>
         <p class="tuple" id="xmss-tuple">WOTS+C, w = 64, h = 20</p>
         <div class="h-control">
           <label>
@@ -197,20 +187,16 @@
         </div>
         <table class="metrics" id="xmss-table"></table>
         <div class="card-link">
-          <a id="xmss-link" href="stateful.html#cand=xmssmt-WC-64-20-1,uxmss-WC-64">Open in the Stateful Comparison</a>
+          <a id="xmss-link" href="stateful.html#cand=xmssmt-WC-64-20-1,uxmss-WC-64">Open in the explorer</a>
         </div>
       </div>
 
       <div class="card">
-        <h2>Stateful, UXMSS <button type="button" class="info" popovertarget="about-uxmss" aria-label="About the UXMSS parameters">i</button></h2>
-        <div class="pop" id="about-uxmss" popover>
-          <p>Ranges go from the first to the last signature. Each signature carries one more 16-byte node
-            than the one before, so size and SigVer grow while ρ and the cached SigGen fall.</p>
-        </div>
+        <h2>Stateful, UXMSS</h2>
         <p class="tuple">WOTS+C, w = 64</p>
         <table class="metrics" id="uxmss-table"></table>
         <div class="card-link">
-          <a href="stateful.html#cand=xmssmt-WC-64-20-1,uxmss-WC-64">Open in the Stateful Comparison</a>
+          <a href="stateful.html#cand=xmssmt-WC-64-20-1,uxmss-WC-64">Open in the explorer</a>
         </div>
       </div>
 
@@ -251,7 +237,7 @@ function renderStateless() {
   const size = shrincsStatelessSize(PINNED);
   const cb = m.sv / size, cbW = m.svWorst / size;
   document.getElementById('stateless-table').innerHTML = [
-    row('Max signatures', fmtPow2(40)),
+    row('Budget', fmtPow2(40)),
     row('Size (B)', fmtNum(size)),
     row('KeyGen (C)', fmtNum(m.kg)),
     row('SigGen (C)', fmtNum(m.sg)),
@@ -275,7 +261,7 @@ function renderXmss() {
   const cb = sv / size;
   document.getElementById('xmss-tuple').textContent = `WOTS+C, w = ${XMSS_W}, h = ${h}`;
   document.getElementById('xmss-table').innerHTML = [
-    row('Max signatures', fmtPow2(h)),
+    row('Budget', fmtPow2(h)),
     row('Size (B)', fmtNum(size)),
     row('KeyGen (C)', fmtNum(kg)),
     row('SigGen, cached (C)', fmtNum(sg)),
@@ -302,7 +288,7 @@ function renderUxmss() {
   const svMax = uxmssVerifyC(hsf, hsf, XMSS_W, swn, 'WC');
   const cb1 = sv1 / sz1, cbMax = svMax / szMax;
   document.getElementById('uxmss-table').innerHTML = [
-    row('Max signatures', fmtNum(hsf + 1)),
+    row('Budget', fmtNum(hsf + 1)),
     row('Size (B)', `${fmtNum(sz1)} → ${fmtNum(szMax)}`),
     row('KeyGen (C)', fmtNum(kg)),
     row('SigGen, cached (C)', `${fmtNum(sg1)} → ${fmtNum(sgLast)}`),
