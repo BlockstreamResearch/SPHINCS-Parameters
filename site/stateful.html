@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SHRINCS Stateful Comparison</title>
+<title>SHRINCS Explorer (stateful)</title>
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦐</text></svg>">
 <style>
@@ -230,6 +230,7 @@
   .filter-grid .ctrl label .val::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   .filter-grid .ctrl input[type="range"] {
     width: 100%;
+    margin-inline: 0;
     accent-color: var(--accent);
   }
 
@@ -303,8 +304,8 @@
 <body>
 
 <header>
-  <nav class="crumbs"><a href="index.html">SHRINCS pinned parameters</a> › <a href="stateless.html">Parameter Explorer</a> · Stateful Comparison</nav>
-  <h1>SHRINCS Stateful Comparison</h1>
+  <nav class="crumbs"><a href="index.html">SHRINCS pinned parameters:</a> <a href="stateless.html">Stateless Path Explorer</a> | Stateful Path Explorer</nav>
+  <h1>SHRINCS Explorer (stateful)</h1>
   <p class="tagline">
     Compare stateful schemes with SLH-DSA-128s, or add your own with <strong>+ Add candidate</strong>.
   </p>
@@ -327,9 +328,8 @@
       </label>
       <button type="button" class="info" popovertarget="about-signer" aria-label="About the signer modes">i</button>
       <div class="pop" id="about-signer" popover>
-        <p>A cached signer keeps tree state between signatures: a BDS state for XMSS and XMSS-MT, and a leaf cache
-          for UXMSS. A cold signer keeps none and rebuilds its trees for every signature. SLH-DSA-128s is stateless,
-          so its SigGen is the same in both modes.</p>
+        <p>A cached signer keeps tree state between signatures. A cold signer keeps none and rebuilds its trees
+          for every signature.</p>
       </div>
     </div>
 
@@ -378,13 +378,10 @@
         Ratios, bounds, sorting and SigVer use the largest signature.</p>
     </div>
     <div class="pop" id="about-siggen" popover>
-      <p>Cached: an upper bound per signature. For XMSS and XMSS-MT that is one BDS update per layer, at most
-        (h′ − K)/2 + 1 leaf computations; for UXMSS it is the first signature, which combines the most nodes from
-        the leaf cache. Cold: the trees are rebuilt for every signature.</p>
+      <p>Cached: an upper bound per signature. Cold: the trees are rebuilt for every signature.</p>
     </div>
     <div class="pop" id="about-state" popover>
-      <p>What a cached signer stores: all hsf + 1 leaf hashes for UXMSS, the BDS state bound for XMSS and XMSS-MT.
-        Empty for SLH-DSA-128s and for a cold signer.</p>
+      <p>What a cached signer stores. Empty for SLH-DSA-128s and for a cold signer.</p>
     </div>
     <div class="pop" id="about-schnorr" popover></div>
     <div class="compare-wrap">
@@ -409,7 +406,7 @@
       <summary class="filter-section-label">
         <span class="chev">▸</span>
         Weights
-        <span class="filter-section-hint">(distance as in the Parameter Explorer)</span>
+        <span class="filter-section-hint">(distance as in the Stateless Path Explorer)</span>
       </summary>
       <div class="filter-grid" id="sweep-weights"></div>
     </details>
@@ -660,7 +657,7 @@ const METRIC_COLS = [
                           value: (m, c) => rhoCell(m, c, m.sigverWorst, 1, fmtRho), ratioFn: m => (m.sigverWorst / m.size),  lowerIsBetter: true },
   { label: () => `${RHO} ÷ Schnorr` + infoButton('about-schnorr', 'About ρ ÷ Schnorr'),
                           value: (m, c) => rhoCell(m, c, m.sigver, SCHNORR.cb64, fmtRatio) },
-  { label: 'Max signatures', value: (_, c) => qsCell(c.metrics) },
+  { label: 'Budget', value: (_, c) => qsCell(c.metrics) },
 ];
 
 function ratioClass(ratio, lowerIsBetter) {
@@ -815,7 +812,7 @@ const SWEEP_BOUND_FILTERS = [
   { key: 'sg',    label: 'SigGen', min: 0.10, log: true },
   { key: 'sv',    label: 'SigVer', min: 0.10, log: true },
   { key: 'cb',    label: 'ρ',      min: 0.10, log: true },
-  { key: 'minQs', label: 'Min. sigs (log₂)', min: 0, max: 40, step: 1, dp: 0 },
+  { key: 'minQs', label: 'Min. budget (log₂)', min: 0, max: 40, step: 1, dp: 0 },
 ];
 // Importance-weight descriptors (W)
 const SWEEP_WEIGHT_FILTERS = [
@@ -1003,7 +1000,7 @@ const SWEEP_COLS = [
                                             value: (m, c) => rhoCell(m, c, m.sigver, SCHNORR.cb64, fmtRatio), sortFn: (m) => m.sigver / m.size },
   { field: 'distance', label: 'Distance',   value: (m, c, std) => sweepDistance(m, std, sweepState.W).toFixed(4),
                                             sortFn: (m, c, std) => sweepDistance(m, std, sweepState.W) },
-  { field: 'qs',       label: 'Max signatures', value: (_, c) => qsCell(c.metrics),             sortFn: (m) => (m.qsLog2 !== null ? Math.pow(2, m.qsLog2) : m.qsExact) },
+  { field: 'qs',       label: 'Budget', value: (_, c) => qsCell(c.metrics),             sortFn: (m) => (m.qsLog2 !== null ? Math.pow(2, m.qsLog2) : m.qsExact) },
 ];
 
 function renderSweepTable() {
