@@ -6,7 +6,7 @@ report behind the parameters of SHRINCS. It computes the size, costs and securit
 the variants W+C, W+C_F+C and W+C_P+FP, searches their parameters, and compares stateful schemes:
 XMSS, XMSS-MT and UXMSS, the SHRINCS stateful tree.
 
-- Site: [SHRINCS pinned parameters, Parameter Explorer and Stateful Comparison](https://blockstreamresearch.github.io/SPHINCS-Parameters/site/)
+- Site: [SHRINCS pinned parameters, with the stateless and the stateful explorer](https://blockstreamresearch.github.io/SPHINCS-Parameters/site/)
 - Report: [report.pdf](https://blockstreamresearch.github.io/SPHINCS-Parameters/site/report.pdf), from [document/](document/)
 - Background: [Searching for SHRINCS parameters](https://blog.blockstream.com/searching-for-shrincs-parameters/), Blockstream blog, August 2026
 
@@ -55,7 +55,11 @@ To open the pages, serve the repository (the pages fetch `site/data.json`), for 
   and PORS+FP, `stateful.sage` XMSS, XMSS-MT and UXMSS.
 - `scripts/`: the parameter sweep and the export of `site/data.json`.
 - `analysis/`: the derived tables and the report's figures.
-- `site/`: the three pages; `site/js/model.js` computes the same model in the browser.
+- `site/`: the three pages. `index.html` shows the pinned parameters. `stateless.html` explores
+  the pools of SPX, W+C, FORS+C and PORS+FP and compares a candidate of your own, of any of
+  these schemes. `stateful.html` compares XMSS, XMSS-MT and UXMSS with SLH-DSA-128s.
+  `site/js/model.js` computes the same model in the browser, and `site/js/octopus_pmf.js` ports
+  `third_party/octopus_pmf.py` for PORS+FP candidates.
 - `document/`: the report in LaTeX. CI builds it and publishes it with the site; a tag also
   attaches it, `site/data.json` and the sweep CSVs to a release.
 - `tests/`: `model.py`, the tests by area (`python3 tests/run.py [model] [generated] [site] [sage]`),

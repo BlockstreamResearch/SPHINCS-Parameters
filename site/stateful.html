@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SHRINCS Stateful Comparison</title>
+<title>SHRINCS Explorer (stateful)</title>
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦐</text></svg>">
 </head>
 <body class="page-stateful">
 
 <header>
-  <nav class="crumbs"><a href="index.html">SHRINCS pinned parameters</a> › <a href="stateless.html">Parameter Explorer</a> · Stateful Comparison</nav>
-  <h1>SHRINCS Stateful Comparison</h1>
+  <nav class="crumbs"><a href="index.html">SHRINCS pinned parameters:</a> <a href="stateless.html">Stateless Path Explorer</a> | Stateful Path Explorer</nav>
+  <h1>SHRINCS Explorer (stateful)</h1>
   <p class="tagline">
     Compare stateful schemes with SLH-DSA-128s, or add your own with <strong>+ Add candidate</strong>.
   </p>
@@ -34,9 +34,8 @@
       </label>
       <button type="button" class="info" popovertarget="about-signer" aria-label="About the signer modes">i</button>
       <div class="pop" id="about-signer" popover>
-        <p>A cached signer keeps tree state between signatures: a BDS state for XMSS and XMSS-MT, and a leaf cache
-          for UXMSS. A cold signer keeps none and rebuilds its trees for every signature. SLH-DSA-128s is stateless,
-          so its SigGen is the same in both modes.</p>
+        <p>A cached signer keeps tree state between signatures. A cold signer keeps none and rebuilds its trees
+          for every signature.</p>
       </div>
     </div>
 
@@ -85,13 +84,10 @@
         Ratios, bounds, sorting and SigVer use the largest signature.</p>
     </div>
     <div class="pop" id="about-siggen" popover>
-      <p>Cached: an upper bound per signature. For XMSS and XMSS-MT that is one BDS update per layer, at most
-        (h′ − K)/2 + 1 leaf computations; for UXMSS it is the first signature, which combines the most nodes from
-        the leaf cache. Cold: the trees are rebuilt for every signature.</p>
+      <p>Cached: an upper bound per signature. Cold: the trees are rebuilt for every signature.</p>
     </div>
     <div class="pop" id="about-state" popover>
-      <p>What a cached signer stores: all hsf + 1 leaf hashes for UXMSS, the BDS state bound for XMSS and XMSS-MT.
-        Empty for SLH-DSA-128s and for a cold signer.</p>
+      <p>What a cached signer stores. Empty for SLH-DSA-128s and for a cold signer.</p>
     </div>
     <div class="pop" id="about-schnorr" popover></div>
     <div class="compare-wrap">
@@ -116,7 +112,7 @@
       <summary class="filter-section-label">
         <span class="chev">▸</span>
         Weights
-        <span class="filter-section-hint">(distance as in the Parameter Explorer)</span>
+        <span class="filter-section-hint">(distance as in the Stateless Path Explorer)</span>
       </summary>
       <div class="filter-grid" id="sweep-weights"></div>
     </details>

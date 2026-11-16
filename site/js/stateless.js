@@ -1,6 +1,6 @@
-// The Parameter Explorer: filters the candidate pools of data.json by bounds
-// relative to SLH-DSA-128s, ranks what is left by distance, and compares a
-// candidate of your own.
+// The Stateless Path Explorer: filters the candidate pools of data.json by
+// bounds relative to SLH-DSA-128s, ranks what is left by distance, and compares
+// a candidate of your own, of any scheme.
 'use strict';
 
 // SLH-DSA-compatible Winternitz parameters: log2(w) divides 8, so message
@@ -12,11 +12,11 @@ const OPTIONAL_W = [32, 64, 128];
 const UNIVERSE_W = [...ALLOWED_W, ...OPTIONAL_W];
 
 // Explorer rows use data.json's field names and carry ρ.
-function metrics(p) {
-  const m = slhMetrics(p);
+function metrics(p, scheme = 'SPX') {
+  const m = schemeMetrics(scheme, p);
   return {
     size: m.size, kg: m.kg, sg: m.sg, sv: m.sv, sv_worst: m.svWorst,
-    cb: m.sv / m.size, cb_worst: m.svWorst / m.size,
+    cb: m.sv / m.size, cb_worst: m.svWorst / m.size, swn: m.swn, mmax: m.mmax,
   };
 }
 
@@ -107,6 +107,7 @@ const state = {
   siteData: null,          // parsed data.json, null if it did not load
   pools: {},               // scheme -> candidate pool
   scheme: 'SPX',
+  customScheme: 'SPX',     // scheme of the custom candidate
   useWorst: false,         // bounds and ranking on worst-case SigVer and ρ
   showOptW: false,         // include OPTIONAL_W
   xMax: { kg: 20, sg: 20, sv: 20, cb: 20 },
@@ -381,7 +382,7 @@ function renderWinner(winner) {
 <div class="winner-grid">
   <div>
     <p class="winner-tuple">(${winner.h}, ${winner.d}, ${winner.k}, ${winner.a}, ${winner.w})</p>
-    <p class="winner-distance">Distance <strong>${d.toFixed(4)}</strong> · h′ = ${winner.h / winner.d}</p>
+    <p class="winner-distance">Distance: <strong>${d.toFixed(4)}</strong></p>
     ${winner.swn ? `<p class="winner-distance">S<sub>wn</sub> = ${winner.swn}${winner.mmax ? ` · m<sub>max</sub> = ${winner.mmax}` : ''}</p>` : ''}
   </div>
   <div>${comparisonTable(winner, 'Winner')}</div>
@@ -478,7 +479,7 @@ ${distHTML}
   ring.style.display = 'block';
 }
 
-function validateCustom(p) {
+function validateCustom(p, scheme) {
   const errors = [];
   const warnings = [];
   const isPosInt = v => Number.isFinite(v) && v > 0 && Math.floor(v) === v;
@@ -496,21 +497,29 @@ function validateCustom(p) {
   }
   if (!UNIVERSE_W.includes(p.w)) {
     errors.push(`w must be one of ${UNIVERSE_W.join(', ')}.`);
+  } else if (scheme !== 'SPX' && !(p.w in WOTS_C_SWN)) {
+    const wc = UNIVERSE_W.filter(w => w in WOTS_C_SWN).sort((x, y) => x - y);
+    errors.push(`With WOTS+C, w must be one of ${wc.join(', ')}.`);
   } else if (OPTIONAL_W.includes(p.w)) {
     warnings.push(`w = ${p.w} is exploratory: its digits do not fit whole bytes, as SLH-DSA requires.`);
+  }
+  if (scheme === 'W+C_F+C' && p.k < 2) errors.push('FORS+C needs k ≥ 2.');
+  if (scheme === 'W+C_P+FP' && (p.k > PORS_MAX_K || p.a > PORS_MAX_A)) {
+    errors.push(`PORS+FP is computed for k ≤ ${PORS_MAX_K} and a ≤ ${PORS_MAX_A}.`);
   }
 
   if (errors.length) return { valid: false, errors, warnings };
 
-  const secBits = computeSecurityBits(Q_S_LOG2, p.h, p.k, p.a);
+  const secBits = schemeForgeryExponent(scheme, p.h, p.k, p.a);
   if (secBits < 128) {
     warnings.push(`Below 128-bit security: ${secBits.toFixed(1)} bits at q<sub>s</sub> = 2<sup>40</sup>.`);
   }
 
-  return { valid: true, errors: [], warnings, secBits };
+  return { valid: true, errors: [], warnings };
 }
 
 function renderCustom() {
+  const scheme = state.customScheme;
   const p = {
     h: parseInt(document.getElementById('cust-h').value, 10),
     d: parseInt(document.getElementById('cust-d').value, 10),
@@ -519,7 +528,7 @@ function renderCustom() {
     w: parseInt(document.getElementById('cust-w').value, 10),
   };
 
-  const v = validateCustom(p);
+  const v = validateCustom(p, scheme);
   const statusEl = document.getElementById('custom-status');
   const resultEl = document.getElementById('custom-result');
   scheduleHashWrite();
@@ -531,7 +540,19 @@ function renderCustom() {
     return;
   }
 
-  const m = metrics(p);
+  let m;
+  try {
+    m = metrics(p, scheme);
+  } catch (err) {
+    if (!(err instanceof RangeError)) throw err;
+    // PORS+FP: no authentication set is as small as the first mmax.
+    statusEl.className = 'custom-status invalid';
+    statusEl.innerHTML = `<strong>Out of range.</strong> PORS+FP starts from ` +
+      `m<sub>max</sub> = (k − 1)·a − 22 = ${String((p.k - 1) * p.a - 22).replace('-', '−')}, ` +
+      `below the smallest authentication set; increase k or a.`;
+    resultEl.innerHTML = '';
+    return;
+  }
 
   // 2^(h/d) overflows a double for h' above about 1024, and the model stops
   // being meaningful long before that.
@@ -548,32 +569,38 @@ function renderCustom() {
     statusEl.innerHTML = `<strong>Valid, with notes:</strong><ul>${v.warnings.map(w => `<li>${w}</li>`).join('')}</ul>`;
   } else {
     statusEl.className = 'custom-status ok';
-    const sameAsStd = p.h === SLH.h && p.d === SLH.d && p.k === SLH.k && p.a === SLH.a && p.w === SLH.w;
+    const sameAsStd = scheme === 'SPX' &&
+      p.h === SLH.h && p.d === SLH.d && p.k === SLH.k && p.a === SLH.a && p.w === SLH.w;
     statusEl.innerHTML = `<strong>Valid.</strong>${sameAsStd ? ' This is SLH-DSA-128s.' : ''}`;
   }
-
-  const hp = p.h / p.d;
-  const chains = wotsL(p.w, 'TW');
-  const secRaw = forsForgeryExponent(Q_S_LOG2, p.h, p.k, p.a);
-  const rawTxt = secRaw > 300 ? '&gt; 300' : secRaw.toFixed(1);
-  const secLabel = secRaw >= 128
-    ? `<span class="sec-ok">128 bits ✓</span> <span class="sec-detail">` +
-      `(${rawTxt} bits against FORS forgery, capped by the 2<sup>−128</sup> preimage bound)</span>`
-    : `<span class="sec-low">${secRaw.toFixed(1)} bits</span>`;
 
   resultEl.innerHTML = `
 <div class="winner-grid">
   <div>
     <p class="winner-tuple">(${p.h}, ${p.d}, ${p.k}, ${p.a}, ${p.w})</p>
-    <div class="custom-notes">
-      <div>Layer height h′ = ${hp}</div>
-      <div>WOTS chains: ${chains}</div>
-      <div>Security at q<sub>s</sub> = 2<sup>40</sup>: ${secLabel}</div>
-    </div>
   </div>
   <div>${comparisonTable(m, 'Yours')}</div>
 </div>
   `;
+}
+
+// The scheme buttons of the custom candidate. WOTS+C has no target sum for w
+// below 16, so those w are disabled with it.
+function renderCustomSchemes() {
+  const host = document.getElementById('custom-scheme');
+  host.innerHTML = Object.keys(SCHEME_LABELS).map(s =>
+    `<button type="button" class="${s === state.customScheme ? 'active' : ''}" ` +
+    `aria-pressed="${s === state.customScheme}" data-scheme="${s}">${SCHEME_LABELS[s]}</button>`).join('');
+  host.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    state.customScheme = b.dataset.scheme;
+    renderCustomSchemes();
+    renderCustom();
+  }));
+  const wSelect = document.getElementById('cust-w');
+  for (const option of wSelect.options) {
+    option.disabled = state.customScheme !== 'SPX' && !(option.value in WOTS_C_SWN);
+  }
+  if (wSelect.selectedOptions[0].disabled) wSelect.value = '16';
 }
 
 function attachCustomCandidate() {
@@ -582,6 +609,7 @@ function attachCustomCandidate() {
     el.addEventListener('input', renderCustom);
     el.addEventListener('change', renderCustom);  // the w select
   });
+  renderCustomSchemes();
   renderCustom();
 }
 
@@ -700,6 +728,7 @@ function writeHash() {
     parts.push('w=' + HASH_KEYS.map(k => state.W[k]).join(','));
   if (state.useWorst) parts.push('wc=1');
   if (state.showOptW) parts.push('ow=1');
+  if (state.customScheme !== 'SPX') parts.push('cs=' + SCHEME_IDS[state.customScheme]);
   const cust = CUSTOM_IDS.map(id => document.getElementById(id).value).join(',');
   if (cust !== CUSTOM_DEFAULTS) parts.push('c=' + cust);
   replaceHash(parts);
@@ -727,6 +756,7 @@ function applyHash() {
   if (params.w) setVec(params.w, state.W, false);
   if (params.wc === '1') state.useWorst = true;
   if (params.ow === '1') state.showOptW = true;
+  if (params.cs && SCHEME_FROM_ID[params.cs]) state.customScheme = SCHEME_FROM_ID[params.cs];
   if (params.c) {
     const vals = params.c.split(',').map(v => parseInt(v, 10));
     if (vals.length === 5 && vals.every(Number.isFinite)) {

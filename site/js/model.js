@@ -120,15 +120,17 @@ function computeNu(l, swn, w) {
   return nu > 0n ? nu : 1n;
 }
 
+// Mean counter attempts of one WOTS+C signature, ceil(w^l / ν).
+function wotsCSearch(w, swn) {
+  const l = wotsL(w, 'WC');
+  const nu = computeNu(l, swn, w);
+  const wToL = BigInt(w) ** BigInt(l);
+  return Number(wToL / nu + ((wToL % nu === 0n) ? 0n : 1n));   // small, fits in a double
+}
+
 function wotsSignC(w, swn, ots) {
   const l = wotsL(w, ots);
-  if (ots === 'WC') {
-    const nu = computeNu(l, swn, w);
-    const wToL = BigInt(w) ** BigInt(l);
-    const searchBig = wToL / nu + ((wToL % nu === 0n) ? 0n : 1n);
-    const search = Number(searchBig);   // typically small, fits in double
-    return search * C_Th1c + l * C_PRF + swn * C_Th1;
-  }
+  if (ots === 'WC') return wotsCSearch(w, swn) * C_Th1c + l * C_PRF + swn * C_Th1;
   // WOTS-TW: the signer walks the part of each chain the verifier does not.
   return l * C_PRF + (l * (w - 1) - wotsTwMeanSteps(w)) * C_Th1;
 }
@@ -313,8 +315,92 @@ function slhMetrics(p) {
   return { size, kg, sg, sv, svWorst };
 }
 
-// FORS security (docs/model.md, FORS security), summed in log2 to avoid
-// underflow.
+// W+C, FORS+C and PORS+FP (docs/model.md, W+C, FORS+C and PORS+FP)
+
+// Bytes of the WOTS+C counter in each layer of a stateless signature.
+const WOTS_C_COUNTER = 4;
+
+// The PORS+FP grinding model takes seconds beyond this k, and t = k·2^a has
+// to stay an exact integer.
+const PORS_MAX_K = 32;
+const PORS_MAX_A = 40;
+
+// PORS+FP grinding: log2 of the mean attempts until the Octopus
+// authentication set of k leaves among t has at most mmax nodes
+// (js/octopus_pmf.js, which only stateless.html loads).
+const _porsTables = new Map();
+
+function porsLog2Attempts(t, k, mmax) {
+  const key = t + ',' + k;
+  let table = _porsTables.get(key);
+  if (!table) {
+    table = interleaveCostTable(t, k);
+    _porsTables.set(key, table);
+  }
+  // The table ends at the largest set, where every attempt succeeds, and
+  // starts at the smallest: below it none does.
+  let best = -1;
+  for (const m of table.keys()) if (m <= mmax && m > best) best = m;
+  if (best < 0) throw new RangeError('mmax is below the smallest authentication set');
+  return table.get(best);
+}
+
+// Size and costs of SPX, W+C, W+C_F+C or W+C_P+FP for p = { h, d, k, a, w }.
+// With WOTS+C the target sum is the S_wn of w, unless p.swn gives another.
+function schemeMetrics(scheme, p) {
+  if (scheme === 'SPX') return { ...slhMetrics(p), swn: 0, mmax: 0 };
+  const { h, d, k, a, w } = p;
+  const swn = p.swn || WOTS_C_SWN[w];
+  const l = wotsL(w, 'WC');
+
+  // one hypertree layer; a signature rebuilds d of them and searches d counters
+  const leaves = Math.pow(2, h / d);
+  const cMerkle = leaves * wotsPkC(w, 'WC') + (leaves - 1) * C_Th2;
+  const cHyper = d * cMerkle + d * wotsCSearch(w, swn) * C_Th1c;
+  const cMsg = C_Hmsg + C_PRFmsg;
+
+  // FORS with `trees` trees of 2^a leaves: to build them, and to verify a signature
+  const forsLeaves = Math.pow(2, a);
+  const forsBuild = trees => trees * forsLeaves * (C_PRF + C_Th1)
+                           + trees * (forsLeaves - 1) * C_Th2 + computeTh(trees);
+  const forsVerify = trees => trees * C_Th1 + trees * a * C_Th2 + computeTh(trees);
+  // FORS+C leaves the last tree out and grinds about 2^a message hashes instead.
+  const sgForsC = cHyper + forsBuild(k - 1) + forsLeaves * cMsg;
+
+  let ftsSize, sg, cFts, mmax = 0;
+  if (scheme === 'W+C') {
+    ftsSize = k * (a + 1) * N;
+    sg = forsBuild(k) + cMsg + cHyper;
+    cFts = forsVerify(k);
+  } else if (scheme === 'W+C_F+C') {
+    ftsSize = (k - 1) * (a + 1) * N;
+    sg = sgForsC;
+    cFts = forsVerify(k - 1);
+  } else {
+    // PORS+FP: one tree of t = k·2^a leaves; the signer grinds message hashes
+    // until the authentication set of its k leaves has at most mmax nodes.
+    const t = k * forsLeaves;
+    const cTree = t * (C_PRF + C_Th1) + (t - 1) * C_Th2;
+    const sgWith = m => cHyper + cTree + Math.ceil(Math.pow(2, porsLog2Attempts(t, k, m))) * cMsg;
+    // mmax grows from (k − 1)·a − ceil(350/n), by 19 at most, until signing
+    // costs less than 1.11 times signing with FORS+C.
+    mmax = (k - 1) * a - Math.ceil(350 / N);
+    for (let i = 0; i < 19 && !(sgWith(mmax) / sgForsC < 1.11); i++) mmax++;
+    ftsSize = (k + mmax) * N;
+    sg = sgWith(mmax);
+    cFts = k * C_Th1 + mmax * C_Th2;
+  }
+
+  // randomizer, hypertree authentication path and WOTS+C signatures, their
+  // counters, the few-time signature
+  const size = N * (1 + h + d * l) + WOTS_C_COUNTER * d + ftsSize;
+  // WOTS+C verification costs the same for every message.
+  const sv = C_Hmsg + cFts + wotsVerifyC(w, swn, 'WC', false, d) + h * C_Th2;
+  return { size, kg: cMerkle, sg, sv, svWorst: sv, swn, mmax };
+}
+
+// FORS and PORS+FP security (docs/model.md, FORS security), summed in log2 to
+// avoid underflow.
 
 const _LOG2_E = 1 / Math.LN2;
 
@@ -364,16 +450,16 @@ function _log2SumExp(a, b) {
 // that scale, so the sum stays accurate far beyond the displayed precision.
 const MAX_SUM_TERMS = 1 << 16;
 
-// -log2 of the FORS forgery probability after 2^q_s_log2 signatures, uncapped.
-// Only r within `spread` of the mean lambda = q_s / 2^h is summed, so the work
-// grows with sqrt(lambda); the custom candidate accepts any h.
-function forsForgeryExponent(q_s_log2, h, k, a) {
+// -log2 of the forgery probability after 2^q_s_log2 signatures, uncapped.
+// log2Forge(r) is log2 of the probability of a forgery on an instance that r
+// signatures have used. Only r within `spread` of the mean lambda = q_s / 2^h
+// is summed, so the work grows with sqrt(lambda); the custom candidate accepts
+// any h.
+function forgeryExponent(q_s_log2, h, log2Forge) {
   const q_s = Math.pow(2, q_s_log2);
-  const t = Math.pow(2, a);
   const log2_p = -h;
   const p = Math.pow(2, -h);
   const log2_one_minus_p = p < 1e-15 ? -p * _LOG2_E : Math.log1p(-p) * _LOG2_E;
-  const ln_one_minus_1_over_t = 1 / t < 1e-15 ? -1 / t : Math.log1p(-1 / t);
   const lambda = Math.pow(2, q_s_log2 - h);
   let log2_sigma = -Infinity;
   const spread = 30 * Math.sqrt(lambda + 1) + 30;
@@ -385,13 +471,29 @@ function forsForgeryExponent(q_s_log2, h, k, a) {
     const log2_C = _log2Binom(q_s, r);
     if (!isFinite(log2_C)) continue;
     const log2_qhp = log2_C + r * log2_p + (q_s - r) * log2_one_minus_p;
-    const log2_pf = k * _log2OneMinusExp(r * ln_one_minus_1_over_t);
+    const log2_pf = log2Forge(r);
     const log2_contrib = log2_qhp + log2_pf + log2_stride;
     if (isFinite(log2_contrib)) log2_sigma = _log2SumExp(log2_sigma, log2_contrib);
     if (r > Math.max(lambda, 5) && log2_contrib < -500) break;
   }
   // sigma is a probability; rounding can leave it a hair above 1.
   return Math.max(0, -log2_sigma);
+}
+
+// FORS: after r signatures each of the k trees of t = 2^a leaves has revealed
+// the leaf a forgery needs with probability 1 − (1 − 1/t)^r.
+function forsForgeryExponent(q_s_log2, h, k, a) {
+  const t = Math.pow(2, a);
+  const ln_one_minus_1_over_t = 1 / t < 1e-15 ? -1 / t : Math.log1p(-1 / t);
+  return forgeryExponent(q_s_log2, h, r => k * _log2OneMinusExp(r * ln_one_minus_1_over_t));
+}
+
+// PORS+FP: r signatures reveal at most r·k of the t = k·2^a leaves, and a
+// forgery needs its k leaves among them.
+function porsForgeryExponent(q_s_log2, h, k, a) {
+  const t = k * Math.pow(2, a);
+  const log2_all = _log2Binom(t, k);
+  return forgeryExponent(q_s_log2, h, r => _log2Binom(Math.min(r * k, t), k) - log2_all);
 }
 
 // Bits of security: the forgery exponent, capped at 8 * hashbytes by preimage
@@ -402,6 +504,12 @@ function computeSecurityBits(q_s_log2, h, k, a, hashbytes = 16) {
 
 // The stateless schemes are evaluated at 2^40 signatures.
 const Q_S_LOG2 = 40;
+
+// The forgery exponent of a stateless scheme: PORS+FP has its own, the others
+// that of FORS.
+function schemeForgeryExponent(scheme, h, k, a) {
+  return (scheme === 'W+C_P+FP' ? porsForgeryExponent : forsForgeryExponent)(Q_S_LOG2, h, k, a);
+}
 
 // Distance, the report's metric-normalised weighted distance (docs/model.md,
 // Distance)

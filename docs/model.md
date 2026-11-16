@@ -105,7 +105,8 @@ hash, each attempt costing H_msg + PRF_msg; the last attempt is the signature's 
   out: k − 1 trees in the signature, in signing and in verification.
 - PORS+FP builds one tree of t = k·2^a leaves, t·(PRF + Th1) and t − 1 node hashes, opens k of
   its leaves and grinds until their Octopus authentication set has at most mmax nodes;
-  `third_party/octopus_pmf.py` gives the expected attempts. mmax starts at (k − 1)·a − ceil(350/n) and grows by
+  `third_party/octopus_pmf.py` gives the expected attempts, and `site/js/octopus_pmf.js` ports it for the
+  candidate of your own on the stateless page. mmax starts at (k − 1)·a − ceil(350/n) and grows by
   one, at most 19 times, until signing costs less than 1.11 times signing with FORS+C.
 
 For FORS, FORS+C and PORS+FP in turn,
