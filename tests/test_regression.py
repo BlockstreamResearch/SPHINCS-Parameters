@@ -157,8 +157,9 @@ def _extract_js(page, end_marker):
     m = re.search(r"'use strict';(.*?)" + re.escape(end_marker), html, re.S)
     assert m, f'extraction markers not found in {page} — update the test'
     js = m.group(1)
-    if '<script src="formulas.js">' in html:
-        js = open(os.path.join(ROOT, 'site', 'formulas.js')).read() + '\n' + js
+    for lib in ('formulas.js', 'js/octopus_pmf.js'):
+        if f'<script src="{lib}">' in html:
+            js = open(os.path.join(ROOT, 'site', lib)).read() + '\n' + js
     return js
 
 
@@ -221,6 +222,72 @@ console.log(JSON.stringify(out));
     assert abs(out['h14_a40'] - 196) < 1e-3, out
     assert abs(out['h28'] - 9.2530) < 1e-3 and abs(out['h35'] - 94.7784) < 1e-3, out
     assert out['ms'] < 5000, out     # about 0.1 s; the unbounded sum needed minutes
+
+
+def test_site_schemes():
+    """The custom-candidate panel of stateless.html computes W+C, FORS+C and
+    PORS+FP in the browser: its model against the reference model, on the
+    frozen sage tuples and off the grid, and against a sample of the pools
+    that sage exported."""
+    js = _extract_js('stateless.html', '// ---------- State ----------')
+    cases = []
+    for key in FIX['variants']:
+        scheme, rest = key.split('|')
+        cases.append([scheme] + [int(x) for x in rest.split(',')])
+    # Off the grid: the tuple of SLH-DSA-128s, every w with a target sum, tall trees
+    for scheme in ('W+C', 'W+C_F+C', 'W+C_P+FP'):
+        for h, d, k, a, w in ((63, 7, 14, 12, 16), (30, 3, 9, 15, 32), (36, 4, 13, 11, 64),
+                              (28, 2, 21, 9, 128), (66, 11, 6, 24, 256)):
+            cases.append([scheme, h, d, k, a, w, M.SWN[w]])
+    data_path = None if _missing(DATA_JSON) else os.path.join(ROOT, DATA_JSON)
+    js += f"""
+const KEYS = ['swn', 'mmax', 'size', 'kg', 'sg', 'sv', 'sv_worst'];
+const out = {{ metrics: [], pools: {{}} }};
+for (const [scheme, h, d, k, a, w, swn] of {json.dumps(cases)}) {{
+  const m = schemeMetrics(scheme, {{h, d, k, a, w, swn}});
+  out.metrics.push(KEYS.slice(1).map(key => m[key]));
+}}
+// without swn, the target sum is the one of w
+out.default_swn = schemeMetrics('W+C', {{h: 44, d: 4, k: 8, a: 16, w: 16}}).swn;
+// (k - 1) * a - 22 is below the smallest authentication set
+try {{
+  schemeMetrics('W+C_P+FP', {{h: 40, d: 5, k: 3, a: 4, w: 16}});
+  out.out_of_range = false;
+}} catch (e) {{ out.out_of_range = e instanceof RangeError; }}
+out.security = {{
+  fors: schemeForgeryExponent('W+C_F+C', 44, 8, 16),
+  pors: schemeForgeryExponent('W+C_P+FP', 44, 8, 16),
+  pors_short: schemeForgeryExponent('W+C_P+FP', 36, 9, 14),
+}};
+const dataPath = {json.dumps(data_path)};
+if (dataPath) {{
+  const data = JSON.parse(require('fs').readFileSync(dataPath, 'utf8'));
+  for (const s of data.meta.schemes.filter(s => s !== 'SPX')) {{
+    const pool = poolFromData(data, s);
+    const step = Math.max(1, Math.floor(pool.length / 25));
+    out.pools[s] = true;
+    for (let i = 0; i < pool.length; i += step) {{
+      const c = pool[i], m = schemeMetrics(s, c);
+      if (KEYS.some(key => m[key] !== c[key]) || schemeForgeryExponent(s, c.h, c.k, c.a) < 128) out.pools[s] = false;
+    }}
+  }}
+}}
+console.log(JSON.stringify(out));
+"""
+    out = _run_node(js)
+    if out is None:
+        return
+    for case, got in zip(cases, out['metrics']):
+        m = M.scheme_metrics(*case)
+        want = [m['mmax'], m['size'], m['kg'], m['sg'], m['sv'], m['sv_worst']]
+        assert got == want, (case, got, want)
+    assert out['default_swn'] == M.SWN[16], out['default_swn']
+    assert out['out_of_range'], 'PORS+FP below the smallest authentication set must be a RangeError'
+    # security.sage, recomputed in 120-digit decimals
+    sec = out['security']
+    assert abs(sec['fors'] - 128.2840) < 1e-3, sec
+    assert abs(sec['pors'] - 130.8261) < 1e-3 and abs(sec['pors_short'] - 87.7155) < 1e-3, sec
+    assert all(out['pools'].values()), out['pools']
 
 
 def test_site_main():

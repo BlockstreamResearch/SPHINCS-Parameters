@@ -478,6 +478,16 @@
       font-style: italic;
     }
 
+    .custom-scheme {
+      display: inline-flex;
+      margin-bottom: 12px;
+    }
+
+    .custom-scheme button {
+      flex: 0 0 auto;
+      padding: 5px 12px;
+    }
+
     .custom-inputs {
       display: flex;
       gap: 12px;
@@ -579,11 +589,11 @@
 <body>
 
   <header>
-    <nav class="crumbs"><a href="index.html">SHRINCS pinned parameters</a> › Parameter Explorer · <a href="stateful.html">Stateful Comparison</a></nav>
-    <h1>SHRINCS Parameter Explorer</h1>
+    <nav class="crumbs"><a href="index.html">SHRINCS pinned parameters:</a> Stateless Path Explorer | <a href="stateful.html">Stateful Path Explorer</a></nav>
+    <h1>SHRINCS Explorer (stateless)</h1>
     <p class="tagline">
       Search SLH-DSA-compatible parameter sets as in the
-      <a href="report.pdf" target="_blank">SHRINCS Parameter Search</a> report.
+      <a href="report.pdf" target="_blank">report</a>.
     </p>
     <button type="button" class="glossary-btn" popovertarget="glossary">Glossary</button>
   </header>
@@ -593,28 +603,23 @@
     <aside class="panel sidebar">
       <h2>Scheme <button type="button" class="info" popovertarget="about-scheme" aria-label="About the schemes">i</button></h2>
       <div class="pop" id="about-scheme" popover>
-        <p>The stateless schemes of the report:</p>
         <ul>
-          <li><strong>SPX</strong>: SLH-DSA, with WOTS and FORS.</li>
-          <li><strong>W+C</strong>: WOTS+C instead of WOTS.</li>
-          <li><strong>FORS+C</strong>: WOTS+C, and FORS+C, which grinds away the last FORS tree.</li>
-          <li><strong>PORS+FP</strong>: WOTS+C, and PORS+FP, a single tree with Octopus authentication.</li>
+          <li><strong>SPX</strong>: SLH-DSA-compatible (WOTS + FORS).</li>
+          <li><strong>W+C</strong>: SPX with WOTS+C instead of WOTS.</li>
+          <li><strong>FORS+C</strong>: SPX with WOTS+C and FORS+C.</li>
+          <li><strong>PORS+FP</strong>: SPX with WOTS+C and PORS+FP.</li>
         </ul>
       </div>
       <p class="hint" id="scheme-hint" hidden></p>
       <div class="seg" id="scheme-controls"></div>
 
-      <h2 class="section-title">Winternitz parameter <button type="button" class="info" popovertarget="about-w" aria-label="About the Winternitz parameter">i</button></h2>
-      <div class="pop" id="about-w" popover>
-        <p>The pool always includes w = 2, 4, 16 and 256, whose digits fit whole bytes as SLH-DSA requires.
-          w = 32, 64 and 128 do not, so they are exploratory and extend only the SPX pool.</p>
-      </div>
+      <h2 class="section-title">Winternitz parameter</h2>
       <label class="mode-toggle">
-        <input type="checkbox" id="optw-toggle"> <span>include w = 32, 64, 128 <span style="white-space: nowrap;">(non-aligned)</span></span>
+        <input type="checkbox" id="optw-toggle"> <span>include non-standard (w = 32/64/128)</span>
       </label>
 
       <h2 class="section-title">Bounds</h2>
-      <p class="hint">Keep candidates within these multiples of SLH-DSA-128s.</p>
+      <p class="hint">func_cost = SLH-DSA.func_cost * multiplier </p>
       <div id="filter-controls"></div>
       <div class="mode-row">
         <label class="mode-toggle"><input type="checkbox" id="worst-toggle"> use worst-case SigVer and ρ</label>
@@ -622,8 +627,7 @@
       </div>
       <div class="pop" id="about-worst" popover>
         <p>Filter and rank on worst-case SigVer and ρ, against the worst case of SLH-DSA-128s
-          (<span data-std="sv_worst"></span> C instead of <span data-std="sv"></span> C). WOTS+C verification costs
-          the same for every message, so candidates with WOTS+C keep their values and gain headroom.</p>
+          (<span data-std="sv_worst"></span> C instead of <span data-std="sv"></span> C).</p>
       </div>
 
       <h2 class="section-title">Weights <button type="button" class="info" popovertarget="about-weights" aria-label="About the weights">i</button></h2>
@@ -631,7 +635,7 @@
         <p>The best candidate has the smallest distance: the weighted root mean square of its five ratios to
           SLH-DSA-128s, each rescaled to 0–1 across the candidates within the bounds.</p>
       </div>
-      <p class="hint">A higher weight gives a metric more say in the ranking.</p>
+      <p class="hint">A higher weight makes a metric more important.</p>
       <div id="weight-controls"></div>
 
       <button class="reset-btn" id="reset-btn">Reset to defaults</button>
@@ -651,7 +655,7 @@
         <h2>Candidate sieve <button type="button" class="info" popovertarget="about-sieve" aria-label="About the candidate sieve">i</button></h2>
         <div class="pop" id="about-sieve" popover>
           <p>Each dot is one parameter set, placed at random. Candidates within the bounds are coloured by distance,
-            from blue (closest to ideal) to red; the others are grey and the winner is ringed. Hover a dot for its numbers.</p>
+            from blue (closest to ideal) to red; the others are grey. The winner is ringed.</p>
         </div>
         <div class="scatter-wrap">
           <canvas id="scatter" width="800" height="500" role="img" aria-label="Candidate sieve"></canvas>
@@ -668,11 +672,9 @@
       </div>
 
       <div class="panel">
-        <h2>Compare your own candidate <button type="button" class="info" popovertarget="about-custom" aria-label="About your own candidate">i</button></h2>
-        <div class="pop" id="about-custom" popover>
-          <p>This panel always uses the SPX model (WOTS and FORS), whichever scheme is selected.</p>
-        </div>
-        <p class="hint">Enter any (h, d, k, a, w) to compare it with SLH-DSA-128s.</p>
+        <h2>Compare your own candidate</h2>
+        <p class="hint">Select a scheme and enter parameters to compare it with SLH-DSA-128s.</p>
+        <div class="seg custom-scheme" id="custom-scheme" role="group" aria-label="Scheme of your candidate"></div>
         <div class="custom-inputs" id="custom-inputs">
           <div class="field"><label for="cust-h">h</label><input type="number" id="cust-h" value="63" min="1" step="1"></div>
           <div class="field"><label for="cust-d">d</label><input type="number" id="cust-d" value="7" min="1" step="1"></div>
@@ -700,6 +702,7 @@
   </main>
 
   <script src="js/ui.js"></script>
+  <script src="js/octopus_pmf.js"></script>
   <script>
     'use strict';
 
@@ -822,24 +825,25 @@
       return Math.ceil((176 + 128 * n + 65) / 512);
     }
 
+    // Compression costs: cached convention, matching costs.sage defaults:
+    // PK.seed midstate cached per keypair; a 2-child node hash is
+    // ADRS_c (22 B) + 32 B + padding = 497 bits -> 1 compression.
+    // Hmsg and PRFmsg for a 32-byte message and an empty context, as the
+    // SHRINCS reference implementation executes them: Hmsg is two nested
+    // SHA-256 calls of 2 compressions each (its input starts with the
+    // randomizer, so nothing is cacheable); PRFmsg is HMAC-SHA-256, 2 + 1
+    // compressions with its two key-pad blocks cached.
+    const C_PRF = 1;  // PRF generation
+    const C_Th1 = 1;  // tweakable hash, 1 value (WOTS chain step / leaf)
+    const C_Th1c = 1; // WOTS+C: hash of the message digits with the counter
+    const C_Th2 = 1;  // tweakable hash, 2 values (internal tree node)
+    const C_Hmsg = 4; // Message hash
+    const C_PRFmsg = 3; // Message PRF
+
     function metrics(p) {
       const n = STD.n; // 16 bytes (128-bit security)
       const hp = p.h / p.d;
       const { len } = wotsComponents(n, p.w);
-
-      // Compression costs: cached convention, matching costs.sage defaults:
-      // PK.seed midstate cached per keypair; a 2-child node hash is
-      // ADRS_c (22 B) + 32 B + padding = 497 bits -> 1 compression.
-      // Hmsg and PRFmsg for a 32-byte message and an empty context, as the
-      // SHRINCS reference implementation executes them: Hmsg is two nested
-      // SHA-256 calls of 2 compressions each (its input starts with the
-      // randomizer, so nothing is cacheable); PRFmsg is HMAC-SHA-256, 2 + 1
-      // compressions with its two key-pad blocks cached.
-      const C_PRF = 1;  // PRF generation
-      const C_Th1 = 1;  // tweakable hash, 1 value (WOTS chain step / leaf)
-      const C_Th2 = 1;  // tweakable hash, 2 values (internal tree node)
-      const C_Hmsg = 4; // Message hash
-      const C_PRFmsg = 3; // Message PRF
 
       // Exact compression counts for leaf/root compressions (matches costs.sage).
       // computeTh(n) = ceil((128 + 96 + 128*n + 65) / 512):
@@ -979,14 +983,15 @@
     const MAX_SUM_TERMS = 1 << 16;
 
     /**
-     * FORS subset-forgery exponent -log2(forgery probability) for
-     * q_s = 2^q_s_log2 signatures (uncapped).
+     * Subset-forgery exponent -log2(forgery probability) for
+     * q_s = 2^q_s_log2 signatures (uncapped). log2Forge(r) is log2 of the
+     * probability of a forgery on an instance that r signatures have used.
      *
-     * The sum runs over r, the number of signatures that land on one FORS
+     * The sum runs over r, the number of signatures that land on one
      * instance: r ~ Binomial(q_s, 2^-h) with mean lambda = q_s / 2^h. Only
      * the terms within `spread` of lambda matter: further out the binomial
-     * weight is below e^-450 of its peak, and the forgery factor
-     * (1 - (1 - 1/t)^r)^k only grows with r, so the low side can be skipped
+     * weight is below e^-450 of its peak, and the forgery probability
+     * only grows with r, so the low side can be skipped
      * as well as the high side. The work is therefore O(sqrt(lambda)), not
      * O(lambda): a tuple with few hypertree leaves (h = 14 gives
      * lambda = 2^26) used to need 67 million terms and froze the page.
@@ -995,13 +1000,11 @@
      * far beyond the displayed precision. For the canonical grid
      * (lambda <= 1) nothing changes: r starts at 1 with stride 1.
      */
-    function forsForgeryExponent(q_s_log2, h, k, a) {
+    function forgeryExponent(q_s_log2, h, log2Forge) {
       const q_s = Math.pow(2, q_s_log2);
-      const t = Math.pow(2, a);
       const log2_p = -h;
       const p = Math.pow(2, -h);
       const log2_one_minus_p = p < 1e-15 ? -p * _LOG2_E : Math.log1p(-p) * _LOG2_E;
-      const ln_one_minus_1_over_t = 1 / t < 1e-15 ? -1 / t : Math.log1p(-1 / t);
       const lambda = Math.pow(2, q_s_log2 - h);
       let log2_sigma = -Infinity;
       const spread = 30 * Math.sqrt(lambda + 1) + 30;
@@ -1013,13 +1016,30 @@
         const log2_C = _log2Binom(q_s, r);
         if (!isFinite(log2_C)) continue;
         const log2_qhp = log2_C + r * log2_p + (q_s - r) * log2_one_minus_p;
-        const log2_pf = k * _log2OneMinusExp(r * ln_one_minus_1_over_t);
+        const log2_pf = log2Forge(r);
         const log2_contrib = log2_qhp + log2_pf + log2_stride;
         if (isFinite(log2_contrib)) log2_sigma = _log2SumExp(log2_sigma, log2_contrib);
         if (r > Math.max(lambda, 5) && log2_contrib < -500) break;
       }
       // sigma is a probability; rounding can leave it a hair above 1.
       return Math.max(0, -log2_sigma);
+    }
+
+    // FORS: k trees of t = 2^a leaves. After r signatures a tree has revealed
+    // the leaf a forgery needs with probability 1 - (1 - 1/t)^r.
+    function forsForgeryExponent(q_s_log2, h, k, a) {
+      const t = Math.pow(2, a);
+      const ln_one_minus_1_over_t = 1 / t < 1e-15 ? -1 / t : Math.log1p(-1 / t);
+      return forgeryExponent(q_s_log2, h, r => k * _log2OneMinusExp(r * ln_one_minus_1_over_t));
+    }
+
+    // PORS+FP: one tree of t = k * 2^a leaves, k distinct leaves per
+    // signature. r signatures reveal at most r * k leaves, and a forgery
+    // needs its k leaves among them: C(min(r * k, t), k) / C(t, k).
+    function porsForgeryExponent(q_s_log2, h, k, a) {
+      const t = k * Math.pow(2, a);
+      const log2_all = _log2Binom(t, k);
+      return forgeryExponent(q_s_log2, h, r => _log2Binom(Math.min(r * k, t), k) - log2_all);
     }
 
     /**
@@ -1045,12 +1065,122 @@
       return passesSecurity(c) && c.size < MAX_SIZE;
     }
 
+    // ---------- Schemes with WOTS+C ----------
+    // W+C, FORS+C and PORS+FP as in costs.sage. The explorer's pools of these
+    // schemes come from data.json; the custom-candidate panel computes them here.
+
+    // Target digit sum S_wn of WOTS+C for each w.
+    const WOTS_C_SWN = { 16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040 };
+    // Bytes of the WOTS+C counter in each of the d WOTS signatures.
+    const WOTS_C_COUNTER = 4;
+    // The PORS+FP grinding model takes seconds beyond this k, and t = k * 2^a
+    // has to stay an exact integer.
+    const PORS_MAX_K = 32;
+    const PORS_MAX_A = 40;
+
+    // Digit strings of length l in base w whose digits sum to swn.
+    function computeNu(l, swn, w) {
+      let nu = 0n;
+      for (let j = 0; j <= l; j++) {
+        const term = binomBig(BigInt(l), BigInt(j)) * binomBig(BigInt(swn + l - j * w - 1), BigInt(l - 1));
+        nu += j % 2 === 0 ? term : -term;
+      }
+      return nu > 0n ? nu : 1n;
+    }
+
+    // PORS+FP grinding: log2 of the expected attempts until the authentication
+    // set of k leaves among t has at most mmax nodes (js/octopus_pmf.js).
+    const _porsTables = new Map();
+    function porsLog2Attempts(t, k, mmax) {
+      const key = t + ',' + k;
+      let table = _porsTables.get(key);
+      if (!table) {
+        table = interleaveCostTable(t, k);
+        _porsTables.set(key, table);
+      }
+      // The table ends at the largest set, where every attempt succeeds, and
+      // starts at the smallest: below it none does.
+      let best = -1;
+      for (const m of table.keys()) if (m <= mmax && m > best) best = m;
+      if (best < 0) throw new RangeError('m_max is below the smallest authentication set');
+      return table.get(best);
+    }
+
+    // Size, costs and ρ of a scheme, for p = { h, d, k, a, w }. With WOTS+C
+    // the target sum is the S_wn of w unless p.swn gives another.
+    function schemeMetrics(scheme, p) {
+      if (scheme === 'SPX') return { ...metrics(p), swn: 0, mmax: 0 };
+      const n = STD.n;
+      const { h, d, k, a, w } = p;
+      const hp = h / d;
+      const swn = p.swn || WOTS_C_SWN[w];
+      const l = wotsComponents(n, w).len1;   // WOTS+C has no checksum chains
+      const Thl = computeTh(l);
+
+      // The signer tries counters until the message digits sum to S_wn:
+      // w^l / nu attempts on average, in each of the d layers.
+      const nu = computeNu(l, swn, w);
+      const search = d * Number((BigInt(w) ** BigInt(l) + nu - 1n) / nu);
+
+      const leaves = Math.pow(2, hp);
+      const c_merkle = leaves * (l * C_PRF + l * (w - 1) * C_Th1 + Thl) + (leaves - 1) * C_Th2;
+      const c_hyper = d * c_merkle + search * C_Th1c;
+      const c_msg = C_Hmsg + C_PRFmsg;
+
+      // FORS with `trees` trees of 2^a leaves: to build them, and to verify a signature.
+      const forsLeaves = Math.pow(2, a);
+      const forsBuild = trees => trees * forsLeaves * (C_PRF + C_Th1) + trees * (forsLeaves - 1) * C_Th2 + computeTh(trees);
+      const forsVerify = trees => trees * C_Th1 + trees * a * C_Th2 + computeTh(trees);
+      // FORS+C drops the last tree: the signer grinds message hashes until
+      // that tree's leaf is the first one, 2^a attempts on average.
+      const sg_forsc = c_hyper + forsBuild(k - 1) + forsLeaves * c_msg;
+
+      let ftsSize, sg, c_fts, mmax = 0;
+      if (scheme === 'W+C') {
+        ftsSize = k * (a + 1) * n;
+        sg = forsBuild(k) + c_msg + c_hyper;
+        c_fts = forsVerify(k);
+      } else if (scheme === 'W+C_F+C') {
+        ftsSize = (k - 1) * (a + 1) * n;
+        sg = sg_forsc;
+        c_fts = forsVerify(k - 1);
+      } else {
+        // PORS+FP: one tree of t = k * 2^a leaves. A signature holds k leaves
+        // and at most m_max authentication nodes; the signer grinds message
+        // hashes until the authentication set is that small.
+        const t = k * forsLeaves;
+        const c_tree = t * (C_PRF + C_Th1) + (t - 1) * C_Th2;
+        const sgWith = m => c_hyper + c_tree + Math.ceil(Math.pow(2, porsLog2Attempts(t, k, m))) * c_msg;
+        // m_max starts at (k - 1) * a - ceil(350 / n) and grows, by 19 at
+        // most, until signing costs less than 1.11 times FORS+C.
+        mmax = (k - 1) * a - Math.ceil(350 / n);
+        for (let i = 0; i < 19 && !(sgWith(mmax) / sg_forsc < 1.11); i++) mmax++;
+        ftsSize = (k + mmax) * n;
+        sg = sgWith(mmax);
+        c_fts = k * C_Th1 + mmax * C_Th2;
+      }
+
+      // d layers of auth path, WOTS+C chains and counter; the few-time
+      // signature; the randomizer.
+      const size = d * ((hp + l) * n + WOTS_C_COUNTER) + ftsSize + n;
+      // WOTS+C verification takes the same steps for every message.
+      const c_wots = ((w - 1) * l - swn) * C_Th1 + C_Th1c + Thl;
+      const sv = C_Hmsg + c_fts + d * c_wots + h * C_Th2;
+      return { size, kg: c_merkle, sg, sv, sv_worst: sv, cb: sv / size, cb_worst: sv / size, swn, mmax };
+    }
+
+    // Forgery exponent of a scheme at q_s = 2^40: PORS+FP has its own
+    // analysis, the other schemes that of FORS (security.sage).
+    function schemeForgeryExponent(scheme, h, k, a) {
+      return (scheme === 'W+C_P+FP' ? porsForgeryExponent : forsForgeryExponent)(Q_S_LOG2, h, k, a);
+    }
+
     // ---------- Canonical data (data.json) ----------
     // The pools are normally loaded from site/data.json, generated by
     // export_site_data.sage: SPX from the same sweep CSV as the report, the
     // W+C / FORS+C / PORS+FP variants computed by costs.sage. The formulas
-    // above stay for the custom-candidate panel (SPX model) and as a
-    // fallback, and are cross-checked against the loaded SPX pool at startup.
+    // above stay for the custom-candidate panel and as a fallback for SPX,
+    // and are cross-checked against the loaded SPX pool at startup.
     function poolFromData(data, scheme) {
       const p = data.pools[scheme];
       const idx = Object.fromEntries(p.fields.map((f, i) => [f, i]));
@@ -1166,6 +1296,7 @@
       schnorr: { ...SCHNORR_FALLBACK },  // BIP340 ρ reference (live after loadSchnorrRef)
       pools: {},               // scheme -> candidate pool
       scheme: 'SPX',
+      customScheme: 'SPX',     // scheme of the custom-candidate panel
       useWorst: false,         // filter/rank on worst-case SigVer & ρ
       showOptW: false,         // include w = 32, 64, 128 (non-byte-aligned extras)
       xMax: { kg: 20, sg: 20, sv: 20, cb: 20 },
@@ -1536,7 +1667,7 @@
     <div class="winner-grid">
       <div>
         <p class="winner-tuple">(${winner.h}, ${winner.d}, ${winner.k}, ${winner.a}, ${winner.w})</p>
-        <p class="winner-distance">Distance <strong>${d.toFixed(4)}</strong> · h′ = ${winner.h / winner.d}</p>
+        <p class="winner-distance">Distance: <strong>${d.toFixed(4)}</strong></p>
         ${winner.swn ? `<p class="winner-distance">S<sub>wn</sub> = ${winner.swn}${winner.mmax ? ` · m<sub>max</sub> = ${winner.mmax}` : ''}</p>` : ''}
       </div>
       <div>${comparisonTable(winner, 'Winner')}</div>
@@ -1640,7 +1771,7 @@
     }
 
     // ---------- Custom candidate panel ----------
-    function validateCustom(p) {
+    function validateCustom(p, scheme) {
       const errors = [];
       const warnings = [];
       const isPosInt = v => Number.isFinite(v) && v > 0 && Math.floor(v) === v;
@@ -1658,22 +1789,29 @@
       }
       if (!UNIVERSE_W.includes(p.w)) {
         errors.push(`w must be one of ${UNIVERSE_W.join(', ')}.`);
+      } else if (scheme !== 'SPX' && !(p.w in WOTS_C_SWN)) {
+        errors.push(`With WOTS+C, w must be one of ${Object.keys(WOTS_C_SWN).join(', ')}.`);
       } else if (OPTIONAL_W.includes(p.w)) {
         warnings.push(`w = ${p.w} is exploratory: its digits do not fit whole bytes, as SLH-DSA requires.`);
+      }
+      if (scheme === 'W+C_F+C' && p.k < 2) errors.push('FORS+C needs k ≥ 2.');
+      if (scheme === 'W+C_P+FP' && (p.k > PORS_MAX_K || p.a > PORS_MAX_A)) {
+        errors.push(`PORS+FP is computed for k ≤ ${PORS_MAX_K} and a ≤ ${PORS_MAX_A}.`);
       }
 
       if (errors.length) return { valid: false, errors, warnings };
 
-      // Real security check (FORS subset-forgery analysis, q_s = 2^40)
-      const secBits = computeSecurityBits(Q_S_LOG2, p.h, p.k, p.a);
-      if (secBits < 128) {
-        warnings.push(`Below 128-bit security: ${secBits.toFixed(1)} bits at q<sub>s</sub> = 2<sup>40</sup>.`);
+      // Real security check (FORS or PORS+FP subset-forgery analysis, q_s = 2^40)
+      const secRaw = schemeForgeryExponent(scheme, p.h, p.k, p.a);
+      if (secRaw < 128) {
+        warnings.push(`Below 128-bit security: ${secRaw.toFixed(1)} bits at q<sub>s</sub> = 2<sup>40</sup>.`);
       }
 
-      return { valid: true, errors: [], warnings, secBits };
+      return { valid: true, errors: [], warnings, secRaw };
     }
 
     function renderCustom() {
+      const scheme = state.customScheme;
       const p = {
         h: parseInt(document.getElementById('cust-h').value, 10),
         d: parseInt(document.getElementById('cust-d').value, 10),
@@ -1682,7 +1820,7 @@
         w: parseInt(document.getElementById('cust-w').value, 10),
       };
 
-      const v = validateCustom(p);
+      const v = validateCustom(p, scheme);
       const statusEl = document.getElementById('custom-status');
       const resultEl = document.getElementById('custom-result');
       scheduleHashWrite();
@@ -1695,7 +1833,20 @@
       }
 
       // Compute metrics
-      const m = metrics(p);
+      let m;
+      try {
+        m = schemeMetrics(scheme, p);
+      } catch (err) {
+        if (!(err instanceof RangeError)) throw err;
+        // PORS+FP: no authentication set is as small as the first m_max.
+        statusEl.className = 'custom-status invalid';
+        statusEl.innerHTML = `<strong>Out of range.</strong> PORS+FP starts from ` +
+          `m<sub>max</sub> = (k − 1)·a − 22 = ${String((p.k - 1) * p.a - 22).replace('-', '−')}, ` +
+          `below the smallest authentication set; ` +
+          `increase k or a.`;
+        resultEl.innerHTML = '';
+        return;
+      }
 
       // Guard against overflow: 2^(h/d) exceeds double precision for h' ≳ 1024,
       // and the model stops being meaningful long before that.
@@ -1713,32 +1864,50 @@
         statusEl.innerHTML = `<strong>Valid, with notes:</strong><ul>${v.warnings.map(w => `<li>${w}</li>`).join('')}</ul>`;
       } else {
         statusEl.className = 'custom-status ok';
-        const sameAsStd = p.h === STD.h && p.d === STD.d && p.k === STD.k && p.a === STD.a && p.w === STD.w;
+        const sameAsStd = scheme === 'SPX' &&
+          p.h === STD.h && p.d === STD.d && p.k === STD.k && p.a === STD.a && p.w === STD.w;
         statusEl.innerHTML = `<strong>Valid.</strong>${sameAsStd ? ' This is SLH-DSA-128s.' : ''}`;
       }
 
       const hp = p.h / p.d;
-      const wotsL = wotsLen(STD.n, p.w);
-      const secRaw = forsForgeryExponent(Q_S_LOG2, p.h, p.k, p.a);
-      const rawTxt = secRaw > 300 ? '&gt; 300' : secRaw.toFixed(1);
-      const secLabel = secRaw >= 128
+      const { len1, len } = wotsComponents(STD.n, p.w);
+      const wotsL = scheme === 'SPX' ? len : len1;   // WOTS+C has no checksum chains
+      const wcNote = scheme === 'SPX' ? ''
+        : `<div>S<sub>wn</sub> = ${m.swn}${scheme === 'W+C_P+FP' ? ` · m<sub>max</sub> = ${m.mmax}` : ''}</div>`;
+      const forgery = scheme === 'W+C_P+FP' ? 'PORS+FP' : 'FORS';
+      const rawTxt = v.secRaw > 300 ? '&gt; 300' : v.secRaw.toFixed(1);
+      const secLabel = v.secRaw >= 128
         ? `<span style="color:var(--good);">128 bits ✓</span> <span style="color:var(--text-mute);font-size:11px;">` +
-          `(${rawTxt} bits against FORS forgery, capped by the 2<sup>−128</sup> preimage bound)</span>`
-        : `<span style="color:var(--bad);">${secRaw.toFixed(1)} bits</span>`;
+          `(${rawTxt} bits against ${forgery} forgery, capped by the 2<sup>−128</sup> preimage bound)</span>`
+        : `<span style="color:var(--bad);">${v.secRaw.toFixed(1)} bits</span>`;
 
       resultEl.innerHTML = `
     <div class="winner-grid">
       <div>
         <p class="winner-tuple">(${p.h}, ${p.d}, ${p.k}, ${p.a}, ${p.w})</p>
-        <div class="custom-notes">
-          <div>Layer height h′ = ${hp}</div>
-          <div>WOTS chains: ${wotsL}</div>
-          <div>Security at q<sub>s</sub> = 2<sup>40</sup>: ${secLabel}</div>
-        </div>
       </div>
       <div>${comparisonTable(m, 'Yours')}</div>
     </div>
   `;
+    }
+
+    // The panel's scheme buttons. WOTS+C has no target sum for w below 16, so
+    // those w are disabled with it.
+    function renderCustomSchemes() {
+      const host = document.getElementById('custom-scheme');
+      host.innerHTML = Object.keys(SCHEME_LABELS).map(s =>
+        `<button type="button" class="${s === state.customScheme ? 'active' : ''}" ` +
+        `aria-pressed="${s === state.customScheme}" data-scheme="${s}">${SCHEME_LABELS[s]}</button>`).join('');
+      host.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+        state.customScheme = b.dataset.scheme;
+        renderCustomSchemes();
+        renderCustom();
+      }));
+      const wSelect = document.getElementById('cust-w');
+      for (const option of wSelect.options) {
+        option.disabled = state.customScheme !== 'SPX' && !(option.value in WOTS_C_SWN);
+      }
+      if (wSelect.selectedOptions[0].disabled) wSelect.value = '16';
     }
 
     function attachCustomCandidate() {
@@ -1747,6 +1916,7 @@
         el.addEventListener('input', renderCustom);
         el.addEventListener('change', renderCustom);  // <select> (cust-w) safety
       });
+      renderCustomSchemes();
       renderCustom();
     }
 
@@ -1907,6 +2077,7 @@
         parts.push('w=' + HASH_KEYS.map(k => state.W[k]).join(','));
       if (state.useWorst) parts.push('wc=1');
       if (state.showOptW) parts.push('ow=1');
+      if (state.customScheme !== 'SPX') parts.push('cs=' + SCHEME_IDS[state.customScheme]);
       const cust = CUSTOM_IDS.map(id => document.getElementById(id).value).join(',');
       if (cust !== CUSTOM_DEFAULTS) parts.push('c=' + cust);
       const url = parts.length
@@ -1956,6 +2127,7 @@
       if (params.w) setVec(params.w, state.W, false);
       if (params.wc === '1') state.useWorst = true;
       if (params.ow === '1') state.showOptW = true;
+      if (params.cs && SCHEME_FROM_ID[params.cs]) state.customScheme = SCHEME_FROM_ID[params.cs];
       if (params.c) {
         const vals = params.c.split(',').map(v => parseInt(v, 10));
         if (vals.length === 5 && vals.every(Number.isFinite)) {
