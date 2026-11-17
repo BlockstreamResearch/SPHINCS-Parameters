@@ -243,14 +243,29 @@ def compute_size(h, d, a, k, w, scheme, mmax=0):
     return hyper_tree_size + fts_size + randomness_size
 
 
-def compute_mmax(h_prime, l, w, d_wots_expected_search, d, k, a):
+def compute_top_layer_saving(h_prime, w, swn, scheme):
+    """The number of compressions which can be saved by SigGen (on the top level). 
+    Root is the public key, so the signer does not recompute it: it skips the 
+    verification of its own WOTS signature there, the mean for WOTS-TW, and the h' nodes above it."""
+    l = compute_wots_l(scheme, w)
+    Thl = compute_Th(l)
+    if scheme == "SPX":
+        l1, l2 = wots_lengths(w)
+        c_wots = compute_wots_tw_mean_steps(l1, l2, w)*C_Th1 + Thl
+    else:  # WOTS+C costs the same for every message
+        c_wots = ((w-1)*l - swn)*C_Th1 + C_Th1c + Thl
+    return c_wots + h_prime*C_Th2
+
+
+def compute_mmax(h_prime, l, w, swn, d_wots_expected_search, d, k, a):
     """The PORS+FP authentication-set bound: from (k-1)*a - ceil(350/n) up,
     the first for which signing costs less than 1.11 times signing with
     FORS+C, and at most 19 steps up (docs/model.md, W+C, FORS+C and PORS+FP)."""
     Thl = compute_Th(l)
     Thk1 = compute_Th(k-1)
     merkle_tree_fixed_part_time = (2**h_prime * (l*C_PRF + l*(w-1)*C_Th1 + Thl)) + (2**h_prime-1)*C_Th2
-    hyper_tree_expected_time = d*merkle_tree_fixed_part_time + d_wots_expected_search*C_Th1c
+    hyper_tree_expected_time = (d*merkle_tree_fixed_part_time + d_wots_expected_search*C_Th1c
+                                - compute_top_layer_saving(h_prime, w, swn, "W+C_P+FP"))
     fors_c_fixed_part_time = (k-1)*(2**a)*C_PRF + (k-1)*(2**a)*C_Th1 + (k-1)*(2**a-1)*C_Th2 + Thk1
     fors_c_expected_search_time = 2**a*(C_Hmsg + C_PRFmsg)
     fors_c_expected_total_time = fors_c_fixed_part_time + fors_c_expected_search_time
@@ -298,9 +313,11 @@ def compute_signing_time(h, d, a, k, w, swn, scheme):
     else:
         d_wots_expected_search = 0
 
-    # One tree per layer: 2^h' WOTS public keys and 2^h' - 1 nodes
+    # One tree per layer, 2^h' WOTS public keys and 2^h' - 1 nodes, less what
+    # the top layer saves
     c_merkle = 2**h_prime * (l*C_PRF + l*(w-1)*C_Th1 + Thl) + (2**h_prime - 1)*C_Th2
-    c_hyper_exp = d*c_merkle + d_wots_expected_search*C_Th1c
+    c_hyper_exp = (d*c_merkle + d_wots_expected_search*C_Th1c
+                   - compute_top_layer_saving(h_prime, w, swn, scheme))
     c_msg = C_Hmsg + C_PRFmsg
 
     mmax = 0
@@ -319,7 +336,7 @@ def compute_signing_time(h, d, a, k, w, swn, scheme):
         # set has at most mmax nodes
         t, subtree_height, extra_leaves = compute_pors_tree_geometry(k, a)
         c_pors_fixed = t*C_PRF + t*C_Th1 + ((2**subtree_height - 1) + extra_leaves)*C_Th2
-        mmax = compute_mmax(h_prime, l, w, d_wots_expected_search, d, k, a)
+        mmax = compute_mmax(h_prime, l, w, swn, d_wots_expected_search, d, k, a)
         pors_search_attempts = ceil(exp_work_from_mmax(t, k, mmax))
         c_pors_search = pors_search_attempts * c_msg
         return {
