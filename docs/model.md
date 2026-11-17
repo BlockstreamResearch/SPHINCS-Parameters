@@ -69,9 +69,10 @@ verification cost the same for every message. Of the w^l digit strings,
 have that sum, so signing takes ceil(w^l / ν) attempts of `C_Th1c` on average, then l PRF calls and
 S_wn chain steps. Verification takes l·(w − 1) − S_wn chain steps, one `C_Th1c` and Th(l).
 
-`parameters.json` sets S_wn = floor(l1·(w − 1)/2), the middle of the digit-sum distribution, where
-ν is largest: 240 for w = 16 and 2040 for w = 256. For w = 128 the product is odd, and
-ν(1206) = ν(1207).
+`parameters.json` sets S_wn = ceil(l1·(w − 1)/2), the middle of the digit-sum distribution, where
+ν is largest: 240 for w = 16 and 2040 for w = 256. For w = 128 the product is odd and rounds up to
+1207, as the specification does; there ν(1206) = ν(1207), so the rounding does not affect
+grinding.
 
 SHRINCS stores the counter in 2 bytes: 2^16 counters miss the target sum with probability below
 2^−126 for every w ≤ 256. w = 65536 needs about 137,000 attempts on average and keeps a 4-byte
@@ -84,13 +85,16 @@ For (h, d, k, a, w), the hypertree has d layers of trees of height h′ = h/d.
     size   = n·(1 + k·(a + 1) + h + d·l)
     tree   = 2^h′·pk + (2^h′ − 1)·Th2
     KeyGen = tree
-    SigGen = FORS + H_msg + PRF_msg + d·tree
+    SigGen = FORS + H_msg + PRF_msg + d·tree − V − h′·Th2
     FORS   = k·2^a·(PRF + Th1) + k·(2^a − 1)·Th2 + Th(k)
     SigVer = H_msg + k·Th1 + k·a·Th2 + Th(k) + d WOTS-TW verifications + h·Th2
 
 The size counts the randomizer, k FORS leaves with a authentication nodes each, the h nodes of the
 hypertree authentication path and d WOTS signatures: 7,856 B for SLH-DSA-128s, (63, 7, 14, 12, 16).
-KeyGen builds the top tree; a signature rebuilds one tree per layer. SigVer takes the mean of
+KeyGen builds the top tree; a signature rebuilds one tree per layer, which costs a tree to sign
+and a tree to verify. The top tree is never rebuilt: its root is the published public key, so
+SigGen saves its verification there, V + h′·Th2 for V one mean
+[WOTS-TW verification](#wots-tw-verification) including Th(l). SigVer takes the mean of
 [WOTS-TW verification](#wots-tw-verification), SigVer worst its worst case in every layer. A SHRINCS
 stateless signature adds a one-byte indicator.
 
@@ -98,8 +102,10 @@ stateless signature adds a one-byte indicator.
 
 W+C signs every layer with WOTS+C instead of WOTS-TW: a layer holds l = l1 chain values and a
 4-byte counter, signing adds d counter searches, and verification costs the same for every
-message. W+C_F+C also replaces FORS with FORS+C, and W+C_P+FP with PORS+FP. Both grind the message
-hash, each attempt costing H_msg + PRF_msg; the last attempt is the signature's message hash.
+message; like SPX, SigGen subtracts the top layer's verification, now deterministic, and its
+h′·Th2 path. W+C_F+C also replaces FORS with FORS+C, and W+C_P+FP with PORS+FP. Both grind the
+message hash, each attempt costing H_msg + PRF_msg; the last attempt is the signature's message
+hash.
 
 - FORS+C grinds until the index in the last tree is 0, about 2^a attempts, and leaves that tree
   out: k − 1 trees in the signature, in signing and in verification.

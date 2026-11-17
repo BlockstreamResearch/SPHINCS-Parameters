@@ -126,7 +126,11 @@ def spx_metrics(h, d, k, a, w):
 
     c_fors = (k * 2**a * C_PRF + k * 2**a * C_TH1
               + k * (2**a - 1) * C_TH2 + thk)
-    sg = c_fors + (C_HMSG + C_PRFMSG) + d * c_merkle
+    # A layer costs a full tree, to sign and to verify. The top tree is never
+    # rebuilt: its root is the published public key, so the signature saves
+    # one WOTS-TW verification and its h' authentication path there.
+    c_top_saved = wots_tw_mean_steps(w, 1) * C_TH1 + thl + hp * C_TH2
+    sg = c_fors + (C_HMSG + C_PRFMSG) + d * c_merkle - c_top_saved
 
     c_fts = k * C_TH1 + k * a * C_TH2 + thk
     c_wots_avg = wots_tw_mean_steps(w, d) * C_TH1 + d * thl     # all d layers
@@ -175,12 +179,14 @@ def _pors_geometry(k, a):
     return t, sub, t - 2**sub
 
 
-def _compute_mmax(hp, l, w, d_search, d, k, a):
+def _compute_mmax(hp, l, w, swn, d_search, d, k, a):
     """The PORS+FP authentication-set bound, as costs.sage compute_mmax."""
     thl = compute_th(l)
     thk1 = compute_th(k - 1)
     merkle = 2**hp * (l * C_PRF + l * (w - 1) * C_TH1 + thl) + (2**hp - 1) * C_TH2
-    hyper = d * merkle + d_search * C_TH1C
+    # the top layer saves its WOTS+C verification and its h' path, as in sg
+    hyper = (d * merkle + d_search * C_TH1C
+             - ((w - 1) * l - swn) * C_TH1 - C_TH1C - thl - hp * C_TH2)
     fors_c_fixed = ((k - 1) * 2**a * C_PRF + (k - 1) * 2**a * C_TH1
                     + (k - 1) * (2**a - 1) * C_TH2 + thk1)
     fors_c_search = 2**a * (C_HMSG + C_PRFMSG)
@@ -215,7 +221,10 @@ def scheme_metrics(scheme, h, d, k, a, w, swn=0):
     d_search = d * (-(-(w**l) // nu))
 
     c_merkle = 2**hp * (l * C_PRF + l * (w - 1) * C_TH1 + thl) + (2**hp - 1) * C_TH2
-    c_hyper = d * c_merkle + d_search * C_TH1C
+    # WOTS+C verification is deterministic: worst == average
+    c_wots = ((w - 1) * l - swn) * C_TH1 + C_TH1C + thl
+    # as in spx_metrics, the top layer saves its verification and h' path
+    c_hyper = d * c_merkle + d_search * C_TH1C - c_wots - hp * C_TH2
     c_msg = C_HMSG + C_PRFMSG
     kg = c_merkle
 
@@ -233,7 +242,7 @@ def scheme_metrics(scheme, h, d, k, a, w, swn=0):
         sg = c_hyper + c_fors + 2**a * c_msg
         c_fts = (k - 1) * C_TH1 + (k - 1) * a * C_TH2 + compute_th(k - 1)
     elif scheme == 'W+C_P+FP':
-        mmax = _compute_mmax(hp, l, w, d_search, d, k, a)
+        mmax = _compute_mmax(hp, l, w, swn, d_search, d, k, a)
         fts_size = (k + mmax) * N
         t, sub, extra = _pors_geometry(k, a)
         c_pors = t * C_PRF + t * C_TH1 + ((2**sub - 1) + extra) * C_TH2
@@ -244,8 +253,6 @@ def scheme_metrics(scheme, h, d, k, a, w, swn=0):
         raise ValueError(scheme)
 
     size = d * (hp * N + l * N + ctr) + fts_size + R_SIZE
-    # WOTS+C verification is deterministic: worst == average
-    c_wots = ((w - 1) * l - swn) * C_TH1 + C_TH1C + thl
     sv = C_HMSG + c_fts + d * c_wots + h * C_TH2
     return {'size': size, 'kg': kg, 'sg': sg, 'sv': sv, 'sv_worst': sv,
             'cpb': sv / size, 'cpb_worst': sv / size, 'mmax': mmax}
