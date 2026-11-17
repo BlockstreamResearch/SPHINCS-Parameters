@@ -18,7 +18,7 @@ const C_PRFmsg = 3;    // message PRF
 const C_PRF = 1;
 
 // Target digit sum S_wn of WOTS+C for each w.
-const WOTS_C_SWN = { 16: 240, 32: 403, 64: 693, 128: 1206, 256: 2040, 65536: 262140 };
+const WOTS_C_SWN = { 16: 240, 32: 403, 64: 693, 128: 1207, 256: 2040, 65536: 262140 };
 
 // UXMSS signatures stay below the size of the report's candidate 2.
 const UXMSS_TARGET_SIZE = 5712;
@@ -304,7 +304,11 @@ function slhMetrics(p) {
   const forsLeaves = Math.pow(2, p.a);
   const cFors = p.k * forsLeaves * C_PRF + p.k * forsLeaves * C_Th1
               + p.k * (forsLeaves - 1) * C_Th2 + Thk;
-  const sg = cFors + C_Hmsg + C_PRFmsg + p.d * cMerkle;
+  // A layer costs a full tree, to sign and to verify. The top tree is never
+  // rebuilt: its root is the published public key, so the signature saves one
+  // WOTS-TW verification and its h' authentication path there.
+  const cTopSaved = wotsTwMeanSteps(p.w, 1) * C_Th1 + Thl + hp * C_Th2;
+  const sg = cFors + C_Hmsg + C_PRFmsg + p.d * cMerkle - cTopSaved;
 
   const cFts = p.k * C_Th1 + p.k * p.a * C_Th2 + Thk;
   const cWotsAvg = wotsTwMeanSteps(p.w, p.d) * C_Th1 + p.d * Thl;
@@ -356,7 +360,11 @@ function schemeMetrics(scheme, p) {
   // one hypertree layer; a signature rebuilds d of them and searches d counters
   const leaves = Math.pow(2, h / d);
   const cMerkle = leaves * wotsPkC(w, 'WC') + (leaves - 1) * C_Th2;
-  const cHyper = d * cMerkle + d * wotsCSearch(w, swn) * C_Th1c;
+  // As in slhMetrics, the top layer saves its WOTS+C verification and its
+  // h' authentication path: the top root is the published public key.
+  const cVerifyWC = ((w - 1) * l - swn) * C_Th1 + C_Th1c + computeTh(l);
+  const cHyper = d * cMerkle + d * wotsCSearch(w, swn) * C_Th1c
+               - cVerifyWC - (h / d) * C_Th2;
   const cMsg = C_Hmsg + C_PRFmsg;
 
   // FORS with `trees` trees of 2^a leaves: to build them, and to verify a signature
