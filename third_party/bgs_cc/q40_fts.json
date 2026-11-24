@@ -8,6 +8,8 @@
   "BGS": 91468,
   "W+C_BGS": 63923
  },
+ "too_slow": 129,
+ "not_searched": 7201,
  "region": {
   "sign_cap": 27,
   "kmax": 8,
@@ -16,8 +18,8 @@
   "security_bits": 128,
   "lmax": 8,
   "cmax": 4,
-  "refine": 1,
   "max_code_seconds": 60,
+  "rounds": 1,
   "r_max": 64,
   "u_max": 12,
   "b_max": 16,

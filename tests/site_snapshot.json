@@ -494,9 +494,9 @@
   "input #cust-w": "16"
  },
  "stateless.html#s=bgs": {
-  "#initial-info": "Scheme BGS-CC · 24,177 candidates on the frontier",
-  "#funnel": "Initial pool 24,177 Size ≤ 1.00× 24,177 KeyGen ≤ 1.00× 13,660 SigGen ≤ 1.00× 7,014 SigVer ≤ 1.00× 4,282 ρ ≤ 1.00× 2,009",
-  "#winner": "(h, d, w) = (36, 4, 4) BGS-CC: K = 1, L = 5, r = 13, b = 1, u = 4, c = (1, 1, 2, 2, 2, 2), E = 4, Δ = 671744 Distance: 0.3461",
+  "#initial-info": "Scheme BGS-CC · 53,719,418,025 parameter sets searched · 45,717 candidates on the frontier",
+  "#funnel": "Initial pool 45,717 Size ≤ 1.00× 45,717 KeyGen ≤ 1.00× 24,027 SigGen ≤ 1.00× 9,721 SigVer ≤ 1.00× 6,045 ρ ≤ 1.00× 2,981",
+  "#winner": "(h, d, w) = (36, 4, 4) BGS-CC: K = 1, L = 5, r = 13, b = 1, u = 4, c = (1, 1, 2, 2, 2, 2), E = 4, Δ = 671744 Distance: 0.3468",
   "#winner row 0": ["Size (B)","6,276","7,856","0.799×"],
   "#winner row 1": ["KeyGen (C)","148,991","292,351","0.510×"],
   "#winner row 2": ["SigGen (C)","829,410","2.22M","0.374×"],
@@ -540,8 +540,8 @@
   "input #cust-w": "16"
  },
  "stateless.html#s=bgs&ow=1&x=1,2,2,2,2": {
-  "#initial-info": "Scheme BGS-CC · 48,595 candidates on the frontier",
-  "#funnel": "Initial pool 48,595 Size ≤ 1.00× 48,595 KeyGen ≤ 2.00× 32,458 SigGen ≤ 2.00× 20,871 SigVer ≤ 2.00× 12,735 ρ ≤ 2.00× 9,069",
+  "#initial-info": "Scheme BGS-CC · 53,719,418,025 parameter sets searched · 91,468 candidates on the frontier",
+  "#funnel": "Initial pool 91,468 Size ≤ 1.00× 91,468 KeyGen ≤ 2.00× 57,892 SigGen ≤ 2.00× 29,991 SigVer ≤ 2.00× 18,241 ρ ≤ 2.00× 13,347",
   "#winner": "(h, d, w) = (35, 5, 16) BGS-CC: K = 1, L = 5, r = 17, b = 1, u = 3, c = (0, 0, 1, 1, 1, 2), E = 2, Δ = 299008 Distance: 0.3101",
   "#winner row 0": ["Size (B)","5,076","7,856","0.646×"],
   "#winner row 1": ["KeyGen (C)","73,087","292,351","0.250×"],
@@ -586,9 +586,9 @@
   "input #cust-w": "16"
  },
  "stateless.html#s=wbgs&x=0.74,2,2,0.8,1&w=5,1,1,2,1": {
-  "#initial-info": "Scheme W+C BGS-CC · 15,323 candidates on the frontier",
-  "#funnel": "Initial pool 15,323 Size ≤ 0.74× 11,611 KeyGen ≤ 2.00× 8,099 SigGen ≤ 2.00× 4,760 SigVer ≤ 0.80× 2,437 ρ ≤ 1.00× 459",
-  "#winner": "(h, d, w) = (36, 4, 16) BGS-CC: K = 1, L = 6, r = 15, b = 1, u = 7, c = (1, 0, 1, 0, 0, 0, 1), E = 1, Δ = 90112 Distance: 0.3962 S wn = 240",
+  "#initial-info": "Scheme W+C BGS-CC · 53,719,418,025 parameter sets searched · 25,755 candidates on the frontier",
+  "#funnel": "Initial pool 25,755 Size ≤ 0.74× 19,375 KeyGen ≤ 2.00× 12,732 SigGen ≤ 2.00× 5,768 SigVer ≤ 0.80× 3,087 ρ ≤ 1.00× 837",
+  "#winner": "(h, d, w) = (36, 4, 16) BGS-CC: K = 1, L = 6, r = 15, b = 1, u = 7, c = (1, 0, 1, 0, 0, 0, 1), E = 1, Δ = 90112 Distance: 0.3954 S wn = 240",
   "#winner row 0": ["Size (B)","4,468","7,856","0.569×"],
   "#winner row 1": ["KeyGen (C)","267,263","292,351","0.914×"],
   "#winner row 2": ["SigGen (C)","1.67M","2.22M","0.752×"],
