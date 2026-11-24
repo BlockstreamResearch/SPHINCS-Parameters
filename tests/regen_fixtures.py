@@ -57,6 +57,20 @@ def model_values(fx):
     for key, entry in fx['variants'].items():
         scheme, params = key.split('|')
         update(entry, M.scheme_metrics(scheme, *ints(params)), METRICS)
+    for key, entry in fx['bgs'].items():       # bgs_paper holds the paper's values, not ours
+        scheme, dw, cfg = key.split('|', 2)
+        h, *fts = M.bgs_key(cfg)
+        update(entry, M.bgs_metrics(scheme, h, *ints(dw), *fts), METRICS)
+    rows = M.bgs_fts_rows()
+    fx['bgs_fts_count'] = len(rows)
+    # test_bgs_cover_bits evaluates these again: six of the configurations near
+    # the target whose code is small, which keeps the test quick
+    near = [r for r in rows
+            if r['bits'] < 129 and M.bgs_code_size(r['c'], r['E']) * 2**len(r['c']) <= 10000]
+    fx['bgs_cover_bits'] = {
+        '%d|%d,%d,%d,%d,%d|%s|%d,%d' % (r['h'], r['K'], r['L'], r['r'], r['b'], r['u'],
+                                        ','.join(map(str, r['c'])), r['E'], r['delta']): r['bits']
+        for r in near[::max(1, len(near) // 6)][:6]}
 
 
 def pipeline_counts(fx):
@@ -78,6 +92,8 @@ def pipeline_counts(fx):
             fx['variant_pool_counts'][scheme] = data['pools'][scheme]['count']
     fx['optional_pool_counts'] = {str(x): sum(1 for r in spx['rows'] if r[w] == x)
                                   for x in data['meta']['w_optional']}
+    for scheme, table in data.get('bgs_cc', {}).get('hypertrees', {}).items():
+        fx['bgs_pool_counts'][scheme] = table['count']
     return True
 
 

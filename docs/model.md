@@ -2,8 +2,8 @@
 
 Sizes are in bytes and costs in SHA-256 compressions (C). The hash output is n = 16 bytes.
 The pages compute the model in `site/js/model.js`, the Sage scripts in `model/costs.sage`,
-`model/stateful.sage` and `model/security.sage`, and `tests/model.py` ports it to check both. The search grids
-and the fixed parameters are in `parameters.json`.
+`model/bgs_cc.sage`, `model/stateful.sage` and `model/security.sage`, and `tests/model.py` ports it to check
+both. The search grids and the fixed parameters are in `parameters.json`.
 
 ## Hash calls
 
@@ -121,6 +121,43 @@ For FORS, FORS+C and PORS+FP in turn,
     SigVer = H_msg + V + d·(((w − 1)·l − S_wn)·Th1 + Th1c + Th(l)) + h·Th2
     V      = k·Th1 + k·a·Th2 + Th(k),  (k − 1)·Th1 + (k − 1)·a·Th2 + Th(k − 1)  or  k·Th1 + mmax·Th2
 
+### BGS-CC
+
+BGS-CC is the few-time signature of Ren and Yu ([ePrint 2026/2502](https://eprint.iacr.org/2026/2502)),
+here in place of FORS. A coordinate has B = 2^b buckets. A bucket is r layers of trees of t = 2^L
+leaves, O = 2^u trees in the first layer and t in the others, and a signature opens one leaf per
+layer: a leaf of one layer commits to a tree of the next. The L + 1 values it sends per layer sit
+on hash chains of capacities c = (c_0, …, c_L), at depths that sum to E. With N the number of
+depth vectors and e = ceil(log2 N^(r·K)), the encoder reads
+
+    blocks = ceil((32 + h + K·(b + u + r·L) + e) / (8·n))
+
+blocks of n bytes per counter: a 32-bit value that must be below Δ, the h-bit address of the
+instance and the choices of the K coordinates. For (K, L, r, b, u, c, E, Δ),
+
+    size   = 4 + n·K·(b + u + r·(L + 1))
+    owner  = t·(c_L + 3) + Σ_{j<L} 2^(j+1)·c_j − 1
+    graph  = K·B·((O + (r − 1)·t)·owner + O) − 1
+    search = ceil(2^e·(2^32 + (blocks − 1)·Δ) / (Δ·N^(r·K)))
+    sign   = graph + search
+    verify = blocks + K·(b + u + r·(E + Σ_{j<L} c_j + L + 1)) + K − 1
+
+These are eqs. (15) to (19) of the paper; `owner` builds one tree of a layer. Every call hashes an
+address with one or two values, or an encoder block of 41 bytes, so it takes one compression.
+`search` is the mean number of encoder blocks until a counter passes, one per attempt and the
+other blocks − 1 for the attempts below Δ, rounded up once. The message is hashed once; the
+counter search does not repeat it.
+
+BGS puts this signature under the hypertree of SPX, and W+C_BGS under that of W+C:
+
+    size   = size above + n·(1 + h + d·l) [+ 4·d]
+    SigGen = sign + H_msg + PRF_msg + d·tree [+ d counter searches] − the top layer's verification
+    SigVer = verify + H_msg + d WOTS verifications + h·Th2
+
+where the hypertree terms are those of [SLH-DSA](#slh-dsa) and of W+C. The bgs-cc implementation
+counts hash calls, not compressions, and estimates a WOTS verification as l·w/2 calls, so its
+counts differ from these in the hypertree part.
+
 ## FORS security
 
 The stateless schemes are evaluated at q_s = 2^40 signatures. Each signature uses one of 2^h FORS
@@ -147,6 +184,23 @@ min(r·k, t) of them:
 λ = q_s / 2^h is summed: further out the binomial weight is below e^−450 of its peak. That keeps
 the work at O(sqrt(λ)); when even that exceeds 2^16 terms, the sum takes every s-th term and
 weights it by s. For the parameter grid λ ≤ 1, and every term from r = 1 is summed.
+
+## BGS-CC security
+
+`third_party/bgs_cc` holds the parameter sets (h, K, L, r, b, u, c, E, Δ) of the candidates at
+q_s = 2^40. Their security is the coverage bound of the paper, eq. (28) with
+the tail of eq. (31): the probability that one encoding attempt is accepted and that earlier
+signatures already disclosed every value it must open. The search sets Δ, with at most three set
+bits, so that the bound is at most 2^−128.002, and evaluates it in floats. `tests/model.py`
+evaluates the bound again, from the paper, for its Table 6 and for a sample of the sets.
+
+A candidate is a set under a hypertree of its height h: a d of the grid that divides h and a w of
+the scheme, with size below 7,856 B. The w are 2, 4, 16 and 256 for BGS, 16 and 256 for W+C_BGS,
+and for both 32, 64 and 128, which the page shows on request. The sets are too many for a grid, so
+the pool is a frontier: `third_party/bgs_cc/search_fts.py` keeps, for each scheme and each w, the
+candidates that no other beats in size, KeyGen, SigGen and ρ, with the average or the worst-case
+verification. SigGen and ρ count as equal within 1%. `third_party/bgs_cc/README.md` says which
+sets the search compared.
 
 ## Stateful schemes
 

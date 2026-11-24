@@ -248,6 +248,8 @@ if (typeof document !== 'undefined') document.body.insertAdjacentHTML('beforeend
     <dd>FORS tree height.</dd>
     <dt>w</dt>
     <dd>Winternitz parameter.</dd>
+    <dt>K, L, r, b, u, c, E, Δ</dt>
+    <dd>BGS-CC: coordinates, tree height, layers, log of the buckets, log of the first trees, chain capacities, depth sum, threshold.</dd>
     <dt>h′ = h/d</dt>
     <dd>Height of one hypertree layer.</dd>
     <dt>q<sub>s</sub></dt>

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Writes the generated files, the sweep CSVs and site/data.json, from
 tests/model.py instead of Sage, so the tests of those files run without Sage.
-The security bits come from the stateless page's JavaScript. The PORS+FP pool
-needs Sage and is left out. make check-local runs:
+The security bits come from the stateless page's JavaScript, those of BGS-CC
+from third_party/bgs_cc. The PORS+FP pool needs Sage and is left out.
+make check-local runs:
 
   python3 tests/synth_generated.py
   GENERATED_REQUIRED=1 python3 tests/run.py
@@ -181,6 +182,7 @@ def main():
         },
         'baseline': baseline,
         'pools': pools,
+        'bgs_cc': M.bgs_site_data(),
         'stateful': {
             'slh': {'size': baseline['size'], 'kg': baseline['kg'],
                     'sg': baseline['sg'], 'sv': baseline['sv'],
@@ -197,8 +199,9 @@ def main():
     }
     out_path = os.path.join(ROOT, 'site', 'data.json')
     json.dump(data, open(out_path, 'w'), separators=(',', ':'))
-    print('site/data.json: SPX %d rows, stateful %d + %d rows' %
-          (len(spx_rows), len(xmssmt_rows), len(uxmss_rows)))
+    print('site/data.json: SPX %d rows, stateful %d + %d rows, BGS-CC %s' %
+          (len(spx_rows), len(xmssmt_rows), len(uxmss_rows),
+           ', '.join('%s %d' % (s, t['count']) for s, t in data['bgs_cc']['hypertrees'].items())))
 
 
 if __name__ == '__main__':

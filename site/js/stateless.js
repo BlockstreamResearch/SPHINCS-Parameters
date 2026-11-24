@@ -1,19 +1,19 @@
 // The Stateless Path Explorer: filters the candidate pools of data.json by
 // bounds relative to SLH-DSA-128s, ranks what is left by distance, and compares
-// a candidate of your own, of any scheme.
+// a candidate of your own, of any scheme but the BGS-CC ones.
 'use strict';
 
 // SLH-DSA-compatible Winternitz parameters: log2(w) divides 8, so message
 // digits stay byte-aligned.
 const ALLOWED_W = [2, 4, 16, 256];
 
-// Exploratory w; a checkbox adds them to the SPX pool.
+// Exploratory w; a checkbox adds them to the SPX and BGS-CC pools.
 const OPTIONAL_W = [32, 64, 128];
 const UNIVERSE_W = [...ALLOWED_W, ...OPTIONAL_W];
 
 // Explorer rows use data.json's field names and carry ρ.
 function metrics(p, scheme = 'SPX') {
-  const m = schemeMetrics(scheme, p);
+  const m = scheme in BGS_SCHEMES ? bgsMetrics(scheme, p) : schemeMetrics(scheme, p);
   return {
     size: m.size, kg: m.kg, sg: m.sg, sv: m.sv, sv_worst: m.svWorst,
     cb: m.sv / m.size, cb_worst: m.svWorst / m.size, swn: m.swn, mmax: m.mmax,
@@ -43,6 +43,43 @@ function poolFromData(data, scheme) {
     c.cb_worst = c.sv_worst / c.size;
     return c;
   });
+}
+
+// The pool of a BGS-CC scheme: each few-time configuration of data.json under
+// the hypertrees the search kept for it, which `trees` lists as rows of the
+// scheme's hypertrees. The two parts add up (model.js, bgsMetrics).
+function bgsPoolFromData(data, scheme) {
+  const g = data.bgs_cc, table = g.hypertrees[scheme];
+  const fi = fieldIndex(g.fts), ti = fieldIndex(table);
+  const pool = [];
+  g.fts.rows.forEach((f, i) => {
+    const bgs = { K: f[fi.K], L: f[fi.L], r: f[fi.r], b: f[fi.b], u: f[fi.u],
+                  c: f[fi.c], E: f[fi.E], delta: f[fi.delta], bits: f[fi.bits] };
+    for (const k of table.trees[i]) {
+      const t = table.rows[k];
+      const c = {
+        h: t[ti.h], d: t[ti.d], w: t[ti.w], swn: t[ti.swn], mmax: 0, bgs,
+        size: f[fi.size] + t[ti.size], kg: t[ti.kg], sg: f[fi.sg] + t[ti.sg],
+        sv: f[fi.sv] + t[ti.sv], sv_worst: f[fi.sv] + t[ti.sv_worst],
+      };
+      c.cb = c.sv / c.size;
+      c.cb_worst = c.sv_worst / c.size;
+      pool.push(c);
+    }
+  });
+  return pool;
+}
+
+// A candidate's parameters: (h, d, k, a, w), or the hypertree of a BGS-CC
+// candidate, whose few-time parameters bgsText gives.
+function tupleText(c) {
+  return c.bgs ? `(h, d, w) = (${c.h}, ${c.d}, ${c.w})`
+               : `(${c.h}, ${c.d}, ${c.k}, ${c.a}, ${c.w})`;
+}
+
+function bgsText(g) {
+  return `K = ${g.K}, L = ${g.L}, r = ${g.r}, b = ${g.b}, u = ${g.u}, ` +
+    `c = (${g.c.join(', ')}), E = ${g.E}, Δ = ${g.delta}`;
 }
 
 // Field of metric k: worst-case mode switches SigVer and ρ to their worst case.
@@ -123,7 +160,8 @@ const state = {
   lastRanges: Object.fromEntries(['size', 'kg', 'sg', 'sv', 'cb'].map(k => [k, { min: 0, max: 1 }])),
 };
 
-// Winternitz parameters in the pool: OPTIONAL_W exist in the SPX pool only.
+// Winternitz parameters in the pool: OPTIONAL_W exist in the SPX and BGS-CC
+// pools only.
 function activeWSet() {
   const act = [...ALLOWED_W];
   if (state.showOptW) act.push(...OPTIONAL_W);
@@ -324,7 +362,7 @@ function renderScatter(eliminatedAt, survivors, winner) {
 
   canvas.setAttribute('aria-label', `Candidate sieve: ${survivors.length.toLocaleString('en-US')} of ` +
     `${state.initialPool.length.toLocaleString('en-US')} candidates within the bounds` +
-    (winner ? `, best (${winner.h}, ${winner.d}, ${winner.k}, ${winner.a}, ${winner.w})` : ''));
+    (winner ? `, best ${tupleText(winner)}` : ''));
 
   const legendHTML = `
 <div class="item"><span class="swatch" style="background:#d4d4d0;"></span>filtered out</div>
@@ -381,7 +419,8 @@ function renderWinner(winner) {
   el.innerHTML = `
 <div class="winner-grid">
   <div>
-    <p class="winner-tuple">(${winner.h}, ${winner.d}, ${winner.k}, ${winner.a}, ${winner.w})</p>
+    <p class="winner-tuple">${tupleText(winner)}</p>
+    ${winner.bgs ? `<p class="winner-distance">BGS-CC: ${bgsText(winner.bgs)}</p>` : ''}
     <p class="winner-distance">Distance: <strong>${d.toFixed(4)}</strong></p>
     ${winner.swn ? `<p class="winner-distance">S<sub>wn</sub> = ${winner.swn}${winner.mmax ? ` · m<sub>max</sub> = ${winner.mmax}` : ''}</p>` : ''}
   </div>
@@ -450,7 +489,8 @@ function renderTooltip(c, clientX, clientY) {
     : '';
 
   tt.innerHTML = `
-<p class="tt-tuple">(${c.h}, ${c.d}, ${c.k}, ${c.a}, ${c.w})${c.swn ? ` <span class="tt-swn">S<sub>wn</sub>=${c.swn}${c.mmax ? `, mmax=${c.mmax}` : ''}</span>` : ''}</p>
+<p class="tt-tuple">${tupleText(c)}${c.swn ? ` <span class="tt-swn">S<sub>wn</sub>=${c.swn}${c.mmax ? `, mmax=${c.mmax}` : ''}</span>` : ''}</p>
+${c.bgs ? `<p class="tt-bgs">${bgsText(c.bgs)}</p>` : ''}
 <div class="tt-status ${st.cls}">${st.text}</div>
 <table>
   <thead><tr><td></td><td>candidate</td><td>SLH-DSA-128s</td><td>ratio</td></tr></thead>
@@ -588,7 +628,7 @@ function renderCustom() {
 // below 16, so those w are disabled with it.
 function renderCustomSchemes() {
   const host = document.getElementById('custom-scheme');
-  host.innerHTML = Object.keys(SCHEME_LABELS).map(s =>
+  host.innerHTML = CUSTOM_SCHEMES.map(s =>
     `<button type="button" class="${s === state.customScheme ? 'active' : ''}" ` +
     `aria-pressed="${s === state.customScheme}" data-scheme="${s}">${SCHEME_LABELS[s]}</button>`).join('');
   host.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
@@ -632,11 +672,41 @@ function attachScatterHover() {
   });
 }
 
+// A sample of the BGS-CC tables of data.json against the model: the few-time
+// configurations and the hypertrees. Returns the number of rows that disagree.
+function selfCheckBgs(g) {
+  let bad = 0;
+  const fi = fieldIndex(g.fts);
+  for (let i = 0; i < g.fts.rows.length; i += Math.max(1, Math.floor(g.fts.rows.length / 25))) {
+    const f = g.fts.rows[i];
+    const m = bgsFtsMetrics({ h: f[fi.h], K: f[fi.K], L: f[fi.L], r: f[fi.r], b: f[fi.b],
+                              u: f[fi.u], c: f[fi.c], E: f[fi.E], delta: f[fi.delta] });
+    if (m.size !== f[fi.size] || m.sg !== f[fi.sg] || m.sv !== f[fi.sv]) {
+      bad++; console.error('data.json BGS-CC configuration disagrees with local formulas:', f, m);
+    }
+  }
+  for (const scheme of g.schemes) {
+    const table = g.hypertrees[scheme], ti = fieldIndex(table);
+    if (table.trees.length !== g.fts.rows.length) {
+      bad++; console.error('data.json BGS-CC candidates do not match the configurations:', scheme);
+    }
+    for (let i = 0; i < table.rows.length; i += Math.max(1, Math.floor(table.rows.length / 10))) {
+      const t = table.rows[i];
+      const m = hypertreeMetrics(t[ti.h], t[ti.d], t[ti.w], BGS_SCHEMES[scheme]);
+      if (m.size !== t[ti.size] || m.kg !== t[ti.kg] || m.sg !== t[ti.sg] ||
+          m.sv !== t[ti.sv] || m.svWorst !== t[ti.sv_worst]) {
+        bad++; console.error('data.json hypertree disagrees with local formulas:', scheme, t, m);
+      }
+    }
+  }
+  return bad;
+}
+
 // Checks data.json against the model on the baseline and a sample of rows; a
 // mismatch is a bug in one of the two.
 function selfCheckData(data, pool) {
   const KEYS = ['size', 'kg', 'sg', 'sv', 'sv_worst'];
-  let bad = 0;
+  let bad = data.bgs_cc ? selfCheckBgs(data.bgs_cc) : 0;
   const b = data.baseline;
   if (KEYS.some(k => STD_M[k] !== b[k])) {
     bad++; console.error('data.json baseline disagrees with local formulas:', b, STD_M);
@@ -653,13 +723,24 @@ function selfCheckData(data, pool) {
   return bad === 0;
 }
 
-const SCHEME_LABELS = { 'SPX': 'SPX', 'W+C': 'W+C', 'W+C_F+C': 'FORS+C', 'W+C_P+FP': 'PORS+FP' };
-const SCHEME_IDS = { 'SPX': 'spx', 'W+C': 'wc', 'W+C_F+C': 'fc', 'W+C_P+FP': 'pfp' };
+const SCHEME_LABELS = { 'SPX': 'SPX', 'W+C': 'W+C', 'W+C_F+C': 'FORS+C', 'W+C_P+FP': 'PORS+FP',
+                        'BGS': 'BGS-CC', 'W+C_BGS': 'W+C BGS-CC' };
+const SCHEME_IDS = { 'SPX': 'spx', 'W+C': 'wc', 'W+C_F+C': 'fc', 'W+C_P+FP': 'pfp',
+                     'BGS': 'bgs', 'W+C_BGS': 'wbgs' };
 const SCHEME_FROM_ID = Object.fromEntries(Object.entries(SCHEME_IDS).map(([k, v]) => [v, k]));
+
+// The candidate of your own takes the schemes the page computes in full; the
+// BGS-CC schemes come as a pool only.
+const CUSTOM_SCHEMES = ['SPX', 'W+C', 'W+C_F+C', 'W+C_P+FP'];
+
+// The schemes of data.json: its pools, then the BGS-CC schemes.
+function siteSchemes(data) {
+  return [...data.meta.schemes, ...(data.bgs_cc ? data.bgs_cc.schemes : [])];
+}
 
 function renderSchemeButtons() {
   const host = document.getElementById('scheme-controls');
-  const schemes = state.siteData ? state.siteData.meta.schemes : [];
+  const schemes = state.siteData ? siteSchemes(state.siteData) : [];
   host.innerHTML = schemes.map(s =>
     `<button class="${s === state.scheme ? 'active' : ''}" data-scheme="${s}">${SCHEME_LABELS[s]}</button>`).join('');
   host.querySelectorAll('button').forEach(b =>
@@ -688,19 +769,36 @@ function renderInfoStrip() {
   }
   const pool = state.initialPool;
   const act = activeWSet();
-  const wtxt = state.scheme === 'SPX'
+  const bgs = state.scheme in BGS_SCHEMES;
+  const wcW = bgs ? act.filter(w => w in WOTS_C_SWN) : [16, 256];
+  const wtxt = state.scheme === 'SPX' || state.scheme === 'BGS'
     ? `w = {${act.join(', ')}}`
-    : `(w, S<sub>wn</sub>) ∈ {(16, 240), (256, 2040)}`;
-  const swept = state.scheme === 'SPX'
-    ? consideredPerW(d.meta.grid) * act.length
-    : d.pools[state.scheme].considered;
+    : `(w, S<sub>wn</sub>) ∈ {${wcW.map(w => `(${w}, ${WOTS_C_SWN[w]})`).join(', ')}}`;
+  const count = n => n.toLocaleString('en-US');
+  let numbers;
+  if (bgs) {
+    // What the search went through, where data.json says, and what it kept.
+    const searched = d.bgs_cc.search.parameter_sets;
+    numbers = (searched ? `<strong>${count(searched)}</strong> parameter sets searched · ` : '') +
+      `<strong>${count(pool.length)}</strong> candidates on the frontier`;
+  } else {
+    const swept = state.scheme === 'SPX' ? consideredPerW(d.meta.grid) * act.length
+                                         : d.pools[state.scheme].considered;
+    numbers = `<strong>${count(swept)}</strong> tuples swept · ` +
+      `<strong>${count(pool.length)}</strong> pass the initial bounds`;
+  }
   document.getElementById('initial-info').innerHTML =
-    `Scheme <strong>${SCHEME_LABELS[state.scheme]}</strong> · ` +
-    `<strong>${swept.toLocaleString('en-US')}</strong> tuples swept · ` +
-    `<strong>${pool.length.toLocaleString('en-US')}</strong> pass the initial bounds`;
-  const source = `<p>Pool: <code>data.json</code>, generated ${d.meta.generated} from commit ${d.meta.commit}. ` +
-    `Security from the FORS and PORS+FP subset-forgery analysis in ` +
-    `<a href="https://github.com/BlockstreamResearch/SPHINCS-Parameters/blob/main/model/security.sage">security.sage</a>.</p>`;
+    `Scheme <strong>${SCHEME_LABELS[state.scheme]}</strong> · ` + numbers;
+  const generated = `<code>data.json</code>, generated ${d.meta.generated} from commit ${d.meta.commit}`;
+  const source = bgs
+    ? `<p>Pool: the frontier of the ` +
+      `<a href="https://github.com/BlockstreamResearch/SPHINCS-Parameters/tree/main/third_party/bgs_cc">BGS-CC search</a>: ` +
+      `for each w, the candidates that no other beats in size, KeyGen, SigGen and ρ (${generated}). ` +
+      `Security from the coverage bound of ` +
+      `<a href="https://eprint.iacr.org/2026/2502">Ren and Yu</a>.</p>`
+    : `<p>Pool: ${generated}. ` +
+      `Security from the FORS and PORS+FP subset-forgery analysis in ` +
+      `<a href="https://github.com/BlockstreamResearch/SPHINCS-Parameters/blob/main/model/security.sage">security.sage</a>.</p>`;
   document.getElementById('about-pool').innerHTML =
     `<p>Initial bounds: at least 128-bit security at q<sub>s</sub> = 2<sup>40</sup>, ` +
     `size below ${fmtNum(STD_M.size)} B, ${wtxt}.</p>` + source + schnorrNote();
@@ -756,7 +854,7 @@ function applyHash() {
   if (params.w) setVec(params.w, state.W, false);
   if (params.wc === '1') state.useWorst = true;
   if (params.ow === '1') state.showOptW = true;
-  if (params.cs && SCHEME_FROM_ID[params.cs]) state.customScheme = SCHEME_FROM_ID[params.cs];
+  if (CUSTOM_SCHEMES.includes(SCHEME_FROM_ID[params.cs])) state.customScheme = SCHEME_FROM_ID[params.cs];
   if (params.c) {
     const vals = params.c.split(',').map(v => parseInt(v, 10));
     if (vals.length === 5 && vals.every(Number.isFinite)) {
@@ -770,15 +868,23 @@ function exportSurvivorsCSV() {
   const header = ['scheme', 'h', 'd', 'k', 'a', 'w', 'swn', 'mmax', 'size_B',
     'keygen_C', 'siggen_C', 'sigver_C', 'sigver_worst_C',
     'rho', 'rho_worst', 'rho_vs_schnorr', 'rho_worst_vs_schnorr', 'schnorr_rho', 'distance'];
+  // A BGS-CC candidate has no k and a; its few-time parameters follow.
+  const bgs = state.scheme in BGS_SCHEMES;
+  if (bgs) header.push('bgs_K', 'bgs_L', 'bgs_r', 'bgs_b', 'bgs_u', 'bgs_c', 'bgs_E', 'bgs_delta', 'cover_bits');
   const lines = [header.join(',')];
   for (const c of state.lastSurvivors) {
-    lines.push([state.scheme, c.h, c.d, c.k, c.a, c.w, c.swn || 0, c.mmax || 0,
+    const row = [state.scheme, c.h, c.d, bgs ? '' : c.k, bgs ? '' : c.a, c.w, c.swn || 0, c.mmax || 0,
       c.size, c.kg, c.sg, c.sv, c.sv_worst,
       c.cb.toFixed(6), c.cb_worst.toFixed(6),
       (c.cb / SCHNORR.cb64).toFixed(6),
       (c.cb_worst / SCHNORR.cb64).toFixed(6),
       SCHNORR.cb64.toFixed(6),
-      distanceOf(c, state.W).toFixed(6)].join(','));
+      distanceOf(c, state.W).toFixed(6)];
+    if (bgs) {
+      const g = c.bgs;
+      row.push(g.K, g.L, g.r, g.b, g.u, g.c.join(' '), g.E, g.delta, g.bits);
+    }
+    lines.push(row.join(','));
   }
   downloadCSV(`survivors_${SCHEME_IDS[state.scheme]}`, lines);
 }
@@ -788,8 +894,8 @@ async function setup() {
   state.siteData = data;
   SCHNORR = schnorr;
   if (data) {
-    data.meta.schemes.forEach((s, si) => {
-      const pool = poolFromData(data, s);
+    siteSchemes(data).forEach((s, si) => {
+      const pool = s in BGS_SCHEMES ? bgsPoolFromData(data, s) : poolFromData(data, s);
       const rand = mulberry32(69421 + si);   // stable layout per scheme
       for (const c of pool) { c._sx = rand(); c._sy = rand(); }
       state.pools[s] = pool;

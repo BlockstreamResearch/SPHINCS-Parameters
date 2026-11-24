@@ -5,6 +5,9 @@ node_modules/
 # Sage's preparsed copy of every script it runs
 *.sage.py
 
+# the sets third_party/bgs_cc/search_fts.py keeps between runs
+third_party/bgs_cc/*.npz
+
 # make generate
 candidates.csv
 analysis/all_size_capped_candidates.csv

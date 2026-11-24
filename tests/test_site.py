@@ -125,6 +125,79 @@ console.log(JSON.stringify(out));
     assert all(out['pools'].values()), out['pools']
 
 
+def test_site_bgs():
+    """The BGS-CC modes of stateless.html: the page's model against
+    tests/model.py on every few-time configuration of third_party/bgs_cc and
+    every hypertree, and the pools the page builds from site/data.json, with
+    and without the non-standard w."""
+    js = page_js('stateless.html')
+    heights = {r['h'] for r in M.bgs_fts_rows()}
+    hts = {s: M.bgs_hypertrees(s, heights) for s in M.BGS_SCHEMES}
+    fts_path = os.path.join(ROOT, M.PARAMETERS['bgs_cc']['fts'])
+    data_path = None if missing(DATA_JSON) else os.path.join(ROOT, DATA_JSON)
+    js += f"""
+const fs = require('fs');
+const out = {{ fts: [], ht: {{}}, pools: {{}} }};
+for (const line of fs.readFileSync({json.dumps(fts_path)}, 'utf8').trim().split('\\n').slice(1)) {{
+  const [h, K, L, r, b, u, c, E, delta] = line.split(',');
+  const m = bgsFtsMetrics({{ h: +h, K: +K, L: +L, r: +r, b: +b, u: +u, c: c.split(' ').map(Number),
+                            E: +E, delta: +delta }});
+  out.fts.push([m.size, m.sg, m.sv]);
+}}
+const hts = {json.dumps({s: [t[:3] for t in ts] for s, ts in hts.items()})};
+for (const s of Object.keys(hts)) out.ht[s] = hts[s].map(([h, d, w]) => {{
+  const m = hypertreeMetrics(h, d, w, BGS_SCHEMES[s]);
+  return [m.swn, m.size, m.kg, m.sg, m.sv, m.svWorst];
+}});
+out.ids = Object.keys(BGS_SCHEMES).map(s => [s, SCHEME_IDS[s], SCHEME_LABELS[s], CUSTOM_SCHEMES.includes(s)]);
+const dataPath = {json.dumps(data_path)};
+if (dataPath) {{
+  const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+  out.schemes = siteSchemes(data);
+  out.selfcheck = data.bgs_cc ? selfCheckBgs(data.bgs_cc) : null;
+  const KEYS = ['size', 'kg', 'sg', 'sv', 'sv_worst', 'swn'];
+  for (const s of (data.bgs_cc ? data.bgs_cc.schemes : [])) {{
+    const pool = bgsPoolFromData(data, s);
+    let ok = pool.every(c => c.size < data.meta.grid.max_size && c.h % c.d === 0 && c.bgs.bits >= 128);
+    for (let i = 0; i < pool.length; i += Math.max(1, Math.floor(pool.length / 40))) {{
+      const c = pool[i], m = metrics(c, s);
+      if (KEYS.some(key => m[key] !== c[key])) ok = false;
+    }}
+    state.pools[s] = pool;
+    state.scheme = s;
+    const shown = [false, true].map(on => {{ state.showOptW = on; rebuildInitialPool(); return state.initialPool.length; }});
+    out.pools[s] = [pool.length, ok, tupleText(pool[0]), bgsText(pool[0].bgs), shown];
+  }}
+}}
+console.log(JSON.stringify(out));
+"""
+    out = run_node(js)
+    if out is None:
+        return
+    rows = M.bgs_fts_rows()
+    assert len(out['fts']) == len(rows) == FIX['bgs_fts_count']
+    for r, got in zip(rows, out['fts']):
+        m = M.bgs_fts_metrics(*[r[k] for k in M.BGS_FTS_FIELDS])
+        assert got == [m['size'], m['sg'], m['sv']], (r, got, m)
+    for scheme, ts in hts.items():
+        for t, got in zip(ts, out['ht'][scheme]):
+            m = M.hypertree_metrics(*t)
+            want = [t[3], m['size'], m['kg'], m['sg'], m['sv'], m['sv_worst']]
+            assert got == want, (scheme, t, got, want)
+    # each scheme has a button and a share-link id, and stays out of the custom panel
+    assert [x[0] for x in out['ids']] == list(M.BGS_SCHEMES), out['ids']
+    assert all(sid and label and not custom for _, sid, label, custom in out['ids']), out['ids']
+    if 'schemes' in out and out['selfcheck'] is not None:
+        assert out['selfcheck'] == 0, out['selfcheck']
+        assert out['schemes'][-len(out['pools']):] == list(out['pools']), out['schemes']
+        optional = set(M.PARAMETERS['stateless']['w_optional'])
+        for scheme, (count, ok, tuple_text, bgs_text, shown) in out['pools'].items():
+            assert ok and count == FIX['bgs_pool_counts'][scheme], (scheme, count, ok)
+            assert tuple_text.startswith('(h, d, w) = (') and bgs_text.startswith('K = '), tuple_text
+            standard = sum(1 for r in rows for _, w in r['trees'][scheme] if w not in optional)
+            assert shown == [standard, count] and 0 < standard < count, (scheme, shown, standard)
+
+
 def test_site_parameters():
     """The JavaScript model's copies of parameters.json, kept so the pages also
     work without data.json."""

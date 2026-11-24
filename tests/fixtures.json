@@ -1,7 +1,8 @@
 {
  "_about": [
   "Golden values for the tests in tests/test_*.py; costs in SHA-256 compressions, sizes in bytes.",
-  "Check with `make fixtures`; after an intended change, update with `make fixtures WRITE=1`."
+  "Check with `make fixtures`; after an intended change, update with `make fixtures WRITE=1`.",
+  "bgs: BGS-CC under a hypertree, by scheme|d,w|h|K,L,r,b,u|c|E,delta. bgs_cover_bits: cover bits of third_party/bgs_cc, by h|K,L,r,b,u|c|E,delta."
  ],
  "wots_len": {
   "2": 136,
@@ -482,5 +483,105 @@
   "32": 2913,
   "64": 3259,
   "128": 3542
+ },
+ "bgs": {
+  "BGS|4,16|40|1,7,6,0,2|2,3,4,4,4,4,4,4|10,6656": {
+   "size": 3700,
+   "kg": 584703,
+   "sg": 4369435,
+   "sv": 1414,
+   "sv_worst": 2386
+  },
+  "W+C_BGS|4,16|36|1,6,8,1,6|2,3,4,4,4,4,4|11,74752": {
+   "size": 3668,
+   "kg": 267263,
+   "sg": 2124002,
+   "sv": 1361,
+   "sv_worst": 1361
+  },
+  "BGS|14,4|42|7,2,5,1,2|1,1,2|2,14680064": {
+   "size": 17940,
+   "kg": 2327,
+   "sg": 39811,
+   "sv": 2007,
+   "sv_worst": 3386
+  },
+  "W+C_BGS|3,256|30|1,4,25,6,1|0,1,1,1,2|2,43008": {
+   "size": 3392,
+   "kg": 4200447,
+   "sg": 15420825,
+   "sv": 6431,
+   "sv_worst": 6431
+  },
+  "BGS|2,2|26|1,4,38,10,2|0,0,0,0,0|0,1408": {
+   "size": 8020,
+   "kg": 2523135,
+   "sg": 36784947,
+   "sv": 441,
+   "sv_worst": 574
+  },
+  "BGS|6,32|36|1,6,15,3,5|1,0,0,0,0,0,1|1,3328": {
+   "size": 5092,
+   "kg": 57919,
+   "sg": 3545850,
+   "sv": 2857,
+   "sv_worst": 5255
+  },
+  "W+C_BGS|4,128|36|1,6,15,3,5|1,0,0,0,0,0,1|1,3328": {
+   "size": 3636,
+   "kg": 1248767,
+   "sg": 8194261,
+   "sv": 5037,
+   "sv_worst": 5037
+  },
+  "W+C_BGS|5,64|30|1,4,25,6,1|0,1,1,1,2|2,43008": {
+   "size": 4392,
+   "kg": 90559,
+   "sg": 3272477,
+   "sv": 3793,
+   "sv_worst": 3793
+  }
+ },
+ "bgs_paper": {
+  "_about": [
+   "The few-time part of three parameter sets of Ren and Yu (ePrint 2026/2502, Tables 4 to 7), by h|K,L,r,b,u|c|E,delta.",
+   "size: Table 6 minus the wrapper bytes of Table 4. sg: Table 7 minus eq. (30), S_wrap. sv: eq. (19). bits: Table 6, rounded down as there."
+  ],
+  "63|1,5,10,0,3|3,3,3,3,3,6|8,311296": {
+   "set": "128s",
+   "q_s_log2": 64,
+   "size": 1012,
+   "sg": 157180,
+   "sv": 295,
+   "bits": 128.032
+  },
+  "66|7,2,5,1,2|1,1,2|2,14680064": {
+   "set": "128f",
+   "q_s_log2": 64,
+   "size": 2020,
+   "sg": 7350,
+   "sv": 275,
+   "bits": 128.027
+  },
+  "22|1,7,5,5,3|4,4,4,4,4,4,4,4|12,82": {
+   "set": "128-24",
+   "q_s_log2": 24,
+   "size": 772,
+   "sg": 94708613,
+   "sv": 250
+  }
+ },
+ "bgs_fts_count": 7013,
+ "bgs_pool_counts": {
+  "BGS": 48595,
+  "W+C_BGS": 38148
+ },
+ "bgs_cover_bits": {
+  "26|1,4,26,9,3|0,1,2,2,3|4,2320": 128.004,
+  "30|1,5,12,7,3|1,2,2,3,2,2|5,4616": 128.003,
+  "32|1,5,27,3,8|0,0,0,0,0,0|0,17920": 128.009,
+  "34|1,4,26,2,4|0,1,2,1,1|2,720896": 128.113,
+  "36|1,4,19,1,2|1,2,2,3,3|5,598016": 128.004,
+  "39|1,3,33,0,4|0,1,1,1|1,3162112": 128.006
  }
 }

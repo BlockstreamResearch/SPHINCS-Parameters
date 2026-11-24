@@ -303,6 +303,7 @@ input[type="range"] { width: 100%; margin-inline: 0; accent-color: var(--accent)
   margin: 0 0 4px;
 }
 #tooltip .tt-swn { font-size: 11px; color: var(--text-soft); }
+#tooltip .tt-bgs { font-family: var(--mono); font-size: 11px; color: var(--text-soft); margin: 0 0 4px; }
 #tooltip .tt-status {
   font-size: 11px;
   text-transform: uppercase;

@@ -2,9 +2,10 @@
 """
 Writes site/data.json for the explorer and the stateful page: the SPX pool from
 analysis/all_size_capped_candidates.csv (make sweeps) with the optional w added,
-the W+C, W+C_F+C and W+C_P+FP pools from the sweep of costs.sage, and the
-XMSS-MT and UXMSS rows of stateful.sage. The pages check samples of it against
-their own model.
+the W+C, W+C_F+C and W+C_P+FP pools from the sweep of costs.sage, the BGS-CC
+candidates of third_party/bgs_cc with the costs of bgs_cc.sage, and the XMSS-MT
+and UXMSS rows of stateful.sage. The pages check samples of it against their own
+model.
 
   sage scripts/export_site_data.sage                     (all schemes, a few minutes)
   sage scripts/export_site_data.sage --schemes SPX,W+C   (a subset; the pages adapt)
@@ -20,8 +21,11 @@ _DOC = __doc__   # loading stateful.sage replaces __doc__
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # see model/costs.sage
 os.environ['STATEFUL_SAGE_NO_MAIN'] = '1'   # its functions, without its CLI
 load(os.path.join(ROOT, "model", "stateful.sage"))   # and through it costs.sage and security.sage
+os.environ['BGS_CC_SAGE_NO_MAIN'] = '1'
+load(os.path.join(ROOT, "model", "bgs_cc.sage"))
 
-ALL_SCHEMES = ['SPX', 'W+C', 'W+C_F+C', 'W+C_P+FP']
+POOL_SCHEMES = ['SPX', 'W+C', 'W+C_F+C', 'W+C_P+FP']
+ALL_SCHEMES = POOL_SCHEMES + list(BGS_SCHEMES)
 schemes = ALL_SCHEMES
 _args = sys.argv[1:]
 i = 0
@@ -100,13 +104,52 @@ if 'SPX' in schemes:
     print("SPX: {} rows ({} core from CSV + {} optional-w)".format(
         len(all_spx), len(spx_rows), len(spx_extra)), file=sys.stderr)
 for scheme in schemes:
-    if scheme == 'SPX':
+    if scheme == 'SPX' or scheme in BGS_SCHEMES:
         continue
     rows, considered = pool_rows(scheme, WC_PAIRS)
     pools[scheme] = {'fields': POOL_FIELDS, 'considered': considered,
                      'count': len(rows), 'rows': rows}
     print("{}: {} rows of {} considered".format(scheme, len(rows), considered),
           file=sys.stderr)
+
+# BGS-CC: the few-time configurations and, per scheme, the hypertrees of their
+# heights and the candidates. A candidate is a configuration under one of the
+# hypertrees the search kept for it; the two add up. 'trees' holds, per
+# configuration, the rows of those hypertrees, and the page pairs them.
+bgs_cc = None
+bgs_selected = [s for s in BGS_SCHEMES if s in schemes]
+if bgs_selected:
+    assert PARAMETERS['bgs_cc']['q_s_log2'] == GRID['q_s_log2']
+    bgs_configs = bgs_fts_rows()
+    fts_rows = []
+    for row in bgs_configs:
+        assert row['bits'] >= PARAMETERS['security_bits'], row
+        m = compute_bgs_fts(*[row[x] for x in BGS_FTS_FIELDS])
+        fts_rows.append([row[x] for x in BGS_FTS_FIELDS]
+                        + [row['bits'], int(m['size']), int(m['sign']), int(m['verify'])])
+    bgs_hyper = {}
+    for scheme in bgs_selected:
+        rows, row_of = [], {}
+        for h, d, w, swn in bgs_hypertrees(scheme, {row['h'] for row in bgs_configs}):
+            m = compute_hypertree(h, d, w, swn, BGS_SCHEMES[scheme])
+            row_of[int(h), int(d), int(w)] = len(rows)
+            rows.append([int(h), int(d), int(w), int(swn), int(m['size']), int(m['keygen']),
+                         int(m['sign']), int(m['verify']), int(m['verify_worst'])])
+        trees = [[row_of[row['h'], d, w] for d, w in row['trees'][scheme]] for row in bgs_configs]
+        for fts, ks in zip(fts_rows, trees):
+            assert all(fts[-3] + rows[k][4] < GRID['max_size'] for k in ks), fts
+        count = sum(len(ks) for ks in trees)
+        bgs_hyper[scheme] = {'fields': ['h', 'd', 'w', 'swn', 'size', 'kg', 'sg', 'sv', 'sv_worst'],
+                             'rows': rows, 'count': count, 'trees': trees}
+        print("{}: {} candidates".format(scheme, count), file=sys.stderr)
+    bgs_cc = {
+        'source': PARAMETERS['bgs_cc']['fts'],
+        'q_s_log2': PARAMETERS['bgs_cc']['q_s_log2'],
+        'search': bgs_search(),
+        'schemes': bgs_selected,
+        'fts': {'fields': BGS_FTS_FIELDS + ['bits', 'size', 'sg', 'sv'], 'rows': fts_rows},
+        'hypertrees': bgs_hyper,
+    }
 
 # Stateful: XMSS-MT (XMSS is d = 1) and UXMSS, from stateful.sage
 STATEFUL = PARAMETERS['stateful']
@@ -167,7 +210,7 @@ data = {
         'grid': GRID,
         'w_optional': W_OPTIONAL,
         'wc_pairs': WC_PAIRS,
-        'schemes': [s for s in ALL_SCHEMES if s in pools],
+        'schemes': [s for s in POOL_SCHEMES if s in pools],
         'uxmss_ref_size': STATEFUL['uxmss_ref_size'],
         'hsf_max': int(HSF_MAX),
         'cost_convention': 'cached',
@@ -191,6 +234,8 @@ data = {
         },
     },
 }
+if bgs_cc:
+    data['bgs_cc'] = bgs_cc
 
 out_path = os.path.join(ROOT, 'site', 'data.json')
 with open(out_path, 'w') as f:

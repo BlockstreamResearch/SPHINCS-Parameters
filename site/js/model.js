@@ -407,6 +407,106 @@ function schemeMetrics(scheme, p) {
   return { size, kg: cMerkle, sg, sv, svWorst: sv, swn, mmax };
 }
 
+// BGS-CC (docs/model.md, BGS-CC): the few-time signature of ePrint 2026/2502
+// in place of FORS
+
+// The BGS-CC schemes and the WOTS variant of their hypertree.
+const BGS_SCHEMES = { 'BGS': 'TW', 'W+C_BGS': 'WC' };
+
+// Bytes of the encoder counter.
+const BGS_COUNTER = 4;
+
+// Codewords of the constant-sum code: the vectors x with 0 <= x_j <= c_j that
+// sum to e (the paper's N), as a BigInt.
+function bgsCodeSize(c, e) {
+  let counts = [1n];
+  for (const cap of c) {
+    const next = new Array(counts.length + cap).fill(0n);
+    counts.forEach((n, s) => { for (let x = 0; x <= cap; x++) next[s + x] += n; });
+    counts = next;
+  }
+  return e < counts.length ? counts[e] : 0n;
+}
+
+// Size and costs of the BGS-CC signature of f = { h, K, L, r, b, u, c, E,
+// delta }; h only sets how many blocks the encoder reads. Every hash call of
+// the few-time part takes one compression.
+function bgsFtsMetrics(f) {
+  const { h, K, L, r, b, u, c, E, delta } = f;
+  const t = Math.pow(2, L), B = Math.pow(2, b), O = Math.pow(2, u);
+  const words = bgsCodeSize(c, E) ** BigInt(r * K);   // codeword choices of one encoding
+  const eBits = words > 1n ? (words - 1n).toString(2).length : 0;   // ceil(log2 words)
+  const blocks = Math.ceil((32 + h + K * (b + u + r * L) + eBits) / (8 * N));
+
+  // one owner tree: t sources, their guard chains and leaves, the edge chains
+  // and the t - 1 nodes
+  let edges = 0;
+  for (let d = 0; d < L; d++) edges += Math.pow(2, d + 1) * c[d];
+  const cOwner = t * (C_PRF + c[L] * C_Th1 + C_Th2) + edges * C_Th1 + (t - 1) * C_Th2;
+  // K coordinates of B buckets: O owners in the first layer and t in each of
+  // the other r - 1, the O - 1 nodes above the first, then the bucket trees
+  // and the K - 1 nodes above the coordinates
+  const cGraph = K * B * ((O + (r - 1) * t) * cOwner + (O - 1) * C_Th2) + (K * B - 1) * C_Th2;
+  // encoder blocks until a counter passes: one per attempt, the other
+  // blocks - 1 for the attempts below the threshold; rounded up exactly
+  const num = (1n << BigInt(eBits)) * (2n ** 32n + BigInt(blocks - 1) * BigInt(delta));
+  const den = BigInt(delta) * words;
+  const cSearch = Number((num + den - 1n) / den);
+
+  let pathSteps = E;
+  for (let d = 0; d < L; d++) pathSteps += c[d];
+  const cLayer = pathSteps * C_Th1 + (L + 1) * C_Th2;
+  return {
+    size: BGS_COUNTER + N * K * (b + u + r * (L + 1)),
+    sg: cGraph + cSearch,
+    sv: blocks + K * ((b + u) * C_Th2 + r * cLayer) + (K - 1) * C_Th2,
+  };
+}
+
+// What surrounds the few-time signature: R, the d layers of the hypertree and
+// the message hashing, with WOTS-TW ('TW') or WOTS+C ('WC') layers. With FORS
+// added it is slhMetrics or schemeMetrics('W+C').
+function hypertreeMetrics(h, d, w, ots) {
+  const hp = h / d;
+  const l = wotsL(w, ots);
+  const Thl = computeTh(l);
+  const leaves = Math.pow(2, hp);
+  const cMerkle = leaves * wotsPkC(w, ots) + (leaves - 1) * C_Th2;
+  const cMsg = C_Hmsg + C_PRFmsg;
+  if (ots === 'WC') {
+    const swn = WOTS_C_SWN[w];
+    const cVerifyWC = ((w - 1) * l - swn) * C_Th1 + C_Th1c + Thl;
+    const sv = C_Hmsg + d * cVerifyWC + h * C_Th2;
+    return {
+      size: N * (1 + h + d * l) + WOTS_C_COUNTER * d,
+      kg: cMerkle,
+      sg: cMsg + d * cMerkle + d * wotsCSearch(w, swn) * C_Th1c - cVerifyWC - hp * C_Th2,
+      sv, svWorst: sv, swn,
+    };
+  }
+  const cTopSaved = wotsTwMeanSteps(w, 1) * C_Th1 + Thl + hp * C_Th2;
+  return {
+    size: N * (1 + h + d * l),
+    kg: cMerkle,
+    sg: cMsg + d * cMerkle - cTopSaved,
+    sv: C_Hmsg + wotsTwMeanSteps(w, d) * C_Th1 + d * Thl + h * C_Th2,
+    svWorst: C_Hmsg + d * (wotsVerifyWorstSteps(w) * C_Th1 + Thl) + h * C_Th2,
+    swn: 0,
+  };
+}
+
+// Size and costs of BGS-CC under a hypertree, for p = { h, d, w } and the
+// few-time configuration p.bgs = { K, L, r, b, u, c, E, delta }: the two parts
+// add up.
+function bgsMetrics(scheme, p) {
+  const ht = hypertreeMetrics(p.h, p.d, p.w, BGS_SCHEMES[scheme]);
+  const fts = bgsFtsMetrics({ h: p.h, ...p.bgs });
+  return {
+    size: ht.size + fts.size, kg: ht.kg, sg: ht.sg + fts.sg,
+    sv: ht.sv + fts.sv, svWorst: ht.svWorst + fts.sv, swn: ht.swn, mmax: 0,
+  };
+}
+
 // FORS and PORS+FP security (docs/model.md, FORS security), summed in log2 to
 // avoid underflow.
 

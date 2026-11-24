@@ -1,0 +1,36 @@
+{
+ "codes": 14086,
+ "parameter_sets": 53719418025,
+ "within_bounds": 7412156457,
+ "stored": 121410,
+ "sets": 19400,
+ "candidates": {
+  "BGS": 91468,
+  "W+C_BGS": 63923
+ },
+ "region": {
+  "sign_cap": 27,
+  "kmax": 8,
+  "max_size": 7856,
+  "q_s_log2": 40,
+  "security_bits": 128,
+  "lmax": 8,
+  "cmax": 4,
+  "refine": 1,
+  "max_code_seconds": 60,
+  "r_max": 64,
+  "u_max": 12,
+  "b_max": 16,
+  "h": [
+   20,
+   72
+  ],
+  "m_cut": 24
+ },
+ "grain": [
+  0.01,
+  0.01
+ ],
+ "margin_bits": 0.002,
+ "bgs_cc_commit": "1fa43973a938d90e50ccd653fe1d6251d984c2bd"
+}

@@ -156,3 +156,34 @@ def test_data_json_stateful():
         want = tuple(m[k] for k in UKEYS)
         assert got == want, (r[:2], got, want)
         assert m['hsf'] <= M.HSF_MAX
+
+
+def test_data_json_bgs():
+    """The BGS-CC tables: every few-time configuration of third_party/bgs_cc,
+    every hypertree of both schemes and the candidates against tests/model.py."""
+    if missing(DATA_JSON):
+        return
+    d = site_data()
+    if 'bgs_cc' not in d:
+        print('  [skip] BGS-CC not exported')
+        return
+    got, want = d['bgs_cc'], M.bgs_site_data()
+    for key in ('source', 'q_s_log2', 'search'):
+        assert got[key] == want[key], key
+    assert got['q_s_log2'] == d['meta']['grid']['q_s_log2']
+    assert got['fts']['fields'] == want['fts']['fields']
+    assert len(got['fts']['rows']) == FIX['bgs_fts_count']
+    for a, b in zip(got['fts']['rows'], want['fts']['rows']):
+        assert a == b, (a, b)
+    assert got['schemes'] and set(got['schemes']) <= set(want['schemes']), got['schemes']
+    grid = d['meta']['grid']
+    for scheme in got['schemes']:
+        g, w = got['hypertrees'][scheme], want['hypertrees'][scheme]
+        assert g['fields'] == w['fields'] and len(g['rows']) == len(w['rows']), scheme
+        for a, b in zip(g['rows'], w['rows']):
+            assert a == b, (scheme, a, b)
+            assert a[0] % a[1] == 0 and grid['d'][0] <= a[1] <= grid['d'][1], (scheme, a)
+        assert g['trees'] == w['trees'], scheme
+        assert g['count'] == sum(len(ks) for ks in g['trees']) == FIX['bgs_pool_counts'][scheme], \
+            (scheme, g['count'])
+        assert {g['rows'][k][2] for ks in g['trees'] for k in ks} <= set(M.bgs_w(scheme)), scheme
