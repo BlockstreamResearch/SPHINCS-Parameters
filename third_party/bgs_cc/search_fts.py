@@ -26,9 +26,10 @@ What differs from bgs-cc's own frontier is what is kept:
 q40_fts.csv holds the sets of the candidates of step 2, each with its hypertrees as d/w per
 scheme; q40_fts.json says what was searched. The sets of step 1 stay beside them in
 q40_fts_store.npz (not in git), with the codes already done, so a run that stops can be
-started again, and step 2 can be repeated with --frontier-only. The tables of the codes are
-cached in <checkout>/bench/results/q40_cache.sqlite, as by bgs-cc. About 13,000 codes take
-two to three hours on eight cores.
+started again, and step 2 can be repeated with --frontier-only. A run on a finished store
+goes one round of neighbours further. The tables of the codes are cached in
+<checkout>/bench/results/q40_cache.sqlite, as by bgs-cc. The first 14,000 codes took about
+five hours on a laptop.
 """
 import argparse
 import csv
@@ -177,7 +178,8 @@ def code_sets(task):
 class Store:
     """The sets of step 1, with the codes they belong to, the codes already done, the counts
     of what was looked at, and the options: those the sets depend on, which a later run has
-    to repeat, and those of the code family, which it may widen."""
+    to repeat, and those of the code family, which it may widen, with the rounds of
+    neighbours done so far."""
 
     def __init__(self, path, options):
         self.path, self.options, self.family = path, options, {}
@@ -197,6 +199,8 @@ class Store:
                 self.done = {(tuple(c), E) for c, E in json.loads(str(z['done']))}
                 self.counts = json.loads(str(z['counts']))
                 self.family = json.loads(str(z['family']))
+                if 'refine' in self.family:      # a store of the first version
+                    self.family['rounds'] = self.family.pop('refine')
         elif options is None:
             raise SystemExit(f'{path} does not exist: run the search first')
 
@@ -272,6 +276,17 @@ def frontier(store, grain):
     return np.flatnonzero(keep), candidates
 
 
+def open_ends(store, rows):
+    """Codes of the family and neighbours of the frontier's codes that are not in the store:
+    those whose table is over the time limit, and those another run would search."""
+    family = set(SR.family(store.family['lmax'], store.family['cmax']))
+    near = {nb for k in set(store.owner[rows].tolist()) for nb in SR.neighbours(*store.codes[k])}
+    costs = [SR.usable(*code, store.family['max_code_seconds'])
+             for code in (family | near) - store.done
+             if P.code_size(list(code[0]), code[1]) > 1]
+    return sum(cost is None for cost in costs), sum(cost is not None for cost in costs)
+
+
 def write_csv(store, rows, candidates, path):
     """The sets `rows` of the store, sorted, each with its hypertrees per scheme. Checks
     every set against the explorer's model on the way."""
@@ -315,7 +330,7 @@ def main():
     ap.add_argument('--cmax', type=int, default=4)
     ap.add_argument('--kmax', type=int, default=8)
     ap.add_argument('--refine', type=int, default=1,
-                    help='rounds of neighbours of the codes that matter')
+                    help='rounds of neighbours of the codes that matter, in this run')
     ap.add_argument('--max-code-seconds', type=float, default=60,
                     help='skip codes whose table takes longer')
     ap.add_argument('--grain', type=float, default=GRAIN,
@@ -334,7 +349,7 @@ def main():
     region = {'sign_cap': args.sign_cap, 'kmax': args.kmax, 'max_size': MAX_SIZE,
               'q_s_log2': Q_S_LOG2, 'security_bits': LAMBDA}
     store = Store(args.store, None if args.frontier_only else region)
-    start, skipped, rounds = time.time(), 0, 0
+    start = time.time()
 
     def step2(label):
         if not len(store.I):
@@ -359,15 +374,15 @@ def main():
             for c, E in codes:
                 yield c, E, cached.get(cache_key(c, E)), (2.0**args.sign_cap, args.kmax)
 
-        store.family = {'lmax': args.lmax, 'cmax': args.cmax, 'refine': args.refine,
-                        'max_code_seconds': args.max_code_seconds}
-        todo = set(SR.family(args.lmax, args.cmax))
+        store.family = {'lmax': max(args.lmax, store.family.get('lmax', 0)),
+                        'cmax': max(args.cmax, store.family.get('cmax', 0)),
+                        'max_code_seconds': args.max_code_seconds,
+                        'rounds': store.family.get('rounds', 0)}
+        todo = set(SR.family(store.family['lmax'], store.family['cmax']))
         # spawn on every system: the workers load bgs-cc themselves
         with multiprocessing.get_context('spawn').Pool(args.jobs, load_bgs_cc, (args.bgs_cc,)) as pool:
             for rnd in range(args.refine + 1):
                 costs = {code: SR.usable(*code, args.max_code_seconds) for code in todo}
-                skipped += sum(1 for code, cost in costs.items()
-                               if cost is None and P.code_size(list(code[0]), code[1]) > 1)
                 codes = sorted((code for code, cost in costs.items() if cost is not None),
                                key=lambda code: (costs[code], code))
                 if args.codes:
@@ -393,13 +408,15 @@ def main():
                             saved = time.time()
                             print(f'  {n:,}/{len(codes):,} codes, {len(store.I):,} sets kept, '
                                   f'{time.time() - start:.0f} s', flush=True)
+                if rnd and not args.codes:
+                    store.family['rounds'] += 1
                 store.save()
-                rounds = rnd
                 rows, candidates = step2(f'after round {rnd}')
                 todo = {nb for k in set(store.owner[rows].tolist())
                         for nb in SR.neighbours(*store.codes[k])}
 
     write_csv(store, rows, candidates, args.out)
+    too_slow, not_searched = open_ends(store, rows)
     summary = {
         'codes': len(store.done),
         'parameter_sets': store.counts[0],       # (code, K, r, u, b, h) looked at
@@ -407,6 +424,8 @@ def main():
         'stored': len(store.I),                  # left by step 1
         'sets': len(rows),
         'candidates': {scheme: len(found) for scheme, found in candidates.items()},
+        'too_slow': too_slow,                    # codes left out: the table takes too long
+        'not_searched': not_searched,            # codes another run would search
         'region': dict(store.options, **store.family, r_max=SR.R_MAX, u_max=SR.U_MAX,
                        b_max=SR.B_MAX, h=[SR.X_LO, 72], m_cut=P.M_CUT),
         'grain': [GRAIN, args.grain],
@@ -416,9 +435,9 @@ def main():
     with open(os.path.splitext(args.out)[0] + '.json', 'w') as fh:
         json.dump(summary, fh, indent=1)
         fh.write('\n')
-    if not args.frontier_only:
-        print(f'{len(store.done):,} codes searched in {rounds + 1} rounds, {skipped} skipped as '
-              f'too slow, {len(store.I):,} sets stored in {store.path}')
+    print(f'{len(store.done):,} codes searched, {store.family["rounds"]} rounds of neighbours, '
+          f'{too_slow:,} codes too slow, {not_searched:,} more for another run; '
+          f'{len(store.I):,} sets stored in {store.path}')
     print(f'wrote {len(rows):,} sets to {args.out}')
 
 
