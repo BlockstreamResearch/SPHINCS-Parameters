@@ -1,8 +1,8 @@
-"""The generated files, the sweep CSVs and site/data.json, against tests/model.py
-and the fixtures. Without them (make generate) these tests are skipped, or fail
-with GENERATED_REQUIRED=1."""
+"""The generated files, the sweep CSVs, site/data.json and the site/data-q*.json
+of the other budgets, against tests/model.py and the fixtures. Without them
+(make generate) these tests are skipped, or fail with GENERATED_REQUIRED=1."""
 import model as M
-from common import FIX, CSVS, DATA_JSON, missing, csv_rows, site_data
+from common import FIX, CSVS, DATA_JSON, BUDGET_JSON, missing, csv_rows, site_data, budget_data
 
 
 def test_csv_row_counts():
@@ -128,6 +128,51 @@ def test_data_json_variant_pools():
             want = (m['mmax'], m['size'], m['kg'], m['sg'], m['sv'], m['sv_worst'])
             assert got == want, (scheme, (h, dd, k, a, w, swn), got, want)
             assert m['size'] < grid['max_size']
+
+
+def test_data_json_budgets():
+    """The other budgets of the stateless page, one file each: the grid moved
+    with the budget, every row against tests/model.py, the pool counts, and
+    BGS-CC where the budget has a search."""
+    if missing(DATA_JSON):
+        return
+    d = site_data()
+    budgets = M.PARAMETERS['stateless']['budgets']
+    assert d['meta']['budgets'] == budgets and d['meta']['grid']['q_s_log2'] in budgets
+    for q in budgets:
+        if q == d['meta']['grid']['q_s_log2']:
+            continue
+        if missing(BUDGET_JSON % q):
+            return
+        o, grid = budget_data(q), M.stateless_grid(q)
+        assert o['meta']['grid'] == grid, q
+        for key in ('w_optional', 'wc_pairs', 'schemes'):
+            assert o['meta'][key] == d['meta'][key], (q, key)
+        spx_w = set(grid['w']) | set(o['meta']['w_optional'])
+        wc_pairs = {tuple(p) for p in o['meta']['wc_pairs']}
+        for scheme in o['meta']['schemes']:
+            p = o['pools'][scheme]
+            idx = {f: i for i, f in enumerate(p['fields'])}
+            assert p['count'] == len(p['rows']) == FIX['budget_pool_counts'][str(q)][scheme], \
+                (q, scheme, p['count'])
+            for r in p['rows']:
+                h, dd, k, a, w, swn = (r[idx[x]] for x in ('h', 'd', 'k', 'a', 'w', 'swn'))
+                assert grid['h'][0] <= h <= grid['h'][1] and h % dd == 0, (q, scheme, r)
+                assert grid['k'][0] <= k <= grid['k'][1] and grid['a'][0] <= a <= grid['a'][1]
+                if scheme == 'SPX':
+                    assert w in spx_w and swn == 0, (q, r)
+                    m = dict(M.spx_metrics(h, dd, k, a, w), mmax=0)
+                else:
+                    assert (w, swn) in wc_pairs, (q, scheme, r)
+                    m = M.scheme_metrics(scheme, h, dd, k, a, w, swn)
+                got = tuple(r[idx[x]] for x in ('mmax', 'size', 'kg', 'sg', 'sv', 'sv_worst'))
+                want = (m['mmax'], m['size'], m['kg'], m['sg'], m['sv'], m['sv_worst'])
+                assert got == want, (q, scheme, (h, dd, k, a, w, swn), got, want)
+                assert m['size'] < grid['max_size']
+        if q in M.bgs_budgets():
+            assert o['bgs_cc'] == M.bgs_site_data(q), q
+        else:
+            assert 'bgs_cc' not in o, q
 
 
 def test_data_json_stateful():

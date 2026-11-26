@@ -2,7 +2,8 @@
  "_about": [
   "Search grids and fixed parameters, read by the Sage scripts, tests/model.py and tests/synth_generated.py.",
   "scripts/export_site_data.sage copies the stateless grid and the UXMSS bounds into site/data.json; docs/model.md explains the values.",
-  "bgs_cc: the BGS-CC parameter sets and the number of signatures they were searched for; their hypertrees take d and w from the stateless grid, with w_optional."
+  "stateless.budgets: the signature budgets (log2) the stateless page offers. grid is the one of grid.q_s_log2; at another budget its h range moves by the difference.",
+  "bgs_cc: the BGS-CC parameter sets of a budget ({q} in fts, a budget without the file has no BGS-CC) and the default budget; their hypertrees take d and w from the stateless grid, with w_optional."
  ],
  "baseline": {"h": 63, "d": 7, "k": 14, "a": 12, "w": 16, "q_s_log2": 64},
  "security_bits": 128,
@@ -10,11 +11,12 @@
  "stateless": {
   "grid": {"h": [40, 50], "d": [2, 25], "k": [6, 24], "a": [8, 20], "w": [2, 4, 16, 256],
            "q_s_log2": 40, "max_size": 7856},
+  "budgets": [20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60],
   "w_optional": [32, 64, 128],
   "wc_w": [16, 256]
  },
  "bgs_cc": {
-  "fts": "third_party/bgs_cc/q40_fts.csv",
+  "fts": "third_party/bgs_cc/q{q}_fts.csv",
   "q_s_log2": 40
  },
  "stateful": {

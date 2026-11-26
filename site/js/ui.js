@@ -195,13 +195,13 @@ function bindShareButton(writeHash) {
 
 // Data
 
-async function loadSiteData() {
+async function loadSiteData(name = 'data.json') {
   try {
-    const resp = await fetch('data.json', { cache: 'no-cache' });
+    const resp = await fetch(name, { cache: 'no-cache' });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     return await resp.json();
   } catch (e) {
-    console.warn('data.json unavailable (' + e.message + ')');
+    console.warn(name + ' unavailable (' + e.message + ')');
     return null;
   }
 }

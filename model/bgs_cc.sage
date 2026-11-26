@@ -119,13 +119,26 @@ def compute_bgs(scheme, h, d, w, K, L, r, b, u, c, E, delta):
     }
 
 
-def bgs_fts_rows():
+def bgs_path(q_s_log2=None, ext='.csv'):
+    """The file of the BGS-CC search for a signature budget, by default that
+    of parameters.json, relative to the repository."""
+    q = PARAMETERS['bgs_cc']['q_s_log2'] if q_s_log2 is None else q_s_log2
+    return os.path.splitext(PARAMETERS['bgs_cc']['fts'].format(q=int(q)))[0] + ext
+
+
+def bgs_budgets():
+    """The budgets of the stateless page that have a BGS-CC search."""
+    return [q for q in PARAMETERS['stateless']['budgets']
+            if os.path.exists(os.path.join(ROOT, bgs_path(q)))]
+
+
+def bgs_fts_rows(q_s_log2=None):
     """The few-time configurations of the search (third_party/bgs_cc): dicts
     with the BGS_FTS_FIELDS, 'bits', the cover bits of the search, and 'trees':
     per scheme the (d, w) of the hypertrees the search kept for the
     configuration."""
     rows = []
-    with open(os.path.join(ROOT, PARAMETERS['bgs_cc']['fts'])) as f:
+    with open(os.path.join(ROOT, bgs_path(q_s_log2))) as f:
         for r in csv.DictReader(f):
             row = {key: int(r[key]) for key in BGS_FTS_FIELDS if key != 'c'}
             row['c'] = [int(x) for x in r['c'].split()]
@@ -136,9 +149,9 @@ def bgs_fts_rows():
     return rows
 
 
-def bgs_search():
+def bgs_search(q_s_log2=None):
     """What the search covered: the .json beside the configurations."""
-    with open(os.path.join(ROOT, os.path.splitext(PARAMETERS['bgs_cc']['fts'])[0] + '.json')) as f:
+    with open(os.path.join(ROOT, bgs_path(q_s_log2, '.json'))) as f:
         return json.load(f)
 
 

@@ -4,11 +4,12 @@ compares it with the file's cover_bits. The local table of each code is the
 exact one of tests/model.py; the sums after it are those of its bgs_cover_bits,
 with numpy, and each table serves all the sets of its code.
 
-    python3 third_party/bgs_cc/check_cover_bits.py [jobs [codes]]
+    python3 third_party/bgs_cc/check_cover_bits.py [jobs [codes]] [--budget Q]
 
 Needs numpy. The largest codes take a minute each; `codes` stops after that
-many, smallest first. A set with more than 150 bits is only checked to have
-them: the tail bound used here stops near 2^-170, below the search's own.
+many, smallest first; --budget Q checks q<Q>_fts.csv, the sets of another
+budget. A set with more than 150 bits is only checked to have them: the tail
+bound used here stops near 2^-170, below the search's own.
 """
 import os
 import sys
@@ -23,7 +24,12 @@ sys.path.insert(0, os.path.join(ROOT, 'tests'))
 import model as M  # noqa: E402
 
 M_CUT = 24                                     # as the search: the local table is exact up to here
-Q_S = 2**M.PARAMETERS['bgs_cc']['q_s_log2']
+BUDGET = M.PARAMETERS['bgs_cc']['q_s_log2']
+if '--budget' in sys.argv:                     # here, so the worker processes see it too
+    _at = sys.argv.index('--budget')
+    BUDGET = int(sys.argv[_at + 1])
+    del sys.argv[_at:_at + 2]
+Q_S = 2**BUDGET
 TARGET = M.PARAMETERS['security_bits']
 ROUNDING = 6e-4                                # the file rounds to 0.001
 SPARE = 150                                    # bits from which the values are not compared
@@ -88,7 +94,7 @@ def one_code(group):
 def main():
     jobs = int(sys.argv[1]) if len(sys.argv) > 1 else os.cpu_count()
     groups = {}
-    for cfg in M.bgs_fts_rows():
+    for cfg in M.bgs_fts_rows(BUDGET):
         groups.setdefault((tuple(cfg['c']), cfg['E']), []).append(cfg)
     # cheapest tables first: a table costs about (codewords) * 2^(L + 1)
     codes = sorted(groups.items(), key=lambda g: M.bgs_code_size(g[0][0], g[0][1]) * 2**len(g[0][0]))

@@ -36,6 +36,16 @@ SWN = {int(w): swn for w, swn in PARAMETERS['swn'].items()}   # WOTS+C target di
 HSF_MAX = PARAMETERS['stateful']['hsf_max']
 
 
+def stateless_grid(q_s_log2):
+    """The stateless grid at a signature budget: the grid of parameters.json
+    with its h range moved along with the budget."""
+    grid = dict(PARAMETERS['stateless']['grid'])
+    shift = q_s_log2 - grid['q_s_log2']
+    grid['h'] = [h + shift for h in grid['h']]
+    grid['q_s_log2'] = q_s_log2
+    return grid
+
+
 def compute_th(x):
     """Compressions for a tweakable hash over x hash-sized values (SHA-256)."""
     return ceil((22 * 8 + 128 * x + 65) / 512)
@@ -483,11 +493,24 @@ def bgs_key(key):
     return int(h), K, L, r, b, u, [int(x) for x in c.split(',')], E, delta
 
 
-def bgs_fts_rows():
+def bgs_path(q_s_log2=None, ext='.csv'):
+    """The file of the BGS-CC search for a signature budget, by default that
+    of parameters.json, relative to the repository."""
+    q = PARAMETERS['bgs_cc']['q_s_log2'] if q_s_log2 is None else q_s_log2
+    return os.path.splitext(PARAMETERS['bgs_cc']['fts'].format(q=q))[0] + ext
+
+
+def bgs_budgets():
+    """The budgets of the stateless page that have a BGS-CC search."""
+    return [q for q in PARAMETERS['stateless']['budgets']
+            if os.path.exists(os.path.join(ROOT, bgs_path(q)))]
+
+
+def bgs_fts_rows(q_s_log2=None):
     """The few-time configurations of the search (third_party/bgs_cc), as dicts
     with the BGS_FTS_FIELDS, 'bits', the search's cover bits, and 'trees': per
     scheme the (d, w) of the hypertrees the search kept for the configuration."""
-    path = os.path.join(ROOT, PARAMETERS['bgs_cc']['fts'])
+    path = os.path.join(ROOT, bgs_path(q_s_log2))
     rows = []
     with open(path, newline='') as fh:
         for r in csv.DictReader(fh):
@@ -500,9 +523,9 @@ def bgs_fts_rows():
     return rows
 
 
-def bgs_search():
+def bgs_search(q_s_log2=None):
     """What the search covered: the .json beside the configurations."""
-    with open(os.path.join(ROOT, os.path.splitext(PARAMETERS['bgs_cc']['fts'])[0] + '.json')) as fh:
+    with open(os.path.join(ROOT, bgs_path(q_s_log2, '.json'))) as fh:
         return json.load(fh)
 
 
@@ -524,13 +547,17 @@ def bgs_hypertrees(scheme, heights):
             for d in range(grid['d'][0], grid['d'][1] + 1) if h % d == 0]
 
 
-def bgs_site_data():
-    """The bgs_cc section of site/data.json: the few-time configurations with
-    their size and costs and, per scheme, the hypertrees of their heights and
-    the candidates. A candidate is a configuration under one of the hypertrees
-    the search kept for it: 'trees' holds, per configuration, their rows."""
+def bgs_site_data(q_s_log2=None):
+    """The bgs_cc section of site/data.json, or of the file of another budget:
+    the few-time configurations with their size and costs and, per scheme, the
+    hypertrees of their heights and the candidates. A candidate is a
+    configuration under one of the hypertrees the search kept for it: 'trees'
+    holds, per configuration, their rows."""
+    q = PARAMETERS['bgs_cc']['q_s_log2'] if q_s_log2 is None else q_s_log2
     max_size = PARAMETERS['stateless']['grid']['max_size']
-    configs = bgs_fts_rows()
+    configs = bgs_fts_rows(q)
+    search = bgs_search(q)
+    assert search['region']['q_s_log2'] == q, (q, search['region'])
     fts_rows = []
     for r in configs:
         m = bgs_fts_metrics(*[r[k] for k in BGS_FTS_FIELDS])
@@ -548,9 +575,9 @@ def bgs_site_data():
         hyper[scheme] = {'fields': ['h', 'd', 'w', 'swn', 'size', 'kg', 'sg', 'sv', 'sv_worst'],
                          'rows': rows, 'count': sum(len(ks) for ks in trees), 'trees': trees}
     return {
-        'source': PARAMETERS['bgs_cc']['fts'],
-        'q_s_log2': PARAMETERS['bgs_cc']['q_s_log2'],
-        'search': bgs_search(),
+        'source': bgs_path(q),
+        'q_s_log2': q,
+        'search': search,
         'schemes': list(BGS_SCHEMES),
         'fts': {'fields': list(BGS_FTS_FIELDS) + ['bits', 'size', 'sg', 'sv'], 'rows': fts_rows},
         'hypertrees': hyper,

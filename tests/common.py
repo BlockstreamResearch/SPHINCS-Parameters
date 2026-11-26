@@ -14,6 +14,7 @@ FIX = json.load(open(os.path.join(HERE, 'fixtures.json')))
 GENERATED_REQUIRED = bool(os.environ.get('GENERATED_REQUIRED'))
 CSVS = ('analysis/all_size_capped_candidates.csv', 'analysis/all_unbound_candidates.csv')
 DATA_JSON = 'site/data.json'
+BUDGET_JSON = 'site/data-q%d.json'   # the pools of a budget other than data.json's
 
 
 def missing(*relpaths):
@@ -55,3 +56,7 @@ def run_node(js):
 
 def site_data():
     return json.load(open(os.path.join(ROOT, 'site', 'data.json')))
+
+
+def budget_data(q):
+    return json.load(open(os.path.join(ROOT, BUDGET_JSON % q)))

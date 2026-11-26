@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Searches the BGS-CC parameter sets for the explorer and writes q40_fts.csv.
 
-    python3 third_party/bgs_cc/search_fts.py <bgs-cc checkout> [--jobs N]
+    python3 third_party/bgs_cc/search_fts.py <bgs-cc checkout> [--jobs N] [--budget Q]
 
 It needs numpy and a checkout of bgs-cc (https://github.com/nekomelisa/bgs-cc), whose
 bench/params.py and bench/search.py give the coverage bound, the code family and the solved
 threshold. The region is that of the bgs-cc search: codes c = (first, middle x (L - 1), last)
 with capacities 0 to 4 and L up to 8, then the neighbours of the codes that matter; K up to 8,
 r up to 64, u up to 12, b up to 16, h from 20 to 72; delta the largest threshold, of three set
-bits, that keeps the bound at 2^-128.002.
+bits, that keeps the bound at 2^-128.002. --budget Q searches for 2^Q signatures instead of
+the budget of parameters.json: the range of h moves by the difference, and the files are
+q<Q>_fts.csv, .json and _store.npz.
 
 What differs from bgs-cc's own frontier is what is kept:
 
@@ -28,11 +30,13 @@ scheme; q40_fts.json says what was searched. The sets of step 1 stay beside them
 q40_fts_store.npz (not in git), with the codes already done, so a run that stops can be
 started again, and step 2 can be repeated with --frontier-only. A run on a finished store
 goes one round of neighbours further. The tables of the codes are cached in
-<checkout>/bench/results/q40_cache.sqlite, as by bgs-cc. The first 14,000 codes took about
-five hours on a laptop.
+<checkout>/bench/results/q40_cache.sqlite, as by bgs-cc; they do not depend on the budget, so
+every budget reads the caches of all. The first 14,000 codes took about five hours on a
+laptop.
 """
 import argparse
 import csv
+import glob
 import json
 import math
 import multiprocessing
@@ -52,7 +56,8 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, 'tests'))
 import model as M  # noqa: E402
 
-Q_S_LOG2 = M.PARAMETERS['bgs_cc']['q_s_log2']
+Q_S_LOG2 = M.PARAMETERS['bgs_cc']['q_s_log2']    # --budget replaces it, in the workers too
+REGION_Q = 40   # the budget the heights of bgs-cc's region, 20 to 72, are laid out for
 LAMBDA = M.PARAMETERS['security_bits']
 MAX_SIZE = M.PARAMETERS['stateless']['grid']['max_size']
 GRAIN = 0.01    # step 1: signing and verification closer than this count as equal
@@ -62,8 +67,10 @@ MIN_HYPERTREE = lambda h: M.N * (1 + h + 2 * 16)   # noqa: E731
 P = SR = None   # bgs-cc's bench/params.py and bench/search.py
 
 
-def load_bgs_cc(path):
-    global P, SR
+def load_bgs_cc(path, q_s_log2=None):
+    global P, SR, Q_S_LOG2
+    if q_s_log2 is not None:
+        Q_S_LOG2 = q_s_log2
     bench = os.path.join(path, 'bench')
     if not os.path.exists(os.path.join(bench, 'search.py')):
         raise SystemExit(f'{path} is not a checkout of bgs-cc: bench/search.py is missing')
@@ -71,6 +78,13 @@ def load_bgs_cc(path):
     import params
     import search
     P, SR = params, search
+
+
+def heights_searched():
+    """The hypertree heights of the region: those of bgs-cc's search, moved along with the
+    budget and kept within the 72 that bgs-cc supports."""
+    shift = Q_S_LOG2 - REGION_Q
+    return np.arange(max(1, SR.X_LO + shift), min(72, 72 + shift) + 1)
 
 
 def buckets(x, grain=GRAIN):
@@ -114,7 +128,7 @@ def code_sets(task):
     rr, uu = np.arange(SR.R_MAX + 1)[:, None], np.arange(SR.U_MAX + 1)[None, :]
     G0 = (2.0**uu + (rr - 1) * t) * J + 2.0**uu  # one bucket of one coordinate, eq. (15), plus 1
     out_i, out_f, counts = [], [], [0, 0]
-    heights = np.arange(SR.X_LO, 73)
+    heights = heights_searched()
     cells = (SR.R_MAX - 1) * (SR.U_MAX + 1) * len(heights)       # (r, u, h) per K and b
 
     def emit(K, r, u, b, h, delta, tau, raw, ell_n, eta):
@@ -338,12 +352,15 @@ def main():
     ap.add_argument('--codes', type=int,
                     help='stop each round after this many codes, cheapest first (a trial run)')
     ap.add_argument('--frontier-only', action='store_true', help='repeat step 2 from the stored sets')
-    ap.add_argument('--store', default=os.path.join(HERE, f'q{Q_S_LOG2}_fts_store.npz'),
-                    help='the sets of step 1')
-    ap.add_argument('--out', default=os.path.join(HERE, f'q{Q_S_LOG2}_fts.csv'))
+    ap.add_argument('--budget', type=int, default=Q_S_LOG2,
+                    help='log2 of the signatures to search for (default: that of parameters.json)')
+    ap.add_argument('--store', help='the sets of step 1 (default: q<budget>_fts_store.npz here)')
+    ap.add_argument('--out', help='default: q<budget>_fts.csv here')
     args = ap.parse_args()
+    args.store = args.store or os.path.join(HERE, f'q{args.budget}_fts_store.npz')
+    args.out = args.out or os.path.join(HERE, f'q{args.budget}_fts.csv')
 
-    load_bgs_cc(args.bgs_cc)
+    load_bgs_cc(args.bgs_cc, args.budget)
     results = os.path.join(args.bgs_cc, 'bench', 'results')
     os.makedirs(results, exist_ok=True)
     region = {'sign_cap': args.sign_cap, 'kmax': args.kmax, 'max_size': MAX_SIZE,
@@ -363,9 +380,14 @@ def main():
     if args.frontier_only:
         rows, candidates = step2('stored sets')
     else:
-        db = sqlite3.connect(os.path.join(results, f'q{Q_S_LOG2}_cache.sqlite'))
+        own = os.path.join(results, f'q{Q_S_LOG2}_cache.sqlite')
+        cached = {}
+        for other in sorted(set(glob.glob(os.path.join(results, 'q*_cache.sqlite'))) - {own}):
+            with sqlite3.connect(other) as con:  # the tables of the other budgets
+                cached.update(con.execute('SELECT key, data FROM f'))
+        db = sqlite3.connect(own)
         db.execute('CREATE TABLE IF NOT EXISTS f (key TEXT PRIMARY KEY, data BLOB)')
-        cached = dict(db.execute('SELECT key, data FROM f'))
+        cached.update(db.execute('SELECT key, data FROM f'))
 
         def cache_key(c, E):
             return f"{','.join(map(str, c))}|{E}|{P.M_CUT}"
@@ -380,7 +402,8 @@ def main():
                         'rounds': store.family.get('rounds', 0)}
         todo = set(SR.family(store.family['lmax'], store.family['cmax']))
         # spawn on every system: the workers load bgs-cc themselves
-        with multiprocessing.get_context('spawn').Pool(args.jobs, load_bgs_cc, (args.bgs_cc,)) as pool:
+        with multiprocessing.get_context('spawn').Pool(args.jobs, load_bgs_cc,
+                                                       (args.bgs_cc, args.budget)) as pool:
             for rnd in range(args.refine + 1):
                 costs = {code: SR.usable(*code, args.max_code_seconds) for code in todo}
                 codes = sorted((code for code, cost in costs.items() if cost is not None),
@@ -427,7 +450,8 @@ def main():
         'too_slow': too_slow,                    # codes left out: the table takes too long
         'not_searched': not_searched,            # codes another run would search
         'region': dict(store.options, **store.family, r_max=SR.R_MAX, u_max=SR.U_MAX,
-                       b_max=SR.B_MAX, h=[SR.X_LO, 72], m_cut=P.M_CUT),
+                       b_max=SR.B_MAX, h=[int(heights_searched()[0]), int(heights_searched()[-1])],
+                       m_cut=P.M_CUT),
         'grain': [GRAIN, args.grain],
         'margin_bits': SR.MARGIN,
         'bgs_cc_commit': checkout_commit(args.bgs_cc),

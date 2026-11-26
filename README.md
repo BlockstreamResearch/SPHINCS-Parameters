@@ -13,7 +13,7 @@ Without Sage, with Python 3.12 and Node 22 as in CI:
 
     make check-local
 
-This writes the sweep CSVs and `site/data.json` from `tests/model.py`, a Python port of the model, and runs the tests.
+This writes the sweep CSVs, `site/data.json` and the `site/data-q*.json` of the other signature budgets from `tests/model.py`, a Python port of the model, and runs the tests.
 
 With SageMath 10.4, pandas and seaborn (`sage -pip install pandas seaborn`):
 
@@ -23,7 +23,7 @@ This runs the steps of CI's generate job, then the tests, in a few minutes:
 
 1. `make sweeps`: `scripts/slhdsa-2to40.sage` evaluates the grid of `parameters.json` with the model in `model/` and writes `analysis/all_size_capped_candidates.csv` and `analysis/all_unbound_candidates.csv`.
 2. `make derived`: `analysis/min_mult_search.py` and `analysis/extremes_summary.py` write the derived tables next to them.
-3. `make data`: `scripts/export_site_data.sage` writes `site/data.json` from the capped CSV, its own sweeps of the optional w and the variants, the BGS-CC candidates of `third_party/bgs_cc`, and `model/stateful.sage`.
+3. `make data`: `scripts/export_site_data.sage` writes `site/data.json` from the capped CSV, its own sweeps of the optional w and the variants, the BGS-CC candidates of `third_party/bgs_cc`, and `model/stateful.sage`. For each other signature budget of `parameters.json` it writes the pools into `site/data-q<budget>.json`, which the explorer loads when its budget slider moves there.
 4. `make figures`: the other `analysis/` scripts draw the report's figures into `document/content/images/`.
 5. `make test`: `tests/run.py`.
 
@@ -35,7 +35,7 @@ To open the pages, serve the repository (the pages fetch `site/data.json`), for 
 - `model/`: the model in Sage. `costs.sage` covers SLH-DSA and its variants, `bgs_cc.sage` BGS-CC under their hypertrees, `security.sage` FORS and PORS+FP, `stateful.sage` XMSS, XMSS-MT and UXMSS.
 - `scripts/`: the parameter sweep and the export of `site/data.json`.
 - `analysis/`: the derived tables and the report's figures.
-- `site/`: the three pages. `index.html` shows the pinned parameters. `stateless.html` explores the pools of SPX, W+C, FORS+C, PORS+FP and BGS-CC and compares a candidate of your own, of any of the first four. `stateful.html` compares XMSS, XMSS-MT and UXMSS with SLH-DSA-128s. `site/js/model.js` computes the same model in the browser, and `site/js/octopus_pmf.js` ports `third_party/octopus_pmf.py` for PORS+FP candidates.
+- `site/`: the three pages. `index.html` shows the pinned parameters. `stateless.html` explores the pools of SPX, W+C, FORS+C, PORS+FP and BGS-CC at a signature budget from 2^20 to 2^60, 2^40 by default, and compares a candidate of your own, of any of the first four. `stateful.html` compares XMSS, XMSS-MT and UXMSS with SLH-DSA-128s. `site/js/model.js` computes the same model in the browser, and `site/js/octopus_pmf.js` ports `third_party/octopus_pmf.py` for PORS+FP candidates.
 - `document/`: the report in LaTeX. CI builds it and publishes it with the site; a tag also attaches it, `site/data.json` and the sweep CSVs to a release.
 - `tests/`: `model.py`, the tests by area (`python3 tests/run.py [model] [generated] [site] [sage]`), the fixtures and the site snapshot.
 - `third_party/octopus_pmf.py`: the size distribution of the Octopus authentication set, for PORS+FP (MIT, from [PORS-FP](https://github.com/MehdiAbri/PORS-FP)).

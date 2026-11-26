@@ -1,6 +1,7 @@
-// The Stateless Path Explorer: filters the candidate pools of data.json by
-// bounds relative to SLH-DSA-128s, ranks what is left by distance, and compares
-// a candidate of your own, of any scheme but the BGS-CC ones.
+// The Stateless Path Explorer: filters the candidate pools of data.json, or of
+// the data-q*.json of another signature budget, by bounds relative to
+// SLH-DSA-128s, ranks what is left by distance, and compares a candidate of
+// your own, of any scheme but the BGS-CC ones.
 'use strict';
 
 // SLH-DSA-compatible Winternitz parameters: log2(w) divides 8, so message
@@ -142,7 +143,10 @@ const DEFAULTS_W = { size: 1.0, kg: 1.0, sg: 1.0, sv: 1.0, cb: 1.0 };
 const state = {
   initialPool: [],
   siteData: null,          // parsed data.json, null if it did not load
-  pools: {},               // scheme -> candidate pool
+  budget: Q_S_LOG2,        // log2 of the signature budget shown
+  budgetWanted: Q_S_LOG2,  // the budget the slider last asked for, while its file loads
+  budgetData: {},          // budget -> its data: data.json, or a data-q*.json once loaded
+  pools: {},               // scheme -> candidate pool of the budget shown
   scheme: 'SPX',
   customScheme: 'SPX',     // scheme of the custom candidate
   useWorst: false,         // bounds and ranking on worst-case SigVer and ρ
@@ -159,6 +163,70 @@ const state = {
   // ratio ranges over the survivors, for the distance
   lastRanges: Object.fromEntries(['size', 'kg', 'sg', 'sv', 'cb'].map(k => [k, { min: 0, max: 1 }])),
 };
+
+// The data of the budget shown: data.json for its own budget, else the
+// data-q*.json of that budget, with its pools and, where a search exists, its
+// BGS-CC candidates.
+function activeData() {
+  return state.budgetData[state.budget] || null;
+}
+
+// The budgets the slider offers.
+function budgetsOf(data) {
+  return data.meta.budgets || [data.meta.grid.q_s_log2];
+}
+
+// The pools of a budget's data.
+function buildPools(data) {
+  state.pools = {};
+  siteSchemes(data).forEach((s, si) => {
+    const pool = s in BGS_SCHEMES ? bgsPoolFromData(data, s) : poolFromData(data, s);
+    const rand = mulberry32(69421 + si);   // stable layout per scheme
+    for (const c of pool) { c._sx = rand(); c._sy = rand(); }
+    state.pools[s] = pool;
+  });
+}
+
+async function loadBudget(q) {
+  if (!(q in state.budgetData)) {
+    const data = await loadSiteData(`data-q${q}.json`);
+    if (!data) return false;
+    state.budgetData[q] = data;
+  }
+  return true;
+}
+
+function renderBudget() {
+  const slider = document.getElementById('budget-slider');
+  const stops = state.siteData ? budgetsOf(state.siteData) : [state.budget];
+  slider.max = stops.length - 1;
+  slider.value = stops.indexOf(state.budget);
+  slider.disabled = stops.length < 2;
+  document.getElementById('budget-val').innerHTML = `2<sup>${state.budget}</sup>`;
+}
+
+// Switches to another budget: its pools, the caps of the bound sliders and,
+// if the budget lacks the scheme shown, SPX.
+async function setBudget(q) {
+  state.budgetWanted = q;
+  const loaded = q === state.budget || await loadBudget(q);
+  if (state.budgetWanted !== q) return;      // the slider has moved on
+  if (loaded && q !== state.budget) {
+    state.budget = q;
+    buildPools(activeData());
+    selfCheckData(activeData(), state.pools['SPX']);
+    if (!state.pools[state.scheme]) state.scheme = 'SPX';
+    computeXMax();
+    clampXToMax();
+    rebuildInitialPool();
+    renderControls();
+    renderSchemeButtons();
+    renderInfoStrip();
+    renderCustom();
+    update();
+  }
+  renderBudget();                            // back to the budget shown if the file did not load
+}
 
 // Winternitz parameters in the pool: OPTIONAL_W exist in the SPX and BGS-CC
 // pools only.
@@ -550,9 +618,10 @@ function validateCustom(p, scheme) {
 
   if (errors.length) return { valid: false, errors, warnings };
 
-  const secBits = schemeForgeryExponent(scheme, p.h, p.k, p.a);
+  const secBits = schemeForgeryExponent(scheme, p.h, p.k, p.a, state.budget);
   if (secBits < 128) {
-    warnings.push(`Below 128-bit security: ${secBits.toFixed(1)} bits at q<sub>s</sub> = 2<sup>40</sup>.`);
+    warnings.push(`Below 128-bit security: ${secBits.toFixed(1)} bits at ` +
+      `q<sub>s</sub> = 2<sup>${state.budget}</sup>.`);
   }
 
   return { valid: true, errors: [], warnings };
@@ -702,13 +771,13 @@ function selfCheckBgs(g) {
   return bad;
 }
 
-// Checks data.json against the model on the baseline and a sample of rows; a
-// mismatch is a bug in one of the two.
+// Checks the data of a budget against the model on the baseline, which only
+// data.json has, and a sample of rows; a mismatch is a bug in one of the two.
 function selfCheckData(data, pool) {
   const KEYS = ['size', 'kg', 'sg', 'sv', 'sv_worst'];
   let bad = data.bgs_cc ? selfCheckBgs(data.bgs_cc) : 0;
   const b = data.baseline;
-  if (KEYS.some(k => STD_M[k] !== b[k])) {
+  if (b && KEYS.some(k => STD_M[k] !== b[k])) {
     bad++; console.error('data.json baseline disagrees with local formulas:', b, STD_M);
   }
   const step = Math.max(1, Math.floor(pool.length / 25));
@@ -733,16 +802,19 @@ const SCHEME_FROM_ID = Object.fromEntries(Object.entries(SCHEME_IDS).map(([k, v]
 // BGS-CC schemes come as a pool only.
 const CUSTOM_SCHEMES = ['SPX', 'W+C', 'W+C_F+C', 'W+C_P+FP'];
 
-// The schemes of data.json: its pools, then the BGS-CC schemes.
+// The schemes of a budget's data: its pools, then the BGS-CC schemes.
 function siteSchemes(data) {
   return [...data.meta.schemes, ...(data.bgs_cc ? data.bgs_cc.schemes : [])];
 }
 
+// A button per scheme of data.json; those the budget shown has no pool for
+// are off.
 function renderSchemeButtons() {
   const host = document.getElementById('scheme-controls');
   const schemes = state.siteData ? siteSchemes(state.siteData) : [];
   host.innerHTML = schemes.map(s =>
-    `<button class="${s === state.scheme ? 'active' : ''}" data-scheme="${s}">${SCHEME_LABELS[s]}</button>`).join('');
+    `<button class="${s === state.scheme ? 'active' : ''}" data-scheme="${s}"` +
+    `${state.pools[s] ? '' : ' disabled title="No candidates at this budget"'}>${SCHEME_LABELS[s]}</button>`).join('');
   host.querySelectorAll('button').forEach(b =>
     b.addEventListener('click', () => activateScheme(b.dataset.scheme)));
 }
@@ -761,7 +833,7 @@ function schnorrNote() {
 }
 
 function renderInfoStrip() {
-  const d = state.siteData;
+  const d = activeData();
   if (!d) {
     document.getElementById('initial-info').textContent = 'No candidate pool: data.json did not load.';
     document.getElementById('about-pool').innerHTML = schnorrNote();
@@ -789,7 +861,8 @@ function renderInfoStrip() {
   }
   document.getElementById('initial-info').innerHTML =
     `Scheme <strong>${SCHEME_LABELS[state.scheme]}</strong> · ` + numbers;
-  const generated = `<code>data.json</code>, generated ${d.meta.generated} from commit ${d.meta.commit}`;
+  const file = d === state.siteData ? 'data.json' : `data-q${state.budget}.json`;
+  const generated = `<code>${file}</code>, generated ${d.meta.generated} from commit ${d.meta.commit}`;
   const source = bgs
     ? `<p>Pool: the frontier of the ` +
       `<a href="https://github.com/BlockstreamResearch/SPHINCS-Parameters/tree/main/third_party/bgs_cc">BGS-CC search</a>: ` +
@@ -800,7 +873,7 @@ function renderInfoStrip() {
       `Security from the FORS and PORS+FP subset-forgery analysis in ` +
       `<a href="https://github.com/BlockstreamResearch/SPHINCS-Parameters/blob/main/model/security.sage">security.sage</a>.</p>`;
   document.getElementById('about-pool').innerHTML =
-    `<p>Initial bounds: at least 128-bit security at q<sub>s</sub> = 2<sup>40</sup>, ` +
+    `<p>Initial bounds: at least 128-bit security at q<sub>s</sub> = 2<sup>${state.budget}</sup>, ` +
     `size below ${fmtNum(STD_M.size)} B, ${wtxt}.</p>` + source + schnorrNote();
 }
 
@@ -820,6 +893,7 @@ const CUSTOM_DEFAULTS = '63,7,14,12,16';
 function writeHash() {
   const parts = [];
   if (state.scheme !== 'SPX') parts.push('s=' + SCHEME_IDS[state.scheme]);
+  if (state.siteData && state.budget !== state.siteData.meta.grid.q_s_log2) parts.push('q=' + state.budget);
   if (HASH_KEYS.some(k => state.X[k] !== DEFAULTS_X[k]))
     parts.push('x=' + HASH_KEYS.map(k => state.X[k]).join(','));
   if (HASH_KEYS.some(k => state.W[k] !== DEFAULTS_W[k]))
@@ -894,13 +968,13 @@ async function setup() {
   state.siteData = data;
   SCHNORR = schnorr;
   if (data) {
-    siteSchemes(data).forEach((s, si) => {
-      const pool = s in BGS_SCHEMES ? bgsPoolFromData(data, s) : poolFromData(data, s);
-      const rand = mulberry32(69421 + si);   // stable layout per scheme
-      for (const c of pool) { c._sx = rand(); c._sy = rand(); }
-      state.pools[s] = pool;
-    });
-    selfCheckData(data, state.pools['SPX']);
+    state.budget = data.meta.grid.q_s_log2;
+    state.budgetData[state.budget] = data;
+    // A share link can name another budget; its pools come first.
+    const q = parseInt(readHash().q, 10);
+    if (q !== state.budget && budgetsOf(data).includes(q) && await loadBudget(q)) state.budget = q;
+    buildPools(activeData());
+    selfCheckData(activeData(), state.pools['SPX']);
   }
   computeXMax();             // slider caps from the loaded pools
   applyHash();               // may switch scheme, X/W, worst mode, w extras, custom tuple
@@ -909,6 +983,7 @@ async function setup() {
   renderControls();
   document.getElementById('worst-toggle').checked = state.useWorst;
   document.getElementById('optw-toggle').checked = state.showOptW;
+  renderBudget();
   document.querySelectorAll('[data-std]').forEach(el => { el.innerHTML = fmtNum(STD_M[el.dataset.std]); });
   renderSchemeButtons();
   renderInfoStrip();
@@ -925,6 +1000,9 @@ async function setup() {
     rebuildInitialPool();
     renderInfoStrip();
     update();
+  });
+  document.getElementById('budget-slider').addEventListener('input', e => {
+    setBudget(budgetsOf(state.siteData)[+e.target.value]);
   });
   document.getElementById('reset-btn').addEventListener('click', () => {
     state.X = { ...DEFAULTS_X };

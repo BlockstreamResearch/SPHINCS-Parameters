@@ -5,10 +5,12 @@ analysis/all_size_capped_candidates.csv (make sweeps) with the optional w added,
 the W+C, W+C_F+C and W+C_P+FP pools from the sweep of costs.sage, the BGS-CC
 candidates of third_party/bgs_cc with the costs of bgs_cc.sage, and the XMSS-MT
 and UXMSS rows of stateful.sage. The pages check samples of it against their own
-model.
+model. Then writes site/data-q<budget>.json with the pools of each other budget
+of parameters.json, for the budget slider of the explorer.
 
-  sage scripts/export_site_data.sage                     (all schemes, a few minutes)
+  sage scripts/export_site_data.sage                     (all schemes, a quarter of an hour)
   sage scripts/export_site_data.sage --schemes SPX,W+C   (a subset; the pages adapt)
+  sage scripts/export_site_data.sage --budgets 30,45     (only these other budgets; '' for none)
 """
 import os
 import sys
@@ -27,11 +29,15 @@ load(os.path.join(ROOT, "model", "bgs_cc.sage"))
 POOL_SCHEMES = ['SPX', 'W+C', 'W+C_F+C', 'W+C_P+FP']
 ALL_SCHEMES = POOL_SCHEMES + list(BGS_SCHEMES)
 schemes = ALL_SCHEMES
+other_budgets = None
 _args = sys.argv[1:]
 i = 0
 while i < len(_args):
     if _args[i] == '--schemes' and i + 1 < len(_args):
         schemes = [s for s in _args[i + 1].split(',') if s]
+        i += 2
+    elif _args[i] == '--budgets' and i + 1 < len(_args):
+        other_budgets = [int(q) for q in _args[i + 1].split(',') if q]
         i += 2
     elif _args[i] == '--help':
         print(_DOC)
@@ -43,10 +49,24 @@ for s in schemes:
     assert s in ALL_SCHEMES, "unknown scheme: %s" % s
 
 GRID = PARAMETERS['stateless']['grid']
+BUDGETS = PARAMETERS['stateless']['budgets']
+if other_budgets is None:
+    other_budgets = [q for q in BUDGETS if q != GRID['q_s_log2']]
+for q in other_budgets:
+    assert q in BUDGETS and q != GRID['q_s_log2'], "not another budget of parameters.json: %s" % q
 W_OPTIONAL = PARAMETERS['stateless']['w_optional']   # SPX only
 WC_PAIRS = [(w, SWN[w]) for w in PARAMETERS['stateless']['wc_w']]
 POOL_FIELDS = ['h', 'd', 'k', 'a', 'w', 'swn', 'mmax',
                'size', 'kg', 'sg', 'sv', 'sv_worst']
+
+
+def grid_at(q_s_log2):
+    """The grid at a signature budget: its h range moves along with the budget."""
+    grid = dict(GRID)
+    shift = q_s_log2 - GRID['q_s_log2']
+    grid['h'] = [int(h + shift) for h in GRID['h']]
+    grid['q_s_log2'] = int(q_s_log2)
+    return grid
 
 
 H_VALUES = range(GRID['h'][0], GRID['h'][1] + 1)
@@ -73,17 +93,18 @@ with open(csv_path) as f:
 assert baseline is not None, "STANDARD row missing from %s" % csv_path
 
 # The optional w of SPX and the variant pools: the sweep of costs.sage
-def pool_rows(scheme, w_swn_pairs):
-    """Pool rows (POOL_FIELDS) of the grid below max_size, and the number of
+def pool_rows(scheme, w_swn_pairs, grid=GRID):
+    """Pool rows (POOL_FIELDS) of a grid below max_size, and the number of
     parameter sets considered."""
     rows, considered, at = [], 0, None
-    for (w, swn, h, d, k, a), r in sweep(scheme, w_swn_pairs, H_VALUES, D_VALUES,
-                                          K_VALUES, A_VALUES, GRID['q_s_log2']):
+    h_values = range(grid['h'][0], grid['h'][1] + 1)
+    for (w, swn, h, d, k, a), r in sweep(scheme, w_swn_pairs, h_values, D_VALUES,
+                                          K_VALUES, A_VALUES, grid['q_s_log2']):
         considered += 1
         if (w, h, d) != at:
             at = (w, h, d)
             print("  {}: w={}, h={}, d={}".format(scheme, w, h, d), file=sys.stderr, end='\r')
-        if r is None or r['size'] >= GRID['max_size']:
+        if r is None or r['size'] >= grid['max_size']:
             continue
         rows.append([int(r[f]) for f in ('h', 'd', 'k', 'a', 'w', 'swn', 'mmax', 'size',
                                          'keygen', 'sign', 'verify', 'verify_worst')])
@@ -116,11 +137,14 @@ for scheme in schemes:
 # heights and the candidates. A candidate is a configuration under one of the
 # hypertrees the search kept for it; the two add up. 'trees' holds, per
 # configuration, the rows of those hypertrees, and the page pairs them.
-bgs_cc = None
 bgs_selected = [s for s in BGS_SCHEMES if s in schemes]
-if bgs_selected:
-    assert PARAMETERS['bgs_cc']['q_s_log2'] == GRID['q_s_log2']
-    bgs_configs = bgs_fts_rows()
+
+
+def bgs_section(q_s_log2):
+    """The bgs_cc section of the data of a budget."""
+    bgs_configs = bgs_fts_rows(q_s_log2)
+    search = bgs_search(q_s_log2)
+    assert search['region']['q_s_log2'] == q_s_log2, search['region']
     fts_rows = []
     for row in bgs_configs:
         assert row['bits'] >= PARAMETERS['security_bits'], row
@@ -141,15 +165,21 @@ if bgs_selected:
         count = sum(len(ks) for ks in trees)
         bgs_hyper[scheme] = {'fields': ['h', 'd', 'w', 'swn', 'size', 'kg', 'sg', 'sv', 'sv_worst'],
                              'rows': rows, 'count': count, 'trees': trees}
-        print("{}: {} candidates".format(scheme, count), file=sys.stderr)
-    bgs_cc = {
-        'source': PARAMETERS['bgs_cc']['fts'],
-        'q_s_log2': PARAMETERS['bgs_cc']['q_s_log2'],
-        'search': bgs_search(),
+        print("{} at 2^{}: {} candidates".format(scheme, q_s_log2, count), file=sys.stderr)
+    return {
+        'source': bgs_path(q_s_log2),
+        'q_s_log2': int(q_s_log2),
+        'search': search,
         'schemes': bgs_selected,
         'fts': {'fields': BGS_FTS_FIELDS + ['bits', 'size', 'sg', 'sv'], 'rows': fts_rows},
         'hypertrees': bgs_hyper,
     }
+
+
+bgs_cc = None
+if bgs_selected:
+    assert PARAMETERS['bgs_cc']['q_s_log2'] == GRID['q_s_log2']
+    bgs_cc = bgs_section(GRID['q_s_log2'])
 
 # Stateful: XMSS-MT (XMSS is d = 1) and UXMSS, from stateful.sage
 STATEFUL = PARAMETERS['stateful']
@@ -208,6 +238,7 @@ data = {
         'generated': datetime.date.today().isoformat(),
         'commit': _commit(),
         'grid': GRID,
+        'budgets': BUDGETS,
         'w_optional': W_OPTIONAL,
         'wc_pairs': WC_PAIRS,
         'schemes': [s for s in POOL_SCHEMES if s in pools],
@@ -245,3 +276,34 @@ with open(out_path, 'w') as f:
 print("Wrote {} — schemes: {} — commit {}".format(
     out_path, ', '.join('%s:%d' % (s, pools[s]['count']) for s in pools),
     data['meta']['commit']))
+
+# The other budgets of the explorer's slider, each in a file of its own: the
+# same pools on the grid of that budget, and BGS-CC where a search exists.
+for q in other_budgets:
+    grid = grid_at(q)
+    q_pools = {}
+    if 'SPX' in schemes:
+        rows, considered = pool_rows('SPX', [(w, 0) for w in grid['w'] + W_OPTIONAL], grid)
+        # as above, 'considered' counts the grid's own w
+        q_pools['SPX'] = {'fields': POOL_FIELDS,
+                          'considered': considered * len(grid['w']) // (len(grid['w']) + len(W_OPTIONAL)),
+                          'count': len(rows), 'rows': rows}
+    for scheme in schemes:
+        if scheme == 'SPX' or scheme in BGS_SCHEMES:
+            continue
+        rows, considered = pool_rows(scheme, WC_PAIRS, grid)
+        q_pools[scheme] = {'fields': POOL_FIELDS, 'considered': considered,
+                           'count': len(rows), 'rows': rows}
+    other = {
+        'meta': {key: data['meta'][key] for key in ('version', 'generator', 'generated', 'commit',
+                                                     'w_optional', 'wc_pairs', 'schemes')},
+        'pools': q_pools,
+    }
+    other['meta']['grid'] = grid
+    if bgs_selected and q in bgs_budgets():
+        other['bgs_cc'] = bgs_section(q)
+    q_path = os.path.join(ROOT, 'site', 'data-q%d.json' % q)
+    with open(q_path, 'w') as f:
+        json.dump(other, f, separators=(',', ':'), default=int)
+    print("Wrote {} — {}".format(
+        q_path, ', '.join('%s:%d' % (s, q_pools[s]['count']) for s in q_pools)))

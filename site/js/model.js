@@ -610,13 +610,14 @@ function computeSecurityBits(q_s_log2, h, k, a, hashbytes = 16) {
   return Math.min(8 * hashbytes, forsForgeryExponent(q_s_log2, h, k, a));
 }
 
-// The stateless schemes are evaluated at 2^40 signatures.
+// The stateless schemes are evaluated at 2^40 signatures, unless the budget
+// slider of the explorer says otherwise.
 const Q_S_LOG2 = 40;
 
 // The forgery exponent of a stateless scheme: PORS+FP has its own, the others
 // that of FORS.
-function schemeForgeryExponent(scheme, h, k, a) {
-  return (scheme === 'W+C_P+FP' ? porsForgeryExponent : forsForgeryExponent)(Q_S_LOG2, h, k, a);
+function schemeForgeryExponent(scheme, h, k, a, q_s_log2 = Q_S_LOG2) {
+  return (scheme === 'W+C_P+FP' ? porsForgeryExponent : forsForgeryExponent)(q_s_log2, h, k, a);
 }
 
 // Distance, the report's metric-normalised weighted distance (docs/model.md,

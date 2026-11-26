@@ -43,6 +43,10 @@ with 91,468 candidates for BGS and 63,923 for W+C_BGS.
 The sets of step 1 stay in `q40_fts_store.npz` (not in git). `--frontier-only` repeats step 2
 from them, and a further run of the script searches one more round of codes.
 
+`--budget Q` searches for 2^Q signatures, a stop of the explorer's budget slider, and writes
+`q<Q>_fts.csv` and `.json`. The range of h moves with the budget, and the tables of the codes,
+which do not depend on it, are reused. The explorer shows BGS-CC at a budget once its file is here.
+
 ## What the numbers rest on
 
 - The region: K up to 8, r up to 64, u up to 12, b up to 16, h from 20 to 72. Sets outside it were

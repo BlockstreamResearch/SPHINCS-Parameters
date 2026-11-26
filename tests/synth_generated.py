@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Writes the generated files, the sweep CSVs and site/data.json, from
-tests/model.py instead of Sage, so the tests of those files run without Sage.
-The security bits come from the stateless page's JavaScript, those of BGS-CC
-from third_party/bgs_cc. The PORS+FP pool needs Sage and is left out.
+"""Writes the generated files, the sweep CSVs, site/data.json and the
+site/data-q*.json of the other budgets, from tests/model.py instead of Sage,
+so the tests of those files run without Sage. The security bits come from the
+stateless page's JavaScript, those of BGS-CC from third_party/bgs_cc. The
+PORS+FP pools need Sage and are left out.
 make check-local runs:
 
   python3 tests/synth_generated.py
@@ -25,6 +26,7 @@ import model as M  # noqa: E402
 
 P = M.PARAMETERS
 GRID = P['stateless']['grid']
+BUDGETS = P['stateless']['budgets']
 W_OPTIONAL = P['stateless']['w_optional']
 WC_PAIRS = [(w, M.SWN[w]) for w in P['stateless']['wc_w']]
 STATEFUL = P['stateful']
@@ -37,34 +39,95 @@ CSV_FIELDS = ['label', 'h', 'd', 'h_prime', 'k', 'a', 'w', 'l',
               'c_per_byte', 'c_per_byte_worst']
 
 
-def hd_pairs():
+def hd_pairs(grid):
     return [(h, d)
-            for h in range(GRID['h'][0], GRID['h'][1] + 1)
-            for d in range(GRID['d'][0], GRID['d'][1] + 1)
+            for h in range(grid['h'][0], grid['h'][1] + 1)
+            for d in range(grid['d'][0], grid['d'][1] + 1)
             if h % d == 0]
 
 
-def security_from_page():
-    """FORS security bits per (h, k, a), via the stateless page's JS."""
+def security_from_page(budgets):
+    """FORS security bits per budget and (h, k, a) of its grid, and those of
+    the baseline, via the stateless page's JS."""
     if not shutil.which('node'):
         sys.exit('node is required (the security analysis runs from the page JS)')
     html = open(os.path.join(ROOT, 'site', 'stateless.html'), encoding='utf-8').read()
     srcs = re.findall(r'<script src="([^"]+)"></script>', html)
     js = '\n'.join(open(os.path.join(ROOT, 'site', s), encoding='utf-8').read() for s in srcs) + """
 const out = { grid: {}, std: computeSecurityBits(%d, %d, %d, %d) };
-for (let h = %d; h <= %d; h++)
-  for (let k = %d; k <= %d; k++)
-    for (let a = %d; a <= %d; a++)
-      out.grid[[h, k, a].join(',')] = computeSecurityBits(%d, h, k, a);
+for (const [q, h0, h1] of %s)
+  for (let h = h0; h <= h1; h++)
+    for (let k = %d; k <= %d; k++)
+      for (let a = %d; a <= %d; a++)
+        out.grid[[q, h, k, a].join(',')] = computeSecurityBits(q, h, k, a);
 console.log(JSON.stringify(out));
 """ % (P['baseline']['q_s_log2'], P['baseline']['h'], P['baseline']['k'], P['baseline']['a'],
-       GRID['h'][0], GRID['h'][1], GRID['k'][0], GRID['k'][1],
-       GRID['a'][0], GRID['a'][1], GRID['q_s_log2'])
+       json.dumps([[q] + M.stateless_grid(q)['h'] for q in budgets]),
+       GRID['k'][0], GRID['k'][1], GRID['a'][0], GRID['a'][1])
     p = subprocess.run(['node', '-e', js], capture_output=True, text=True, timeout=600)
     assert p.returncode == 0, p.stderr[:2000]
     out = json.loads(p.stdout.strip().splitlines()[-1])
-    grid = {tuple(int(x) for x in key.split(',')): v for key, v in out['grid'].items()}
-    return grid, out['std']
+    sec = {q: {} for q in budgets}
+    for key, v in out['grid'].items():
+        q, h, k, a = (int(x) for x in key.split(','))
+        sec[q][h, k, a] = v
+    return sec, out['std']
+
+
+def stateless_pools(grid, sec):
+    """The SPX, W+C and FORS+C pools of a grid, as in data.json, given the
+    security bits per (h, k, a)."""
+    passing = {t for t, bits in sec.items() if bits >= P['security_bits']}
+    pairs = hd_pairs(grid)
+    ks = range(grid['k'][0], grid['k'][1] + 1)
+    as_ = range(grid['a'][0], grid['a'][1] + 1)
+
+    # SPX, with the optional w
+    spx_rows = []
+    for w in grid['w'] + W_OPTIONAL:
+        for (h, d) in pairs:
+            for k in ks:
+                for a in as_:
+                    if (h, k, a) in passing:
+                        m = M.spx_metrics(h, d, k, a, w)
+                        if m['size'] < grid['max_size']:
+                            spx_rows.append([h, d, k, a, w, 0, 0, m['size'], m['kg'], m['sg'],
+                                             m['sv'], m['sv_worst']])
+    pools = {'SPX': {'fields': POOL_FIELDS,
+                     'considered': len(pairs) * len(grid['w']) * len(ks) * len(as_),
+                     'count': len(spx_rows), 'rows': spx_rows}}
+
+    # The FORS-based variant pools
+    for scheme in ('W+C', 'W+C_F+C'):
+        rows, considered = [], 0
+        for w, swn in WC_PAIRS:
+            for (h, d) in pairs:
+                for k in ks:
+                    for a in as_:
+                        considered += 1
+                        if (h, k, a) not in passing:
+                            continue
+                        m = M.scheme_metrics(scheme, h, d, k, a, w, swn)
+                        if m['size'] >= grid['max_size']:
+                            continue
+                        rows.append([h, d, k, a, w, swn, m['mmax'], m['size'],
+                                     m['kg'], m['sg'], m['sv'], m['sv_worst']])
+        pools[scheme] = {'fields': POOL_FIELDS, 'considered': considered,
+                         'count': len(rows), 'rows': rows}
+    return pools
+
+
+def meta_of(grid, pools):
+    return {
+        'version': 3,
+        'generator': 'tests/synth_generated.py (tests/model.py, not Sage)',
+        'generated': datetime.date.today().isoformat(),
+        'commit': 'local-synth',
+        'grid': grid,
+        'w_optional': W_OPTIONAL,
+        'wc_pairs': [list(p) for p in WC_PAIRS],
+        'schemes': list(pools.keys()),
+    }
 
 
 def spx_csv_row(label, h, d, k, a, w, security):
@@ -80,9 +143,10 @@ def spx_csv_row(label, h, d, k, a, w, security):
 
 
 def main():
-    sec, std_sec = security_from_page()
+    all_sec, std_sec = security_from_page(sorted(set(BUDGETS) | {GRID['q_s_log2']}))
+    sec = all_sec[GRID['q_s_log2']]
     passing = {t for t, bits in sec.items() if bits >= P['security_bits']}
-    pairs = hd_pairs()
+    pairs = hd_pairs(GRID)
 
     # The sweep CSVs: the grid's w only, as slhdsa-2to40.sage
     std = spx_csv_row('STANDARD', *BASELINE, std_sec)
@@ -107,43 +171,11 @@ def main():
             wtr.writerows(rows)
         print('%s: %d rows' % (name, len(rows)))
 
-    # data.json: the SPX pool, with the optional w
-    def spx_pool_row(h, d, k, a, w):
-        m = M.spx_metrics(h, d, k, a, w)
-        return [h, d, k, a, w, 0, 0, m['size'], m['kg'], m['sg'], m['sv'], m['sv_worst']]
-
-    spx_rows = []
-    for w in GRID['w'] + W_OPTIONAL:
-        for (h, d) in pairs:
-            for k in range(GRID['k'][0], GRID['k'][1] + 1):
-                for a in range(GRID['a'][0], GRID['a'][1] + 1):
-                    if (h, k, a) in passing and \
-                            M.spx_metrics(h, d, k, a, w)['size'] < GRID['max_size']:
-                        spx_rows.append(spx_pool_row(h, d, k, a, w))
-    spx_considered = (len(pairs) * len(GRID['w'])
-                      * (GRID['k'][1] - GRID['k'][0] + 1)
-                      * (GRID['a'][1] - GRID['a'][0] + 1))
-    pools = {'SPX': {'fields': POOL_FIELDS, 'considered': spx_considered,
-                     'count': len(spx_rows), 'rows': spx_rows}}
-
-    # The FORS-based variant pools
+    # data.json: the pools of the grid's own budget
+    pools = stateless_pools(GRID, sec)
+    spx_rows = pools['SPX']['rows']
     for scheme in ('W+C', 'W+C_F+C'):
-        rows, considered = [], 0
-        for w, swn in WC_PAIRS:
-            for (h, d) in pairs:
-                for k in range(GRID['k'][0], GRID['k'][1] + 1):
-                    for a in range(GRID['a'][0], GRID['a'][1] + 1):
-                        considered += 1
-                        if (h, k, a) not in passing:
-                            continue
-                        m = M.scheme_metrics(scheme, h, d, k, a, w, swn)
-                        if m['size'] >= GRID['max_size']:
-                            continue
-                        rows.append([h, d, k, a, w, swn, m['mmax'], m['size'],
-                                     m['kg'], m['sg'], m['sv'], m['sv_worst']])
-        pools[scheme] = {'fields': POOL_FIELDS, 'considered': considered,
-                         'count': len(rows), 'rows': rows}
-        print('%s: %d rows' % (scheme, len(rows)))
+        print('%s: %d rows' % (scheme, pools[scheme]['count']))
 
     # Stateful
     b = M.spx_metrics(*BASELINE)
@@ -167,19 +199,9 @@ def main():
                                u['sv_max'], u['sv_max_worst']])
 
     data = {
-        'meta': {
-            'version': 3,
-            'generator': 'tests/synth_generated.py (tests/model.py, not Sage)',
-            'generated': datetime.date.today().isoformat(),
-            'commit': 'local-synth',
-            'grid': GRID,
-            'w_optional': W_OPTIONAL,
-            'wc_pairs': [list(p) for p in WC_PAIRS],
-            'schemes': list(pools.keys()),
-            'uxmss_ref_size': STATEFUL['uxmss_ref_size'],
-            'hsf_max': M.HSF_MAX,
-            'cost_convention': 'cached',
-        },
+        'meta': dict(meta_of(GRID, pools), budgets=BUDGETS,
+                     uxmss_ref_size=STATEFUL['uxmss_ref_size'], hsf_max=M.HSF_MAX,
+                     cost_convention='cached'),
         'baseline': baseline,
         'pools': pools,
         'bgs_cc': M.bgs_site_data(),
@@ -202,6 +224,20 @@ def main():
     print('site/data.json: SPX %d rows, stateful %d + %d rows, BGS-CC %s' %
           (len(spx_rows), len(xmssmt_rows), len(uxmss_rows),
            ', '.join('%s %d' % (s, t['count']) for s, t in data['bgs_cc']['hypertrees'].items())))
+
+    # The other budgets of the page, each in a file of its own
+    for q in BUDGETS:
+        if q == GRID['q_s_log2']:
+            continue
+        grid = M.stateless_grid(q)
+        pools = stateless_pools(grid, all_sec[q])
+        other = {'meta': meta_of(grid, pools), 'pools': pools}
+        if q in M.bgs_budgets():
+            other['bgs_cc'] = M.bgs_site_data(q)
+        json.dump(other, open(os.path.join(ROOT, 'site', 'data-q%d.json' % q), 'w'),
+                  separators=(',', ':'))
+        print('site/data-q%d.json: %s' % (q, ', '.join('%s %d' % (s, t['count'])
+                                                       for s, t in pools.items())))
 
 
 if __name__ == '__main__':

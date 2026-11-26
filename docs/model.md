@@ -160,7 +160,9 @@ counts differ from these in the hypertree part.
 
 ## FORS security
 
-The stateless schemes are evaluated at q_s = 2^40 signatures. Each signature uses one of 2^h FORS
+The stateless schemes are evaluated at q_s = 2^40 signatures. The explorer also offers the other
+budgets of `parameters.json`, 2^20 to 2^60: at 2^q the grid's range of h, 40 to 50 at 2^40, becomes
+q to q + 10, and the rest of the grid stays. Each signature uses one of 2^h FORS
 instances, so the number r of signatures that land on a given instance follows Binomial(q_s, 2^−h).
 After r signatures each of the k trees of t = 2^a leaves has revealed up to r leaves, and a forger
 needs the leaf it must open revealed in every tree:
@@ -188,7 +190,8 @@ weights it by s. For the parameter grid λ ≤ 1, and every term from r = 1 is s
 ## BGS-CC security
 
 `third_party/bgs_cc` holds the parameter sets (h, K, L, r, b, u, c, E, Δ) of the candidates at
-q_s = 2^40. Their security is the coverage bound of the paper, eq. (28) with
+q_s = 2^40. A set is searched for one budget, so every other budget needs a search of its own and
+has no BGS-CC candidates without one. Their security is the coverage bound of the paper, eq. (28) with
 the tail of eq. (31): the probability that one encoding attempt is accepted and that earlier
 signatures already disclosed every value it must open. The search sets Δ, with at most three set
 bits, so that the bound is at most 2^−128.002, and evaluates it in floats. `tests/model.py`

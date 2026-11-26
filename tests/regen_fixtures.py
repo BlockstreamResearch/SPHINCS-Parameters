@@ -94,6 +94,17 @@ def pipeline_counts(fx):
                                   for x in data['meta']['w_optional']}
     for scheme, table in data.get('bgs_cc', {}).get('hypertrees', {}).items():
         fx['bgs_pool_counts'][scheme] = table['count']
+    counts = fx.setdefault('budget_pool_counts', {})
+    for gone in [q for q in counts if int(q) not in data['meta']['budgets']]:
+        del counts[gone]
+    for q in data['meta']['budgets']:
+        path = os.path.join(ROOT, 'site', 'data-q%d.json' % q)
+        if q == data['meta']['grid']['q_s_log2'] or not os.path.exists(path):
+            continue
+        with open(path) as fh:
+            pools = json.load(fh)['pools']
+        for scheme, pool in pools.items():   # tests/synth_generated.py does not export W+C_P+FP
+            counts.setdefault(str(q), {})[scheme] = pool['count']
     return True
 
 

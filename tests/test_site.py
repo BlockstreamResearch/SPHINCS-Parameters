@@ -6,7 +6,7 @@ import os
 import re
 
 import model as M
-from common import FIX, ROOT, DATA_JSON, missing, tuple_of, page_js, run_node
+from common import FIX, ROOT, DATA_JSON, BUDGET_JSON, missing, tuple_of, page_js, run_node, site_data
 
 
 def test_site_explorer():
@@ -133,7 +133,7 @@ def test_site_bgs():
     js = page_js('stateless.html')
     heights = {r['h'] for r in M.bgs_fts_rows()}
     hts = {s: M.bgs_hypertrees(s, heights) for s in M.BGS_SCHEMES}
-    fts_path = os.path.join(ROOT, M.PARAMETERS['bgs_cc']['fts'])
+    fts_path = os.path.join(ROOT, M.bgs_path())
     data_path = None if missing(DATA_JSON) else os.path.join(ROOT, DATA_JSON)
     js += f"""
 const fs = require('fs');
@@ -305,6 +305,64 @@ console.log(JSON.stringify(out));
     for key, f in FIX['stateful']['xmssmt'].items():
         want = [f['size'], f['kg'], f['sg'], f['sv'], f['sv_worst']]
         assert out['xmssmt'][key] == want, (key, out['xmssmt'][key], want)
+
+
+def test_site_budgets():
+    """The budget slider of stateless.html: its stops, the pools the page
+    builds from the file of each budget, and that every candidate of a pool
+    reaches the security target at that budget by the page's own analysis."""
+    if missing(DATA_JSON):
+        return
+    d = site_data()
+    default = d['meta']['grid']['q_s_log2']
+    files = {q: os.path.join(ROOT, BUDGET_JSON % q) for q in d['meta']['budgets'] if q != default}
+    if missing(*[BUDGET_JSON % q for q in files]):
+        return
+    js = page_js('stateless.html') + f"""
+const fs = require('fs');
+const data = JSON.parse(fs.readFileSync({json.dumps(os.path.join(ROOT, DATA_JSON))}, 'utf8'));
+const files = {json.dumps(files)};
+const out = {{ stops: budgetsOf(data), budgets: {{}} }};
+state.siteData = data;
+state.budgetData[data.meta.grid.q_s_log2] = data;
+for (const q of out.stops) {{
+  if (q in files) state.budgetData[q] = JSON.parse(fs.readFileSync(files[q], 'utf8'));
+  state.budget = q;
+  buildPools(activeData());
+  const res = {{ counts: {{}}, weakest: {{}}, h: [Infinity, 0] }};
+  for (const s of Object.keys(state.pools)) {{
+    res.counts[s] = state.pools[s].length;
+    if (s in BGS_SCHEMES) continue;
+    const seen = new Set();
+    res.weakest[s] = Infinity;
+    for (const c of state.pools[s]) {{
+      res.h = [Math.min(res.h[0], c.h), Math.max(res.h[1], c.h)];
+      const key = [c.h, c.k, c.a].join();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      res.weakest[s] = Math.min(res.weakest[s], schemeForgeryExponent(s, c.h, c.k, c.a, q));
+    }}
+  }}
+  res.ok = selfCheckData(activeData(), state.pools['SPX']);
+  out.budgets[q] = res;
+}}
+console.log(JSON.stringify(out));
+"""
+    out = run_node(js)
+    if out is None:
+        return
+    assert out['stops'] == M.PARAMETERS['stateless']['budgets'], out['stops']
+    target = M.PARAMETERS['security_bits']
+    for q in out['stops']:
+        res, grid = out['budgets'][str(q)], M.stateless_grid(q)
+        assert res['ok'], q
+        assert grid['h'][0] <= res['h'][0] <= res['h'][1] <= grid['h'][1], (q, res['h'])
+        want = dict(FIX['variant_pool_counts'], SPX=FIX['site_pool_count'], **FIX['bgs_pool_counts']) \
+            if q == default else FIX['budget_pool_counts'][str(q)]
+        for scheme, count in res['counts'].items():
+            assert count == want[scheme], (q, scheme, count)
+        for scheme, bits in res['weakest'].items():
+            assert bits >= target, (q, scheme, bits)
 
 
 def test_site_data_integration():
