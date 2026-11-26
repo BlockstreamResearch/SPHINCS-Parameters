@@ -199,8 +199,9 @@ the scheme, with size below 7,856 B. The w are 2, 4, 16 and 256 for BGS, 16 and 
 and for both 32, 64 and 128, which the page shows on request. The sets are too many for a grid, so
 the pool is a frontier: `third_party/bgs_cc/search_fts.py` keeps, for each scheme and each w, the
 candidates that no other beats in size, KeyGen, SigGen and ρ, with the average or the worst-case
-verification. SigGen and ρ count as equal within 1%. `third_party/bgs_cc/README.md` says which
-sets the search compared.
+verification. SigGen and ρ count as equal within 1%. The chain capacities c come from a local
+search that has not converged, so a longer search can still find slightly better candidates;
+`third_party/bgs_cc/README.md` says what was searched.
 
 ## Stateful schemes
 
